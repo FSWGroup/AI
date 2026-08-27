@@ -1,0 +1,30 @@
+# dependencies
+node_modules/
+
+# next.js
+.next/
+out/
+
+# production
+build/
+
+# env — never commit real secrets
+.env
+.env.local
+.env.production
+
+# local object storage for dev recordings (never commit candidate video)
+.storage/
+
+# testing
+coverage/
+playwright-report/
+test-results/
+e2e/.auth/
+
+# misc
+*.pem
+.DS_Store
+npm-debug.log*
+*.tsbuildinfo
+next-env.d.ts

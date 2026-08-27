@@ -1,0 +1,49 @@
+@import "tailwindcss";
+
+@theme {
+  /* FSW WorkFit visual language: white, dark navy, restrained blue accents. */
+  --color-navy-50: #f4f7fa;
+  --color-navy-100: #e6ecf3;
+  --color-navy-200: #c6d3e2;
+  --color-navy-300: #9db1c9;
+  --color-navy-400: #6c88a8;
+  --color-navy-500: #4a6788;
+  --color-navy-600: #38506d;
+  --color-navy-700: #2c3f57;
+  --color-navy-800: #1e2d40;
+  --color-navy-900: #132030;
+  --color-navy-950: #0b1520;
+
+  --color-fsw-50: #eef4fe;
+  --color-fsw-100: #dce8fc;
+  --color-fsw-200: #b8d0f9;
+  --color-fsw-300: #86aef4;
+  --color-fsw-400: #5286ec;
+  --color-fsw-500: #2d63dd;
+  --color-fsw-600: #1d4bbc;
+  --color-fsw-700: #1a3d98;
+  --color-fsw-800: #1b357a;
+  --color-fsw-900: #1b2f63;
+
+  --font-sans: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto,
+    "Helvetica Neue", Arial, sans-serif;
+}
+
+body {
+  @apply bg-navy-50 text-navy-900 antialiased;
+}
+
+/* Focus visibility for keyboard users (WCAG 2.2). */
+:focus-visible {
+  outline: 2px solid var(--color-fsw-500);
+  outline-offset: 2px;
+}
+
+@media print {
+  body {
+    background: white;
+  }
+  .no-print {
+    display: none !important;
+  }
+}

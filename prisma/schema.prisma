@@ -1,0 +1,879 @@
+// FSW WorkFit Assessment — database schema.
+//
+// Design principles:
+//  - Immutable history: candidates' attempts reference frozen QuestionVersion
+//    rows and a frozen AssessmentVersion, so later edits never change what a
+//    historical attempt saw or how it renders.
+//  - Raw data is never destroyed by scoring: raw responses, raw scores, and
+//    scaled/banded scores are stored side by side with the norm table and
+//    scoring version that produced them.
+//  - Webcam video lives in object storage, never in this database; only chunk
+//    manifests and access audit trails live here.
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ---------------------------------------------------------------------------
+// Identity, access control, audit
+// ---------------------------------------------------------------------------
+
+enum UserRole {
+  SUPER_ADMIN
+  HR_ADMIN
+  HIRING_MANAGER
+  ASSESSMENT_ADMIN
+  VIEWER
+}
+
+model User {
+  id           String   @id @default(cuid())
+  email        String   @unique
+  name         String
+  passwordHash String
+  role         UserRole
+  active       Boolean  @default(true)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  sessions            Session[]
+  auditEvents         AuditEvent[]
+  invitationsSent     Invitation[]             @relation("InvitedBy")
+  jobAssignments      JobProfileAssignment[]
+  questionsCreated    Question[]               @relation("QuestionCreatedBy")
+  questionsReviewed   QuestionVersion[]        @relation("QuestionReviewedBy")
+  accommodationsGiven AccommodationOverride[]  @relation("AccommodationApprovedBy")
+  notes               CandidateNote[]
+}
+
+model Session {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  tokenHash String   @unique
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+  ip        String?
+  userAgent String?
+
+  @@index([userId])
+  @@index([expiresAt])
+}
+
+/// Restricts a HIRING_MANAGER (or scoped VIEWER) to specific job profiles.
+model JobProfileAssignment {
+  id           String     @id @default(cuid())
+  userId       String
+  user         User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  jobProfileId String
+  jobProfile   JobProfile @relation(fields: [jobProfileId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, jobProfileId])
+}
+
+model AuditEvent {
+  id            String   @id @default(cuid())
+  userId        String?
+  user          User?    @relation(fields: [userId], references: [id], onDelete: SetNull)
+  /// Who acted when it was not a signed-in admin (e.g. "system:retention").
+  actorLabel    String?
+  action        String
+  entityType    String
+  entityId      String?
+  previousValue Json?
+  newValue      Json?
+  ip            String?
+  createdAt     DateTime @default(now())
+
+  @@index([entityType, entityId])
+  @@index([userId])
+  @@index([createdAt])
+  @@index([action])
+}
+
+// ---------------------------------------------------------------------------
+// Organization configuration
+// ---------------------------------------------------------------------------
+
+/// Single-row organization settings (id is always "org").
+model OrgSettings {
+  id                        String   @id @default("org")
+  companyName               String   @default("FSW Group")
+  logoUrl                   String?
+  privacyContactEmail       String?
+  accommodationContactEmail String?
+  hrNotificationEmail       String?
+  assessmentDisclaimer      String?
+  permittedAdminDomains     String[] @default([])
+  /// Current-awareness (dated) questions allowed on new forms.
+  currentAwarenessEnabled   Boolean  @default(false)
+  /// EEO/adverse-impact module is disabled unless explicitly configured.
+  eeoModuleEnabled          Boolean  @default(false)
+  privacyNoticeVersion      String   @default("1.0")
+  privacyNoticeConfigured   Boolean  @default(false)
+  /// Roles allowed to view webcam recordings. Least privilege by default.
+  recordingAccessRoles      String[] @default(["SUPER_ADMIN", "HR_ADMIN"])
+  storageConfigured         Boolean  @default(false)
+  httpsConfirmed            Boolean  @default(false)
+  updatedAt                 DateTime @updatedAt
+}
+
+enum RetentionRecordType {
+  ASSESSMENT_ANSWERS
+  SCORE_REPORT_DATA
+  INVITATION_RECORDS
+  INTEGRITY_EVENT_LOGS
+  WEBCAM_RECORDINGS
+  AUDIT_RECORDS
+}
+
+model RetentionPolicy {
+  id            String              @id @default(cuid())
+  recordType    RetentionRecordType @unique
+  retentionDays Int?
+  /// Null retentionDays = keep indefinitely until policy is set.
+  updatedById   String?
+  updatedAt     DateTime            @updatedAt
+  createdAt     DateTime            @default(now())
+}
+
+model LegalHold {
+  id          String    @id @default(cuid())
+  /// "GLOBAL", or "CANDIDATE:<id>", or "ATTEMPT:<id>".
+  scope       String
+  reason      String
+  active      Boolean   @default(true)
+  createdById String?
+  createdAt   DateTime  @default(now())
+  releasedAt  DateTime?
+
+  @@index([active])
+}
+
+model RetentionRun {
+  id          String   @id @default(cuid())
+  startedAt   DateTime @default(now())
+  finishedAt  DateTime?
+  summary     Json?
+}
+
+// ---------------------------------------------------------------------------
+// Assessment constructs, questions, versions
+// ---------------------------------------------------------------------------
+
+enum Construct {
+  MENTAL_ACUITY
+  BUSINESS_TERMS
+  AWARENESS_MEMORY
+  VOCABULARY
+  NUMERICAL_PERCEPTION
+  MECHANICAL_INTEREST
+  ENERGY
+  FLEXIBILITY
+  ORGANIZATION
+  COMMUNICATION
+  EMOTIONAL_DEVELOPMENT
+  ASSERTIVENESS
+  COMPETITIVENESS
+  MENTAL_TOUGHNESS
+  QUESTIONING_PROBING
+  MOTIVATION
+  DISTORTION
+  EQUIVOCATION
+}
+
+enum QuestionStatus {
+  DRAFT
+  REVIEW
+  APPROVED
+  RETIRED
+}
+
+enum QuestionKind {
+  MULTIPLE_CHOICE
+  LIKERT_STATEMENT
+  MEMORY_STUDY
+  STRING_COMPARISON
+}
+
+/// Head record for a question. Candidate-facing payloads never include the
+/// internal id, construct, or scoring fields — only QuestionVersion.publicId.
+model Question {
+  id          String         @id @default(cuid())
+  construct   Construct
+  subtype     String
+  kind        QuestionKind
+  status      QuestionStatus @default(DRAFT)
+  /// Latest version number; versions are immutable snapshots.
+  currentVersion Int         @default(1)
+  source      String         @default("fsw_original")
+  createdById String?
+  createdBy   User?          @relation("QuestionCreatedBy", fields: [createdById], references: [id], onDelete: SetNull)
+  createdAt   DateTime       @default(now())
+  updatedAt   DateTime       @updatedAt
+  /// For dated current-awareness items: date after which the item is stale.
+  currentAwarenessExpiry DateTime?
+
+  versions QuestionVersion[]
+
+  @@index([construct, status])
+  @@index([status])
+}
+
+/// Immutable snapshot of a question's content and scoring at a version.
+model QuestionVersion {
+  id       String @id @default(cuid())
+  /// Opaque identifier safe to expose to candidates. Reveals nothing.
+  publicId String @unique @default(cuid())
+
+  questionId String
+  question   Question @relation(fields: [questionId], references: [id], onDelete: Cascade)
+  version    Int
+
+  construct Construct
+  subtype   String
+  kind      QuestionKind
+  prompt    String
+  /// Stimulus text for MEMORY_STUDY cards; study seconds etc.
+  promptData Json?
+  /// Array of choice strings for MULTIPLE_CHOICE / STRING_COMPARISON.
+  choices   Json?
+  /// Never sent to clients. Index into choices.
+  correctIndex Int?
+  /// Admin-only rationale. Never sent to candidates.
+  explanation String?
+  difficulty  Int      @default(2)
+  weight      Float    @default(1)
+  reverseCoded Boolean @default(false)
+  /// Consistency-pair key for equivocation checks.
+  pairKey     String?
+  /// True for impression-management (DISTORTION) items.
+  impressionManagement Boolean @default(false)
+
+  reviewedById String?
+  reviewedBy   User?     @relation("QuestionReviewedBy", fields: [reviewedById], references: [id], onDelete: SetNull)
+  approvedAt   DateTime?
+  createdAt    DateTime  @default(now())
+
+  formQuestions    AssessmentFormQuestion[]
+  attemptQuestions AttemptQuestion[]
+  itemStats        ItemStatistic[]
+
+  @@unique([questionId, version])
+  @@index([construct])
+}
+
+enum AssessmentVersionStatus {
+  DRAFT
+  ACTIVE
+  RETIRED
+}
+
+/// A frozen, versioned assessment form: sections, timers, question pool,
+/// scoring + narrative versions. Every attempt records exactly one of these.
+model AssessmentVersion {
+  id            String                  @id @default(cuid())
+  name          String
+  versionNumber Int
+  status        AssessmentVersionStatus @default(DRAFT)
+  description   String?
+  scoringVersion   String @default("1.0")
+  narrativeVersion String @default("1.0")
+  createdAt     DateTime @default(now())
+  activatedAt   DateTime?
+  retiredAt     DateTime?
+
+  sections      SectionDefinition[]
+  formQuestions AssessmentFormQuestion[]
+  invitations   Invitation[]
+  attempts      Attempt[]
+  normTables    NormTable[]
+
+  @@unique([name, versionNumber])
+}
+
+model SectionDefinition {
+  id                  String            @id @default(cuid())
+  assessmentVersionId String
+  assessmentVersion   AssessmentVersion @relation(fields: [assessmentVersionId], references: [id], onDelete: Cascade)
+  /// Section key, e.g. "BEHAVIORAL", "MENTAL_ACUITY".
+  key          String
+  title        String
+  orderIndex   Int
+  timed        Boolean @default(false)
+  durationSeconds Int?
+  /// How many questions to serve from the pool for this section.
+  questionCount Int
+  instructions String
+  /// If true, item order is randomized within difficulty buckets per attempt.
+  randomize    Boolean @default(true)
+
+  @@unique([assessmentVersionId, key])
+  @@index([assessmentVersionId, orderIndex])
+}
+
+/// The question pool of a form version (references immutable versions).
+model AssessmentFormQuestion {
+  id                  String            @id @default(cuid())
+  assessmentVersionId String
+  assessmentVersion   AssessmentVersion @relation(fields: [assessmentVersionId], references: [id], onDelete: Cascade)
+  sectionKey          String
+  questionVersionId   String
+  questionVersion     QuestionVersion   @relation(fields: [questionVersionId], references: [id])
+  /// Equivalent-difficulty bucket used for constrained randomization.
+  difficultyBucket    Int               @default(2)
+  /// Fixed ordering anchor within the section (study cards first, etc.).
+  orderHint           Int               @default(0)
+
+  @@unique([assessmentVersionId, sectionKey, questionVersionId])
+  @@index([assessmentVersionId, sectionKey])
+}
+
+// ---------------------------------------------------------------------------
+// Jobs and benchmarks
+// ---------------------------------------------------------------------------
+
+model JobProfile {
+  id          String  @id @default(cuid())
+  name        String
+  description String?
+  isSalesRole Boolean @default(false)
+  leadershipModuleEnabled Boolean @default(false)
+  active      Boolean @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  benchmarks  JobDimensionBenchmark[]
+  openings    JobOpening[]
+  assignments JobProfileAssignment[]
+  concernRules AreaOfConcernRule[]
+}
+
+model JobDimensionBenchmark {
+  id           String     @id @default(cuid())
+  jobProfileId String
+  jobProfile   JobProfile @relation(fields: [jobProfileId], references: [id], onDelete: Cascade)
+  construct    Construct
+  minScore     Int
+  maxScore     Int
+  required     Boolean    @default(true)
+  enabled      Boolean    @default(true)
+  weight       Float      @default(1)
+  note         String?
+
+  @@unique([jobProfileId, construct])
+}
+
+/// Configurable critical-attention rules ("Additional Interview Attention
+/// Recommended" — never automatic failure).
+model AreaOfConcernRule {
+  id           String     @id @default(cuid())
+  jobProfileId String
+  jobProfile   JobProfile @relation(fields: [jobProfileId], references: [id], onDelete: Cascade)
+  construct    Construct
+  /// Scores at or below this band trigger the attention flag.
+  maxBand      Int
+  label        String     @default("Additional Interview Attention Recommended")
+  enabled      Boolean    @default(true)
+
+  @@unique([jobProfileId, construct])
+}
+
+enum JobOpeningStatus {
+  OPEN
+  PAUSED
+  CLOSED
+}
+
+model JobOpening {
+  id           String           @id @default(cuid())
+  jobProfileId String
+  jobProfile   JobProfile       @relation(fields: [jobProfileId], references: [id])
+  title        String
+  status       JobOpeningStatus @default(OPEN)
+  createdAt    DateTime         @default(now())
+
+  invitations Invitation[]
+  attempts    Attempt[]
+}
+
+// ---------------------------------------------------------------------------
+// Composite definitions (sales traits, leadership) — transparent, DB-backed
+// ---------------------------------------------------------------------------
+
+enum CompositeCategory {
+  SALES
+  LEADERSHIP
+}
+
+model CompositeDefinition {
+  id       String            @id @default(cuid())
+  key      String            @unique
+  name     String
+  category CompositeCategory
+  /// [{ "construct": "MENTAL_TOUGHNESS", "weight": 1 }, ...]
+  components Json
+  description String?
+  version  String            @default("1.0")
+  orderIndex Int             @default(0)
+  active   Boolean           @default(true)
+}
+
+// ---------------------------------------------------------------------------
+// Candidates, invitations, attempts
+// ---------------------------------------------------------------------------
+
+model Candidate {
+  id        String   @id @default(cuid())
+  firstName String
+  lastName  String
+  email     String
+  phone     String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  invitations Invitation[]
+  attempts    Attempt[]
+  notes       CandidateNote[]
+
+  @@index([email])
+}
+
+model CandidateNote {
+  id          String    @id @default(cuid())
+  candidateId String
+  candidate   Candidate @relation(fields: [candidateId], references: [id], onDelete: Cascade)
+  authorId    String?
+  author      User?     @relation(fields: [authorId], references: [id], onDelete: SetNull)
+  body        String
+  createdAt   DateTime  @default(now())
+}
+
+enum InvitationStatus {
+  PENDING
+  OPENED
+  STARTED
+  COMPLETED
+  EXPIRED
+  REVOKED
+}
+
+model Invitation {
+  id                  String            @id @default(cuid())
+  candidateId         String
+  candidate           Candidate         @relation(fields: [candidateId], references: [id], onDelete: Cascade)
+  jobOpeningId        String
+  jobOpening          JobOpening        @relation(fields: [jobOpeningId], references: [id])
+  assessmentVersionId String
+  assessmentVersion   AssessmentVersion @relation(fields: [assessmentVersionId], references: [id])
+  /// SHA-256 of the invitation token. Raw token exists only in the emailed URL.
+  tokenHash           String            @unique
+  /// Human-readable assessment code (not a secret by itself).
+  code                String            @unique
+  status              InvitationStatus  @default(PENDING)
+  expiresAt           DateTime
+  invitedById         String?
+  invitedBy           User?             @relation("InvitedBy", fields: [invitedById], references: [id], onDelete: SetNull)
+  createdAt           DateTime          @default(now())
+
+  attempts Attempt[]
+
+  @@index([candidateId])
+  @@index([status])
+}
+
+enum AttemptStatus {
+  NOT_STARTED
+  IN_PROGRESS
+  INTERRUPTED
+  COMPLETED
+  EXPIRED
+  INVALIDATED
+}
+
+model Attempt {
+  id                  String            @id @default(cuid())
+  invitationId        String
+  invitation          Invitation        @relation(fields: [invitationId], references: [id])
+  candidateId         String
+  candidate           Candidate         @relation(fields: [candidateId], references: [id])
+  jobOpeningId        String
+  jobOpening          JobOpening        @relation(fields: [jobOpeningId], references: [id])
+  assessmentVersionId String
+  assessmentVersion   AssessmentVersion @relation(fields: [assessmentVersionId], references: [id])
+  attemptNumber       Int               @default(1)
+  /// Candidate-friendly Record ID shown for support/recovery, e.g. "FW-8342-KQ".
+  recordId            String            @unique
+  /// SHA-256 of the resume token (magic-link secret).
+  resumeTokenHash     String            @unique
+  status              AttemptStatus     @default(NOT_STARTED)
+  /// Entry-flow progress: which pre-assessment screen the candidate reached.
+  entryStep           String            @default("welcome")
+  startedAt           DateTime?
+  completedAt         DateTime?
+  invalidatedReason   String?
+  /// Accommodation overrides applied to this attempt (timing multiplier etc.).
+  timeMultiplier      Float             @default(1)
+  cameraExempt        Boolean           @default(false)
+  untimed             Boolean           @default(false)
+  createdAt           DateTime          @default(now())
+  updatedAt           DateTime          @updatedAt
+
+  sections        AttemptSection[]
+  questions       AttemptQuestion[]
+  responses       Response[]
+  scores          Score[]
+  compositeScores CompositeScore[]
+  integrityEvents IntegrityEvent[]
+  consents        ConsentRecord[]
+  recordings      Recording[]
+  reports         Report[]
+  accommodations  AccommodationOverride[]
+
+  @@index([candidateId])
+  @@index([jobOpeningId])
+  @@index([status])
+}
+
+enum AttemptSectionStatus {
+  PENDING
+  IN_PROGRESS
+  COMPLETED
+  EXPIRED
+}
+
+model AttemptSection {
+  id         String               @id @default(cuid())
+  attemptId  String
+  attempt    Attempt              @relation(fields: [attemptId], references: [id], onDelete: Cascade)
+  sectionKey String
+  orderIndex Int
+  status     AttemptSectionStatus @default(PENDING)
+  timed      Boolean
+  /// Effective duration after accommodations. Null = untimed.
+  durationSeconds Int?
+  startedAt  DateTime?
+  /// Server-authoritative deadline. Never recalculated from client time.
+  expiresAt  DateTime?
+  completedAt DateTime?
+
+  @@unique([attemptId, sectionKey])
+  @@index([attemptId, orderIndex])
+}
+
+/// The frozen, ordered question list actually served to one attempt.
+model AttemptQuestion {
+  id                String          @id @default(cuid())
+  attemptId         String
+  attempt           Attempt         @relation(fields: [attemptId], references: [id], onDelete: Cascade)
+  sectionKey        String
+  orderIndex        Int
+  questionVersionId String
+  questionVersion   QuestionVersion @relation(fields: [questionVersionId], references: [id])
+
+  response Response?
+
+  @@unique([attemptId, sectionKey, orderIndex])
+  @@index([attemptId, sectionKey])
+}
+
+model Response {
+  id                String          @id @default(cuid())
+  attemptId         String
+  attempt           Attempt         @relation(fields: [attemptId], references: [id], onDelete: Cascade)
+  attemptQuestionId String          @unique
+  attemptQuestion   AttemptQuestion @relation(fields: [attemptQuestionId], references: [id], onDelete: Cascade)
+  /// Choice index for MC/Likert (0-based). Null while unanswered.
+  value             Int?
+  answeredAt        DateTime?
+  firstViewedAt     DateTime?
+  responseTimeMs    Int?
+  changedCount      Int             @default(0)
+  /// Scored server-side; null for unscored kinds.
+  isCorrect         Boolean?
+  unanswered        Boolean         @default(true)
+
+  @@index([attemptId])
+}
+
+// ---------------------------------------------------------------------------
+// Scoring, norms, reports
+// ---------------------------------------------------------------------------
+
+enum BandType {
+  PROVISIONAL
+  STANINE
+}
+
+model NormTable {
+  id                  String   @id @default(cuid())
+  construct           Construct
+  assessmentVersionId String?
+  assessmentVersion   AssessmentVersion? @relation(fields: [assessmentVersionId], references: [id])
+  population          String
+  effectiveDate       DateTime
+  sampleSize          Int
+  methodology         String
+  /// Ordered raw-score (or theta) upper bounds for bands 1..8; band 9 above.
+  /// [{ "band": 1, "maxRaw": 4 }, ...] or z-thresholds per methodology.
+  thresholds          Json
+  status              String   @default("ACTIVE")
+  createdAt           DateTime @default(now())
+
+  scores Score[]
+
+  @@index([construct])
+}
+
+model Score {
+  id             String    @id @default(cuid())
+  attemptId      String
+  attempt        Attempt   @relation(fields: [attemptId], references: [id], onDelete: Cascade)
+  construct      Construct
+  rawScore       Float
+  /// Normalized 0-100 internal scale (kept alongside raw, never replacing it).
+  scaledScore    Float
+  percentile     Float?
+  band           Int
+  bandType       BandType
+  normTableId    String?
+  normTable      NormTable? @relation(fields: [normTableId], references: [id], onDelete: SetNull)
+  scoringVersion String
+  /// Construct-specific diagnostics (middle count, pair inconsistency, etc.).
+  detail         Json?
+  createdAt      DateTime  @default(now())
+
+  @@unique([attemptId, construct])
+}
+
+model CompositeScore {
+  id             String  @id @default(cuid())
+  attemptId      String
+  attempt        Attempt @relation(fields: [attemptId], references: [id], onDelete: Cascade)
+  key            String
+  name           String
+  category       CompositeCategory
+  value          Float
+  band           Int
+  formulaVersion String
+  detail         Json?
+
+  @@unique([attemptId, key])
+}
+
+enum ReportStatus {
+  PENDING
+  READY
+  FAILED
+}
+
+model Report {
+  id               String       @id @default(cuid())
+  attemptId        String
+  attempt          Attempt      @relation(fields: [attemptId], references: [id], onDelete: Cascade)
+  status           ReportStatus @default(PENDING)
+  scoringVersion   String
+  narrativeVersion String
+  /// Benchmark values frozen at generation time for reproducibility.
+  benchmarkSnapshot Json
+  /// Fully rendered report data (sections, narratives, selections).
+  payload          Json?
+  pdfObjectKey     String?
+  version          Int          @default(1)
+  generatedAt      DateTime?
+  createdAt        DateTime     @default(now())
+
+  @@index([attemptId])
+}
+
+// ---------------------------------------------------------------------------
+// Narrative / interview / development templates (seeded, versioned)
+// ---------------------------------------------------------------------------
+
+model NarrativeTemplate {
+  id        String    @id @default(cuid())
+  construct Construct
+  /// "BAND_1".."BAND_9", "RANGE_BELOW", "RANGE_WITHIN", "RANGE_ABOVE",
+  /// or for validity: "LEVEL_NORMAL", "LEVEL_ELEVATED", "LEVEL_HIGH".
+  slot      String
+  text      String
+  version   String    @default("1.0")
+  active    Boolean   @default(true)
+
+  @@unique([construct, slot, version])
+}
+
+model InterviewQuestionTemplate {
+  id        String    @id @default(cuid())
+  construct Construct
+  focus     String // BELOW_RANGE | ABOVE_RANGE | VALIDITY
+  measures  String
+  /// [{question, altWording, listenFor}]
+  questions Json
+  version   String    @default("1.0")
+  active    Boolean   @default(true)
+
+  @@unique([construct, focus, version])
+}
+
+model DevelopmentTemplate {
+  id              String    @id @default(cuid())
+  construct       Construct
+  recommendations Json
+  version         String    @default("1.0")
+  active          Boolean   @default(true)
+
+  @@unique([construct, version])
+}
+
+// ---------------------------------------------------------------------------
+// Recording, consent, integrity
+// ---------------------------------------------------------------------------
+
+enum RecordingStatus {
+  ACTIVE
+  FINALIZED
+  INCOMPLETE
+  DELETED
+}
+
+model Recording {
+  id        String          @id @default(cuid())
+  attemptId String
+  attempt   Attempt         @relation(fields: [attemptId], references: [id], onDelete: Cascade)
+  /// One recording session per continuous MediaRecorder run.
+  sessionId String          @unique
+  status    RecordingStatus @default(ACTIVE)
+  mimeType  String          @default("video/webm")
+  startedAt DateTime        @default(now())
+  endedAt   DateTime?
+  /// Set when the client-declared final sequence is fully uploaded.
+  expectedChunks Int?
+  deletedAt DateTime?
+
+  chunks RecordingChunk[]
+
+  @@index([attemptId])
+}
+
+enum ChunkUploadStatus {
+  PENDING
+  UPLOADED
+  FAILED
+}
+
+model RecordingChunk {
+  id          String            @id @default(cuid())
+  recordingId String
+  recording   Recording         @relation(fields: [recordingId], references: [id], onDelete: Cascade)
+  sequence    Int
+  objectKey   String
+  sizeBytes   Int?
+  checksum    String?
+  startedAt   DateTime?
+  endedAt     DateTime?
+  status      ChunkUploadStatus @default(PENDING)
+  uploadedAt  DateTime?
+
+  @@unique([recordingId, sequence])
+}
+
+model ConsentRecord {
+  id            String   @id @default(cuid())
+  attemptId     String
+  attempt       Attempt  @relation(fields: [attemptId], references: [id], onDelete: Cascade)
+  /// e.g. "recording", "rules".
+  consentType   String
+  noticeVersion String
+  consentText   String
+  ip            String?
+  userAgent     String?
+  consentedAt   DateTime @default(now())
+
+  @@index([attemptId])
+}
+
+model IntegrityEvent {
+  id         String   @id @default(cuid())
+  attemptId  String
+  attempt    Attempt  @relation(fields: [attemptId], references: [id], onDelete: Cascade)
+  /// Objective event types only (TAB_HIDDEN, CAMERA_INTERRUPTED, ...).
+  type       String
+  occurredAt DateTime @default(now())
+  meta       Json?
+
+  @@index([attemptId, occurredAt])
+}
+
+enum AccommodationType {
+  EXTENDED_TIME
+  CAMERA_EXEMPT
+  UNTIMED
+  ALTERNATE_PRESENTATION
+  IN_PERSON_ADMINISTRATION
+}
+
+model AccommodationOverride {
+  id           String            @id @default(cuid())
+  attemptId    String
+  attempt      Attempt           @relation(fields: [attemptId], references: [id], onDelete: Cascade)
+  type         AccommodationType
+  /// e.g. 1.5 for time-and-a-half. Only for EXTENDED_TIME.
+  timeMultiplier Float?
+  note         String?
+  approvedById String?
+  approvedBy   User?             @relation("AccommodationApprovedBy", fields: [approvedById], references: [id], onDelete: SetNull)
+  createdAt    DateTime          @default(now())
+}
+
+// ---------------------------------------------------------------------------
+// Analytics / calibration (anonymous aggregates)
+// ---------------------------------------------------------------------------
+
+model ItemStatistic {
+  id                String          @id @default(cuid())
+  questionVersionId String          @unique
+  questionVersion   QuestionVersion @relation(fields: [questionVersionId], references: [id], onDelete: Cascade)
+  administered      Int             @default(0)
+  correctCount      Int             @default(0)
+  unansweredCount   Int             @default(0)
+  totalResponseMs   BigInt          @default(0)
+  updatedAt         DateTime        @updatedAt
+}
+
+// ---------------------------------------------------------------------------
+// Email outbox (console/dev provider persists here; real providers log here)
+// ---------------------------------------------------------------------------
+
+model EmailMessage {
+  id        String   @id @default(cuid())
+  toEmail   String
+  template  String
+  subject   String
+  bodyText  String
+  status    String   @default("SENT")
+  createdAt DateTime @default(now())
+}
+
+// ---------------------------------------------------------------------------
+// Voluntary EEO data (adverse-impact module). Disabled unless configured.
+// Stored separately; never joined into candidate result views.
+// ---------------------------------------------------------------------------
+
+model EeoRecord {
+  id        String   @id @default(cuid())
+  /// Deliberately NOT a foreign key to Candidate — linkage only through
+  /// this opaque reference, resolved solely by the compliance module.
+  candidateRef String
+  jobOpeningId String?
+  /// Self-reported, voluntary, categorical data as configured by compliance.
+  data      Json
+  createdAt DateTime @default(now())
+
+  @@index([jobOpeningId])
+}
