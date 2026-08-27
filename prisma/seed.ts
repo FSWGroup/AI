@@ -15,8 +15,10 @@ import { PrismaClient, type Construct, type Prisma } from "@prisma/client";
 import bcrypt from "bcryptjs";
 import { randomUUID } from "crypto";
 
-// Netlify DB (Neon) exposes NETLIFY_DATABASE_URL; alias it for Prisma.
-process.env.DATABASE_URL ??= process.env.NETLIFY_DATABASE_URL;
+import { resolveDatabaseUrl } from "../src/lib/database-url";
+
+// Accept Netlify DB / Neon connection strings under their various env names.
+resolveDatabaseUrl();
 
 import { mentalAcuityBank } from "../src/content/banks/mental-acuity";
 import { businessTermsBank } from "../src/content/banks/business-terms";

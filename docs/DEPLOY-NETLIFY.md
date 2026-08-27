@@ -8,9 +8,12 @@ this GitHub repo (FSWGroup/AI), and a hosted Postgres database.
 Pick one:
 
 - **Netlify DB (easiest)** — after creating the site in step 2, open the
-  site's **Extensions → Neon database** (Netlify DB) and install it. It
-  provisions Postgres and sets `NETLIFY_DATABASE_URL` on the site
-  automatically; the build uses it without further configuration.
+  project sidebar → **Database** and create/connect a database (Netlify DB,
+  powered by Neon). It provisions Postgres and sets its connection variable
+  (`NETLIFY_DB_URL`, or `NETLIFY_DATABASE_URL` on older versions) on the
+  site automatically; the build detects either without further
+  configuration. Claim the database to a free Neon account when prompted —
+  unclaimed databases are temporary and expire.
 - **Neon directly** — neon.tech → New project → copy the connection string
   (it ends in `?sslmode=require`). You'll paste it as `DATABASE_URL` below.
 - Supabase/RDS/any hosted Postgres also works — you just need the URL.
@@ -31,7 +34,7 @@ Site configuration → Environment variables:
 
 | Variable | Value |
 | --- | --- |
-| `DATABASE_URL` | your Postgres URL (skip if using Netlify DB — `NETLIFY_DATABASE_URL` is detected automatically) |
+| `DATABASE_URL` | your Postgres URL (skip if using Netlify DB — its `NETLIFY_DB_URL`/`NETLIFY_DATABASE_URL` variable is detected automatically) |
 | `APP_SECRET` | run `openssl rand -hex 32` and paste the output |
 | `STORAGE_PROVIDER` | `netlify` (webcam recordings go to private Netlify Blobs) |
 | `BOOTSTRAP_ADMIN_EMAIL` | your admin email, e.g. `jwelsford@fswelsford.com` |

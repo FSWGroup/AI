@@ -8,8 +8,9 @@
  */
 
 import { PrismaClient } from "@prisma/client";
+import { resolveDatabaseUrl } from "../src/lib/database-url";
 
-process.env.DATABASE_URL ??= process.env.NETLIFY_DATABASE_URL;
+resolveDatabaseUrl();
 
 const prisma = new PrismaClient();
 

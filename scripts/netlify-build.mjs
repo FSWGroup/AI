@@ -12,17 +12,33 @@
 
 import { execSync } from "node:child_process";
 
-process.env.DATABASE_URL ||= process.env.NETLIFY_DATABASE_URL || "";
+// Accept the connection string under any name Netlify DB / Neon has used
+// (mirrors src/lib/database-url.ts, which the runtime uses):
+//   DATABASE_URL, NETLIFY_DATABASE_URL_UNPOOLED, NETLIFY_DB_URL,
+//   NETLIFY_DATABASE_URL.
+// Neon pooled endpoints (host contains "-pooler.") need pgbouncer=true for
+// Prisma, appended automatically when missing.
+let dbUrl =
+  process.env.DATABASE_URL ||
+  process.env.NETLIFY_DATABASE_URL_UNPOOLED ||
+  process.env.NETLIFY_DB_URL ||
+  process.env.NETLIFY_DATABASE_URL ||
+  "";
+if (dbUrl && dbUrl.includes("-pooler.") && !dbUrl.includes("pgbouncer=")) {
+  dbUrl += (dbUrl.includes("?") ? "&" : "?") + "pgbouncer=true";
+}
+process.env.DATABASE_URL = dbUrl;
 
 const problems = [];
 const warnings = [];
 
 if (!process.env.DATABASE_URL) {
   problems.push(
-    "DATABASE_URL is not set. Add it in Site configuration → Environment\n" +
-      "    variables (any hosted Postgres connection string, e.g. from\n" +
-      "    neon.tech), or install the Netlify DB / Neon extension on this\n" +
-      "    site, which provides NETLIFY_DATABASE_URL automatically.",
+    "No database is configured. Either install Netlify DB on this project\n" +
+      "    (project sidebar → Database → create/connect — it sets the\n" +
+      "    connection variable automatically), or add DATABASE_URL in Site\n" +
+      "    configuration → Environment variables with a hosted Postgres\n" +
+      "    connection string (e.g. from neon.tech).",
   );
 }
 if (!process.env.APP_SECRET) {

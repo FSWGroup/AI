@@ -1,8 +1,10 @@
 # FSW WorkFit on Netlify.
 #
 # Required environment variables (Site settings → Environment variables):
-#   DATABASE_URL              Postgres connection string (or use Netlify DB,
-#                             which provides NETLIFY_DATABASE_URL automatically)
+#   DATABASE_URL              Postgres connection string — or install Netlify
+#                             DB (project sidebar → Database), whose variable
+#                             (NETLIFY_DB_URL / NETLIFY_DATABASE_URL) is
+#                             detected automatically
 #   APP_SECRET                openssl rand -hex 32
 #   STORAGE_PROVIDER          netlify   (recordings in Netlify Blobs)
 #   BOOTSTRAP_ADMIN_EMAIL     first SUPER_ADMIN account (created on first build)

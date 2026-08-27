@@ -1,8 +1,9 @@
 import { PrismaClient } from "@prisma/client";
+import { resolveDatabaseUrl } from "./database-url";
 
-// Netlify DB (Neon) exposes NETLIFY_DATABASE_URL; alias it so Prisma's
-// datasource env("DATABASE_URL") works without duplicating the value.
-process.env.DATABASE_URL ??= process.env.NETLIFY_DATABASE_URL;
+// Accept Netlify DB / Neon-provided connection strings under their various
+// env names and normalize pooled endpoints for Prisma.
+resolveDatabaseUrl();
 
 const globalForPrisma = globalThis as unknown as { prisma?: PrismaClient };
 
