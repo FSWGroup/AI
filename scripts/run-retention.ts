@@ -9,6 +9,8 @@
 
 import { PrismaClient } from "@prisma/client";
 
+process.env.DATABASE_URL ??= process.env.NETLIFY_DATABASE_URL;
+
 const prisma = new PrismaClient();
 
 async function main(): Promise<void> {

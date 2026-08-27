@@ -33,6 +33,7 @@ const schema = z.discriminatedUnion("action", [
   }),
   z.object({ action: z.literal("recalculate") }),
   z.object({ action: z.literal("add_note"), body: z.string().min(1).max(4000) }),
+  z.object({ action: z.literal("resume_link") }),
 ]);
 
 export const POST = withErrorHandling(async (req, ctx) => {
@@ -154,6 +155,31 @@ export const POST = withErrorHandling(async (req, ctx) => {
         ip: meta.ip,
       });
       return apiOk({ ok: true, reportId });
+    }
+
+    case "resume_link": {
+      // Rotate the resume token and hand the fresh link to the admin — the
+      // supported path when a candidate loses their session and no email
+      // provider is wired. Old links stop working immediately.
+      if (!["NOT_STARTED", "IN_PROGRESS", "INTERRUPTED"].includes(attempt.status)) {
+        return apiError("Only open attempts can issue a resume link.", 409);
+      }
+      const newToken = generateToken();
+      await prisma.attempt.update({
+        where: { id: attemptId },
+        data: { resumeTokenHash: hashToken(newToken) },
+      });
+      await audit({
+        userId: user.id,
+        action: AUDIT_ACTIONS.RESUME_LINK_ISSUED,
+        entityType: "Attempt",
+        entityId: attemptId,
+        ip: meta.ip,
+      });
+      return apiOk({
+        ok: true,
+        resumeUrl: `${env.appBaseUrl}/assessment/resume/${newToken}`,
+      });
     }
 
     case "add_note": {

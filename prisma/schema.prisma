@@ -12,6 +12,9 @@
 
 generator client {
   provider = "prisma-client-js"
+  // "native" for local dev/build machines; rhel for AWS-Lambda-based hosts
+  // (Netlify Functions, Vercel) where the runtime differs from the build OS.
+  binaryTargets = ["native", "rhel-openssl-3.0.x"]
 }
 
 datasource db {

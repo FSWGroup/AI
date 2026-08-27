@@ -6,6 +6,7 @@ import { can } from "@/lib/auth/rbac";
 import { scopedJobProfileIds } from "@/lib/auth/scope";
 import { audit, AUDIT_ACTIONS } from "@/lib/audit";
 import { ReportView } from "@/components/report/ReportView";
+import { PrintButton } from "@/components/admin/PrintButton";
 import type { ReportPayload } from "@/lib/report/generate";
 
 export const dynamic = "force-dynamic";
@@ -51,12 +52,15 @@ export default async function AdminReportPage({
         >
           ← Back to candidate
         </Link>
-        <a
-          href={`/api/admin/attempts/${attemptId}/pdf`}
-          className="rounded-lg bg-navy-900 px-4 py-2.5 text-sm font-semibold text-white hover:bg-navy-800"
-        >
-          Download PDF
-        </a>
+        <div className="flex gap-2">
+          <PrintButton />
+          <a
+            href={`/api/admin/attempts/${attemptId}/pdf`}
+            className="rounded-lg bg-navy-900 px-4 py-2.5 text-sm font-semibold text-white hover:bg-navy-800"
+          >
+            Download PDF
+          </a>
+        </div>
       </div>
       <ReportView payload={report.payload as unknown as ReportPayload} />
     </div>

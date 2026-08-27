@@ -44,7 +44,9 @@ export const POST = withErrorHandling(async (req) => {
       where: { recordType: "WEBCAM_RECORDINGS" },
     });
     if (!retention?.retentionDays) missing.push("recording retention policy");
-    if (!settings?.storageConfigured && env.storageProvider !== "s3") {
+    // s3 and netlify providers are durable managed storage; only the
+    // dev-only local-disk provider requires an explicit settings override.
+    if (!settings?.storageConfigured && env.storageProvider === "local") {
       missing.push("object storage");
     }
     if (!settings?.httpsConfirmed && !env.appBaseUrl.startsWith("https://")) {
@@ -120,8 +122,9 @@ export const POST = withErrorHandling(async (req) => {
   return apiOk({
     invitationId: invitation.id,
     code: invitation.code,
-    // Dev convenience: the console email provider stores the email in the
-    // outbox; returning the URL here lets local admins launch immediately.
-    launchUrl: env.isProduction ? undefined : launchUrl,
+    // Returned to the inviting admin (who is already fully authorized) so
+    // the link can be shared directly when no email provider is wired.
+    // The token itself is stored only as a hash.
+    launchUrl,
   });
 });

@@ -11,10 +11,14 @@ export const env = {
     return required("APP_SECRET");
   },
   get appBaseUrl(): string {
-    return process.env.APP_BASE_URL ?? "http://localhost:3000";
+    // Netlify injects URL with the site's canonical HTTPS address.
+    return process.env.APP_BASE_URL ?? process.env.URL ?? "http://localhost:3000";
   },
-  get storageProvider(): "local" | "s3" {
-    return process.env.STORAGE_PROVIDER === "s3" ? "s3" : "local";
+  get storageProvider(): "local" | "s3" | "netlify" {
+    const v = process.env.STORAGE_PROVIDER;
+    if (v === "s3") return "s3";
+    if (v === "netlify") return "netlify";
+    return "local";
   },
   get emailProvider(): string {
     return process.env.EMAIL_PROVIDER ?? "console";

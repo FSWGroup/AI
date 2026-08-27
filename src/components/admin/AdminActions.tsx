@@ -27,14 +27,16 @@ export function AdminActions({
     setBusy(true);
     setMessage(null);
     try {
-      const res = await api<{ launchUrl?: string }>(
+      const res = await api<{ launchUrl?: string; resumeUrl?: string }>(
         `/api/admin/attempts/${attemptId}`,
         { body },
       );
       setMessage(
         res.launchUrl
-          ? `Done. Dev launch link: ${res.launchUrl}`
-          : "Done. The action was recorded in the audit log.",
+          ? `Done. Retest launch link (share only with the candidate): ${res.launchUrl}`
+          : res.resumeUrl
+            ? `Resume link (share only with the candidate; previous links are now invalid): ${res.resumeUrl}`
+            : "Done. The action was recorded in the audit log.",
       );
       router.refresh();
     } catch (err) {
@@ -51,6 +53,23 @@ export function AdminActions({
           {message}
         </p>
       )}
+
+      <Card className="p-6">
+        <h3 className="text-sm font-bold text-navy-900">Resume link</h3>
+        <p className="mt-1 text-xs text-navy-500">
+          If the candidate lost their session, issue a fresh secure resume
+          link to send them. It restores their exact session (same questions,
+          answers, and remaining time) and invalidates any earlier link.
+        </p>
+        <Button
+          className="mt-3"
+          variant="secondary"
+          disabled={busy || !["NOT_STARTED", "IN_PROGRESS", "INTERRUPTED"].includes(status)}
+          onClick={() => void act({ action: "resume_link" })}
+        >
+          Issue resume link
+        </Button>
+      </Card>
 
       <Card className="p-6">
         <h3 className="text-sm font-bold text-navy-900">Retest</h3>

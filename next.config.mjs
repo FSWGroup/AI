@@ -1,6 +1,9 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   reactStrictMode: true,
+  // Keep native/binary packages out of the serverless bundle graph;
+  // they are loaded from node_modules at runtime instead.
+  serverExternalPackages: ["@prisma/client", "prisma", "playwright-core"],
   eslint: {
     // Linting runs as a separate `npm run lint` step in CI; keep builds fast.
     ignoreDuringBuilds: true,

@@ -20,7 +20,7 @@ export async function GET(req: Request): Promise<NextResponse> {
   }
   const objectKey = payload.slice("download:".length);
   const storage = getStorage();
-  if (storage.kind !== "local") {
+  if (!storage.appRouted) {
     return apiError("Direct downloads are not served by the application.", 400);
   }
   const data = await storage.getObject(objectKey);

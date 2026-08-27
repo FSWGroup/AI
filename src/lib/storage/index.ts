@@ -12,6 +12,8 @@
  *    upload/download URLs with an HMAC token verified by our own routes.
  *  - S3Storage: any S3-compatible store (AWS S3, Cloudflare R2, MinIO)
  *    using presigned PUT/GET URLs.
+ *  - NetlifyBlobsStorage: zero-config private storage on Netlify; small
+ *    chunks route through the signed app endpoints (see netlify-blobs.ts).
  */
 
 import { env } from "@/lib/env";
@@ -19,7 +21,9 @@ import { LocalDiskStorage } from "./local";
 import { S3Storage } from "./s3";
 
 export interface StorageProvider {
-  readonly kind: "local" | "s3";
+  readonly kind: "local" | "s3" | "netlify";
+  /** True when uploads/downloads flow through the app's signed routes. */
+  readonly appRouted: boolean;
   /** Short-lived signed URL the browser can PUT a chunk to. */
   getUploadUrl(objectKey: string, contentType: string): Promise<string>;
   /** Short-lived signed URL for streaming/downloading an object. */
@@ -37,7 +41,17 @@ let provider: StorageProvider | null = null;
 
 export function getStorage(): StorageProvider {
   if (!provider) {
-    provider = env.storageProvider === "s3" ? new S3Storage() : new LocalDiskStorage();
+    if (env.storageProvider === "s3") {
+      provider = new S3Storage();
+    } else if (env.storageProvider === "netlify") {
+      // Lazy require keeps @netlify/blobs out of non-Netlify bundles' hot path.
+      const { NetlifyBlobsStorage } =
+        // eslint-disable-next-line @typescript-eslint/no-require-imports
+        require("./netlify-blobs") as typeof import("./netlify-blobs");
+      provider = new NetlifyBlobsStorage();
+    } else {
+      provider = new LocalDiskStorage();
+    }
   }
   return provider;
 }

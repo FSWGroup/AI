@@ -22,6 +22,7 @@ function safeJoin(objectKey: string): string {
 
 export class LocalDiskStorage implements StorageProvider {
   readonly kind = "local" as const;
+  readonly appRouted = true;
 
   async getUploadUrl(objectKey: string, _contentType: string): Promise<string> {
     const token = createSignedValue(`upload:${objectKey}`, 15 * 60);

@@ -50,10 +50,15 @@ export function InviteForm({
         {result.launchUrl && (
           <div className="mt-4 rounded-lg bg-navy-50 p-3">
             <p className="text-xs font-semibold uppercase tracking-wide text-navy-400">
-              Development only — launch link
+              Secure launch link — share only with this candidate
             </p>
             <p className="mt-1 break-all font-mono text-xs text-navy-700">
               {result.launchUrl}
+            </p>
+            <p className="mt-2 text-xs text-navy-400">
+              If no email provider is configured, copy this link and send it to
+              the candidate yourself. It expires on the date you set and works
+              only for this invitation.
             </p>
           </div>
         )}

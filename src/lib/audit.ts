@@ -53,6 +53,7 @@ export const AUDIT_ACTIONS = {
   NOTE_UPDATED: "candidate_note.updated",
   ATTEMPT_INVALIDATED: "attempt.invalidated",
   RETEST_AUTHORIZED: "attempt.retest_authorized",
+  RESUME_LINK_ISSUED: "attempt.resume_link_issued",
   ACCOMMODATION_GRANTED: "attempt.accommodation_granted",
   RETENTION_CHANGED: "retention.changed",
   RETENTION_RUN: "retention.run",

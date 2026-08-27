@@ -151,6 +151,14 @@ teardown) so runs finish in seconds.
 
 ## Deployment
 
+**Netlify (fastest path):** the repo ships `netlify.toml` and a build
+pipeline that migrates, seeds, and bootstraps your admin account from env
+vars — see **`docs/DEPLOY-NETLIFY.md`** for the 15-minute runbook
+(hosted Postgres + `STORAGE_PROVIDER=netlify` for recordings in private
+Netlify Blobs; PDFs via the report's Print button there).
+
+**Generic Node host:**
+
 1. Provision PostgreSQL and a **private** S3-compatible bucket.
 2. Set the environment variables above (`STORAGE_PROVIDER=s3`, real
    `APP_SECRET`, HTTPS `APP_BASE_URL`).

@@ -15,6 +15,9 @@ import { PrismaClient, type Construct, type Prisma } from "@prisma/client";
 import bcrypt from "bcryptjs";
 import { randomUUID } from "crypto";
 
+// Netlify DB (Neon) exposes NETLIFY_DATABASE_URL; alias it for Prisma.
+process.env.DATABASE_URL ??= process.env.NETLIFY_DATABASE_URL;
+
 import { mentalAcuityBank } from "../src/content/banks/mental-acuity";
 import { businessTermsBank } from "../src/content/banks/business-terms";
 import { vocabularyBank } from "../src/content/banks/vocabulary";
@@ -65,6 +68,27 @@ async function main(): Promise<void> {
     },
     update: {},
   });
+
+  // ---- Production bootstrap admin ----------------------------------------------
+  // On a fresh production database, create the first SUPER_ADMIN from env
+  // vars so hosted deploys (e.g. Netlify) never need dev accounts.
+  const userCount = await prisma.user.count();
+  const bootstrapEmail = process.env.BOOTSTRAP_ADMIN_EMAIL;
+  const bootstrapPassword = process.env.BOOTSTRAP_ADMIN_PASSWORD;
+  if (userCount === 0 && bootstrapEmail && bootstrapPassword) {
+    if (bootstrapPassword.length < 12) {
+      throw new Error("BOOTSTRAP_ADMIN_PASSWORD must be at least 12 characters.");
+    }
+    await prisma.user.create({
+      data: {
+        email: bootstrapEmail.toLowerCase(),
+        name: "FSW Administrator",
+        role: "SUPER_ADMIN",
+        passwordHash: await bcrypt.hash(bootstrapPassword, 12),
+      },
+    });
+    console.log(`Bootstrap SUPER_ADMIN created: ${bootstrapEmail.toLowerCase()}`);
+  }
 
   // ---- Dev-only admin accounts -----------------------------------------------
   if (process.env.NODE_ENV === "production" && !process.env.SEED_DEV_USERS) {

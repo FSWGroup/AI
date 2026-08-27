@@ -213,25 +213,33 @@ export async function scoreAttempt(attemptId: string): Promise<void> {
   ]);
 
   // ---- Anonymous aggregate item statistics (calibration module) --------------
-  for (const aq of attempt.questions) {
-    if (aq.questionVersion.kind === "MEMORY_STUDY") continue;
-    const answered = aq.response?.unanswered === false;
-    const correct = aq.response?.isCorrect === true;
-    await prisma.itemStatistic.upsert({
-      where: { questionVersionId: aq.questionVersionId },
-      create: {
-        questionVersionId: aq.questionVersionId,
-        administered: 1,
-        correctCount: correct ? 1 : 0,
-        unansweredCount: answered ? 0 : 1,
-        totalResponseMs: BigInt(aq.response?.responseTimeMs ?? 0),
-      },
-      update: {
-        administered: { increment: 1 },
-        correctCount: { increment: correct ? 1 : 0 },
-        unansweredCount: { increment: answered ? 0 : 1 },
-        totalResponseMs: { increment: BigInt(aq.response?.responseTimeMs ?? 0) },
-      },
-    });
+  // Batched into one round trip so scoring stays fast on serverless hosts
+  // with a remote database (hundreds of sequential upserts would risk the
+  // function timeout).
+  const statItems = attempt.questions.filter(
+    (aq) => aq.questionVersion.kind !== "MEMORY_STUDY",
+  );
+  if (statItems.length > 0) {
+    const ids = statItems.map((aq) => aq.questionVersionId);
+    const corrects = statItems.map((aq) => (aq.response?.isCorrect === true ? 1 : 0));
+    const unanswereds = statItems.map((aq) =>
+      aq.response?.unanswered === false ? 0 : 1,
+    );
+    const responseMs = statItems.map((aq) => aq.response?.responseTimeMs ?? 0);
+    await prisma.$executeRaw`
+      INSERT INTO "ItemStatistic"
+        ("id", "questionVersionId", "administered", "correctCount",
+         "unansweredCount", "totalResponseMs", "updatedAt")
+      SELECT gen_random_uuid()::text, t.qv, 1, t.c, t.u, t.ms, NOW()
+      FROM unnest(
+        ${ids}::text[], ${corrects}::int[], ${unanswereds}::int[], ${responseMs}::bigint[]
+      ) AS t(qv, c, u, ms)
+      ON CONFLICT ("questionVersionId") DO UPDATE SET
+        "administered"    = "ItemStatistic"."administered" + 1,
+        "correctCount"    = "ItemStatistic"."correctCount" + EXCLUDED."correctCount",
+        "unansweredCount" = "ItemStatistic"."unansweredCount" + EXCLUDED."unansweredCount",
+        "totalResponseMs" = "ItemStatistic"."totalResponseMs" + EXCLUDED."totalResponseMs",
+        "updatedAt"       = NOW()
+    `;
   }
 }

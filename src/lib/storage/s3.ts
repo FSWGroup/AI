@@ -18,6 +18,7 @@ import type { StorageProvider } from "./index";
 
 export class S3Storage implements StorageProvider {
   readonly kind = "s3" as const;
+  readonly appRouted = false;
   private client: S3Client;
   private bucket: string;
 

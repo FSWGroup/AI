@@ -48,7 +48,7 @@ export default async function AdminPortalLayout({
 
   return (
     <div className="flex min-h-screen">
-      <aside className="hidden w-60 shrink-0 flex-col border-r border-navy-100 bg-white p-5 sm:flex">
+      <aside className="hidden w-60 shrink-0 flex-col border-r border-navy-100 bg-white p-5 sm:flex print:hidden">
         <div>
           <p className="text-xs font-semibold uppercase tracking-widest text-fsw-600">
             FSW Group

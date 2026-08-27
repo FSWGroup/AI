@@ -27,7 +27,7 @@ export async function PUT(req: Request): Promise<NextResponse> {
   if (body.length > MAX_CHUNK_BYTES) return apiError("Chunk too large.", 413);
 
   const storage = getStorage();
-  if (storage.kind !== "local") {
+  if (!storage.appRouted) {
     return apiError("Direct uploads are not served by the application.", 400);
   }
   await storage.putObject(objectKey, body, req.headers.get("content-type") ?? "application/octet-stream");

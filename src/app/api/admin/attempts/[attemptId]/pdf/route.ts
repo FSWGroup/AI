@@ -27,12 +27,23 @@ export const GET = withErrorHandling(async (_req, ctx) => {
   const key = reportPdfKey(attemptId, report.id);
   let pdf = report.pdfObjectKey ? await storage.getObject(key) : null;
   if (!pdf) {
-    pdf = await renderReportPdf({
-      reportId: report.id,
-      candidateName: payload.meta.candidateName,
-      position: payload.meta.position,
-      completedAt: payload.meta.completedAt,
-    });
+    try {
+      pdf = await renderReportPdf({
+        reportId: report.id,
+        candidateName: payload.meta.candidateName,
+        position: payload.meta.position,
+        completedAt: payload.meta.completedAt,
+      });
+    } catch {
+      // No Chromium runtime available (typical on serverless hosts like
+      // Netlify Functions). The web report is fully print-styled — the
+      // "Print / Save as PDF" button produces the same document.
+      return apiError(
+        "Server-side PDF rendering is not available in this environment. " +
+          "Open the web report and use “Print / Save as PDF” instead.",
+        501,
+      );
+    }
     await storage.putObject(key, pdf, "application/pdf");
     await prisma.report.update({
       where: { id: report.id },
