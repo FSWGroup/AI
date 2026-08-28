@@ -4,6 +4,7 @@ import {
   evaluateRulesForAll,
 } from "@/lib/services/assignment";
 import { markLessonComplete, recordAcknowledgement } from "@/lib/services/completion";
+import { assessSkill } from "@/lib/services/skills";
 import { buildActor } from "@/lib/auth/scope";
 
 /**
@@ -219,6 +220,65 @@ export async function seedDemonstrationState(
   console.log(
     `   ${completions} course completion(s), ${partials} in progress, ${acknowledgements} acknowledgement(s)`,
   );
+
+  console.log("→ Demonstration skill assessments, so knowledge risk has a range to show");
+
+  /*
+   * Without assessed skills every required skill reads "nobody covers this",
+   * which is technically true of a fresh install and useless as a demonstration.
+   * These go through the real assessment service, so they produce the same
+   * SkillAssessment evidence and notification a manager's sign-off would.
+   *
+   * The shape is deliberate: exactly one person cleared to the level the
+   * Application Engineer role demands on Control Valves — the single point of
+   * failure this feature exists to surface — and a pair on Customer Service, one
+   * holiday away from being one.
+   */
+  const admin = userIds.get("admin@fswelsford.com");
+  const engineer = userIds.get("kim.harlow@fswelsford.com");
+
+  if (admin && engineer) {
+    const assessor = await buildActor(admin);
+    const skillByName = new Map(
+      (await prisma.skill.findMany({ select: { id: true, name: true } })).map((s) => [s.name, s.id]),
+    );
+
+    const assessments: { userId: string | undefined; skill: string; rating: "COMPETENT" | "HIGHLY_COMPETENT" }[] = [
+      // The only person cleared on control valves at the level the work needs.
+      { userId: engineer, skill: "Control Valves", rating: "HIGHLY_COMPETENT" },
+      { userId: engineer, skill: "Valve Fundamentals", rating: "HIGHLY_COMPETENT" },
+      // Two on customer service: thin, not absent.
+      { userId: learner, skill: "Customer Service", rating: "COMPETENT" },
+      { userId: engineer, skill: "Customer Service", rating: "COMPETENT" },
+      { userId: warehouse, skill: "Warehouse Receiving", rating: "COMPETENT" },
+    ];
+
+    let assessed = 0;
+    if (assessor) {
+      for (const entry of assessments) {
+        const skillId = entry.userId ? skillByName.get(entry.skill) : undefined;
+        if (!entry.userId || !skillId) continue;
+
+        const already = await prisma.skillAssessment.findFirst({
+          where: { userId: entry.userId, skillId, rating: entry.rating },
+          select: { id: true },
+        });
+        if (already) {
+          assessed += 1;
+          continue;
+        }
+
+        await assessSkill(assessor, {
+          userId: entry.userId,
+          skillId,
+          rating: entry.rating,
+          comments: "Demonstration assessment recorded by the seed, not a real sign-off.",
+        });
+        assessed += 1;
+      }
+    }
+    console.log(`   ${assessed} skill assessment(s) recorded`);
+  }
 
   console.log("→ Spreading due dates so urgency grouping is demonstrable");
 

@@ -36,6 +36,30 @@ function ffprobeBin(): string {
 }
 
 let cachedAvailability: boolean | undefined;
+/** When the last negative result was recorded, so it can be retried. */
+let negativeCheckedAt = 0;
+
+/**
+ * How long a "not available" verdict is trusted before probing again.
+ *
+ * A positive result is cached for the life of the process: an ffmpeg binary does
+ * not disappear from under a running server. A negative one is not, because the
+ * probe can fail for reasons that have nothing to do with ffmpeg — a loaded host
+ * that cannot spawn a process inside the timeout being the obvious one. Caching
+ * that forever would let one slow moment disable video rendering until the next
+ * restart, silently.
+ */
+const NEGATIVE_RECHECK_MS = 60_000;
+
+/**
+ * Timeout for the `-version` probe.
+ *
+ * Deliberately generous. This gates a whole feature, so a false negative costs
+ * far more than a slow check: the previous 5s was short enough that a busy
+ * four-core host running the test suite exceeded it while ffmpeg itself was
+ * perfectly healthy.
+ */
+const VERSION_PROBE_TIMEOUT_MS = 20_000;
 
 function commandResolvesOnPath(bin: string): boolean {
   try {
@@ -54,7 +78,7 @@ function checkFfmpegAvailable(): boolean {
   if (!resolvable) return false;
 
   try {
-    execFileSync(bin, ["-version"], { stdio: "ignore", timeout: 5000 });
+    execFileSync(bin, ["-version"], { stdio: "ignore", timeout: VERSION_PROBE_TIMEOUT_MS });
     return true;
   } catch {
     return false;
@@ -62,13 +86,21 @@ function checkFfmpegAvailable(): boolean {
 }
 
 export function isFfmpegAvailable(): boolean {
-  if (cachedAvailability === undefined) cachedAvailability = checkFfmpegAvailable();
+  if (cachedAvailability === true) return true;
+
+  const stale = cachedAvailability === false && Date.now() - negativeCheckedAt >= NEGATIVE_RECHECK_MS;
+  if (cachedAvailability === undefined || stale) {
+    cachedAvailability = checkFfmpegAvailable();
+    if (!cachedAvailability) negativeCheckedAt = Date.now();
+  }
+
   return cachedAvailability;
 }
 
 /** Test seam: force a re-check (the binary can appear mid-process in dev). */
 export function __resetFfmpegAvailabilityCache(): void {
   cachedAvailability = undefined;
+  negativeCheckedAt = 0;
 }
 
 /** Probe a media file's duration with ffprobe. Returns 0 if the file has no readable duration. */

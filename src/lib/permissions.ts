@@ -12,6 +12,8 @@
 export const PERMISSIONS = {
   // People
   "people.view": "View the people directory and basic profiles",
+  "people.view_all":
+    "See every person in the organization, not only your own reporting line",
   "people.edit": "Create and edit people records",
   "people.sensitive_view": "View encrypted sensitive profile fields",
   "people.sensitive_edit": "Edit encrypted sensitive profile fields",
@@ -133,6 +135,7 @@ export const DEFAULT_ROLE_PERMISSIONS: Record<RoleKey, Permission[]> = {
   [ROLE_KEYS.HR_ADMIN]: [
     ...LEARNER_BASE,
     "people.edit",
+    "people.view_all",
     "people.import",
     "people.deactivate",
     "people.sensitive_view",
@@ -149,6 +152,7 @@ export const DEFAULT_ROLE_PERMISSIONS: Record<RoleKey, Permission[]> = {
 
   [ROLE_KEYS.TRAINING_ADMIN]: [
     ...LEARNER_BASE,
+    "people.view_all",
     "training.create",
     "training.publish",
     "training.assign",
@@ -177,6 +181,7 @@ export const DEFAULT_ROLE_PERMISSIONS: Record<RoleKey, Permission[]> = {
 
   [ROLE_KEYS.COMPLIANCE_ADMIN]: [
     ...LEARNER_BASE,
+    "people.view_all",
     "compliance.view",
     "compliance.manage",
     "training.assign",
@@ -230,6 +235,7 @@ export const DEFAULT_ROLE_PERMISSIONS: Record<RoleKey, Permission[]> = {
     "training.view",
     "sop.view",
     "people.view",
+    "people.view_all",
     "org.view",
     "skills.view",
     "reports.view",

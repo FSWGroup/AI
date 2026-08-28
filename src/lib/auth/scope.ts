@@ -62,16 +62,25 @@ export function actorHasAll(actor: Actor | null, permissions: Permission[]): boo
 
 /** True when the actor's capabilities amount to platform-wide reporting reach. */
 export function hasPlatformScope(actor: Actor): boolean {
-  if (!actor.permissions.has("reports.view") || !actor.permissions.has("people.view")) {
-    return false;
-  }
-  return (
-    actor.permissions.has("training.assign") ||
-    actor.permissions.has("compliance.view") ||
-    actor.permissions.has("audit.view") ||
-    actor.permissions.has("people.edit")
-  );
+  /*
+   * Scope is granted, not inferred.
+   *
+   * This used to deduce org-wide visibility from a combination of capabilities:
+   * reports.view + people.view + one of training.assign / compliance.view /
+   * audit.view / people.edit. That composed badly. A line manager scopes to
+   * their reporting line and an instructor scopes to the people they teach, but
+   * holding both added up to `training.assign` and silently promoted them to
+   * seeing every person in the organization — in team status, the skills matrix,
+   * the manager brief and knowledge risk. The seeded sales manager had exactly
+   * that pair of roles.
+   *
+   * One explicit permission cannot be assembled out of two narrower roles, so
+   * the escalation is gone by construction rather than by choosing a safer set
+   * of capabilities to infer from.
+   */
+  return actor.permissions.has("people.view_all");
 }
+
 
 /**
  * The set of user IDs an actor may view.

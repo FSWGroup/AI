@@ -34,7 +34,11 @@ export default async function AppLayout({ children }: { children: React.ReactNod
     { label: "My transcript", href: "/transcript", keywords: "transcript history record" },
     { label: "Training calendar", href: "/calendar", keywords: "calendar dates deadlines sessions" },
     ...(actor.permissions.has("team.view")
-      ? [{ label: "Team training status", href: "/team/status", keywords: "team manager status" }]
+      ? [
+          { label: "This week with your team", href: "/team/brief", keywords: "brief coaching manager week" },
+          { label: "Team training status", href: "/team/status", keywords: "team manager status" },
+          { label: "Knowledge risk", href: "/team/knowledge-risk", keywords: "risk succession single point failure skills" },
+        ]
       : []),
     ...(actor.permissions.has("training.create")
       ? [{ label: "Create a course", href: "/admin/training/new", keywords: "new course build" }]

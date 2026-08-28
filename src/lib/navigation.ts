@@ -76,6 +76,13 @@ export const MANAGER_NAV: NavSection = {
   items: [
     { label: "Team", href: "/team", icon: "team", permissions: ["team.view"] },
     {
+      // First in the section on purpose: it is the page a manager should open.
+      label: "This Week",
+      href: "/team/brief",
+      icon: "status",
+      permissions: ["team.view"],
+    },
+    {
       label: "Training Status",
       href: "/team/status",
       icon: "status",
@@ -90,6 +97,12 @@ export const MANAGER_NAV: NavSection = {
     {
       label: "Skills Matrix",
       href: "/team/skills",
+      icon: "matrix",
+      permissions: ["team.view", "skills.view"],
+    },
+    {
+      label: "Knowledge Risk",
+      href: "/team/knowledge-risk",
       icon: "matrix",
       permissions: ["team.view", "skills.view"],
     },
