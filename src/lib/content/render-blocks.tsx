@@ -186,7 +186,7 @@ function WarningView({ block }: { block: Extracted<"warning"> }) {
 function ImageView({ block }: { block: Extracted<"image"> }) {
   return (
     <figure className="not-prose my-4">
-      {/* eslint-disable-next-line @next/next/no-img-element -- media is served from an internal API route, not a Next-optimized static asset */}
+      { }
       <img
         src={`/api/media/${block.mediaId}`}
         alt={block.altText}

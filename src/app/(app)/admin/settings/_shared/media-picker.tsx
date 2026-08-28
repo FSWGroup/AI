@@ -58,7 +58,7 @@ export function MediaPickerField({
       <div className="flex items-center gap-3">
         <div className="flex h-14 w-20 shrink-0 items-center justify-center overflow-hidden rounded-md border border-[var(--border-default)] bg-[var(--surface-sunken)]">
           {value && previewIsImage ? (
-            // eslint-disable-next-line @next/next/no-img-element
+             
             <img src={`/api/media/${value}`} alt="" className="h-full w-full object-contain" />
           ) : value ? (
             <Glyph name="download" className="h-5 w-5 text-[var(--text-muted)]" />

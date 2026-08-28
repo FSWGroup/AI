@@ -69,7 +69,7 @@ export function ComplianceRuleCard({ rule }: { rule: ComplianceRuleStatus }) {
       <div className="flex flex-col gap-4 border-t border-[var(--border-subtle)] p-4">
         {!rule.hasLinkedCourse && (
           <p className="rounded-md bg-[var(--surface-sunken)] p-2.5 text-[0.75rem] text-[var(--text-muted)]">
-            This requirement has no linked course, so compliance evidence can't be tracked automatically here. Affected
+            This requirement has no linked course, so compliance evidence can&apos;t be tracked automatically here. Affected
             population is shown; track evidence manually or link a course.
           </p>
         )}

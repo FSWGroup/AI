@@ -124,7 +124,7 @@ export function ScenarioPlayer({ lesson, progress, onComplete }: LessonPlayerPro
       )}
 
       {alreadyComplete && (
-        <p className="text-[0.8125rem] font-medium text-success-700">You've already completed this scenario.</p>
+        <p className="text-[0.8125rem] font-medium text-success-700">You&apos;ve already completed this scenario.</p>
       )}
     </div>
   );

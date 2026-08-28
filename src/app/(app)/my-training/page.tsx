@@ -264,7 +264,7 @@ export default async function MyTrainingPage({
                           href="/my-training"
                           className="inline-flex h-9.5 items-center rounded-md bg-[var(--brand-primary)] px-4 text-sm font-medium text-white hover:bg-[var(--brand-primary-hover)] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--focus-ring)]"
                         >
-                          See what's assigned
+                          See what&apos;s assigned
                         </Link>
                       }
                     />

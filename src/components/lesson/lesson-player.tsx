@@ -76,7 +76,7 @@ export function LessonPlayer(props: LessonPlayerProps) {
     default:
       return (
         <p className="text-[0.875rem] text-[var(--text-muted)]">
-          This lesson type isn't supported yet.
+          This lesson type isn&apos;t supported yet.
         </p>
       );
   }

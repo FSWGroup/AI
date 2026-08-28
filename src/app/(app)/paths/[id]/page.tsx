@@ -60,7 +60,7 @@ export default async function PathDetailPage({
       />
       <PageBody>
         <ol className="relative flex flex-col gap-0 border-l-2 border-[var(--border-subtle)] pl-8">
-          {progress.items.map((item, index) => {
+          {progress.items.map((item, _index) => {
             const done = item.status === "COMPLETED" || item.percent >= 100;
             const overdue = item.status === "OVERDUE";
             return (

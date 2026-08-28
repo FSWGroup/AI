@@ -96,7 +96,7 @@ export function VideoPlayer({ lesson, course, progress, onComplete, onProgress }
   return (
     <div className="flex flex-col gap-4">
       <div className="overflow-hidden rounded-lg border border-[var(--border-subtle)] bg-black">
-        {/* eslint-disable-next-line jsx-a11y/media-has-caption -- track is added conditionally below */}
+        { }
         <video ref={videoRef} controls className="aspect-video w-full" preload="metadata">
           <source src={src} />
           {captionsDataUrl && <track kind="captions" src={captionsDataUrl} default label="Captions" />}

@@ -76,7 +76,7 @@ export default async function TeamSkillsPage() {
           </div>
         )}
         <p className={cn("mt-3 text-[0.75rem] text-[var(--text-muted)]")}>
-          Red badges mark a gap against the position's required level; green means the requirement is met or there is no requirement.
+          Red badges mark a gap against the position&apos;s required level; green means the requirement is met or there is no requirement.
         </p>
       </PageBody>
     </>

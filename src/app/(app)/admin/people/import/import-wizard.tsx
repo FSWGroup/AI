@@ -151,7 +151,7 @@ export function ImportWizard() {
             <Glyph name="upload" className="h-8 w-8 text-[var(--text-muted)]" />
             <p className="text-[0.9375rem] font-medium text-[var(--text-primary)]">Upload a CSV file</p>
             <p className="max-w-md text-[0.8125rem] text-[var(--text-muted)]">
-              The first row must contain column headers. You'll map columns to fields on the next step.
+              The first row must contain column headers. You&apos;ll map columns to fields on the next step.
             </p>
             <input
               ref={fileInput}

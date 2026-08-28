@@ -32,7 +32,6 @@ export default async function MediaDetailPage({ params }: { params: Promise<{ id
             <ScormSection mediaId={asset.id} enabled={Boolean(settings?.features.scormPlayer)} version={scormInfo.version} />
           ) : asset.kind === "VIDEO" ? (
             <div className="overflow-hidden rounded-lg border border-[var(--border-subtle)] bg-black">
-              {/* eslint-disable-next-line jsx-a11y/media-has-caption -- track is added conditionally below */}
               <video controls className="aspect-video w-full" preload="metadata">
                 <source src={`/api/media/${asset.id}`} type={asset.mimeType} />
                 {asset.captionsVtt && <track kind="captions" src={`/api/media/${asset.id}/captions.vtt`} srcLang="en" label="English captions" default />}
@@ -44,7 +43,7 @@ export default async function MediaDetailPage({ params }: { params: Promise<{ id
               <source src={`/api/media/${asset.id}`} type={asset.mimeType} />
             </audio>
           ) : asset.kind === "IMAGE" ? (
-            // eslint-disable-next-line @next/next/no-img-element
+             
             <img src={`/api/media/${asset.id}`} alt={asset.altText ?? ""} className="max-h-[36rem] w-full rounded-lg border border-[var(--border-subtle)] object-contain" />
           ) : asset.mimeType === "application/pdf" ? (
             <iframe title={asset.title ?? asset.filename} src={`/api/media/${asset.id}`} className="h-[36rem] w-full rounded-lg border border-[var(--border-subtle)]" />

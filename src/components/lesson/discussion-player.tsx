@@ -10,7 +10,7 @@ import { initials } from "@/lib/utils";
 import { MarkCompleteButton } from "@/components/lesson/mark-complete-button";
 import type { LessonPlayerProps } from "@/components/lesson/types";
 
-export function DiscussionPlayer({ lesson, progress, viewer, extra, onComplete, onProgress, postComment }: LessonPlayerProps) {
+export function DiscussionPlayer({ lesson, progress, viewer: _viewer, extra, onComplete, onProgress, postComment }: LessonPlayerProps) {
   const comments = extra?.comments ?? [];
   const [body, setBody] = React.useState("");
   const [submitting, setSubmitting] = React.useState(false);

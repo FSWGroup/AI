@@ -8,7 +8,6 @@ import { toast } from "sonner";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Field, Input, Select } from "@/components/ui/input";
-import { Glyph } from "@/components/icons";
 import { cn, slugify } from "@/lib/utils";
 import {
   createBusinessUnitAction,

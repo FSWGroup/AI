@@ -4,7 +4,6 @@ import { useMemo, useState, useTransition } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Field, Input, Select } from "@/components/ui/input";
 import { Glyph } from "@/components/icons";
@@ -54,7 +53,7 @@ export function AdminPeopleTable({
   departments,
   managers,
   courses,
-  sops,
+  sops: _sops,
   paths,
 }: {
   items: AdminPersonRow[];

@@ -60,7 +60,7 @@ export default async function SkillDetailPage({ params }: { params: Promise<{ id
                 </span>
               </>
             ) : (
-              <span className="text-[0.8125rem] text-[var(--text-muted)]">You haven't demonstrated this skill yet.</span>
+              <span className="text-[0.8125rem] text-[var(--text-muted)]">You haven&apos;t demonstrated this skill yet.</span>
             )}
             {myGap && (
               <Badge tone="warning">

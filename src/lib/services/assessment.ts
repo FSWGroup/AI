@@ -4,7 +4,6 @@ import type { Prisma } from "@prisma/client";
 import { QuestionType } from "@prisma/client";
 import type { Actor } from "@/lib/auth/guard";
 import { actorHas, AuthorizationError } from "@/lib/auth/guard";
-import type { Permission } from "@/lib/permissions";
 import { recordAudit } from "@/lib/audit";
 import { getSettings } from "@/lib/settings";
 import { markLessonComplete } from "@/lib/services/completion";
@@ -18,10 +17,6 @@ import { markLessonComplete } from "@/lib/services/completion";
  */
 
 export class ServiceError extends Error {}
-
-function requireCap(actor: Actor, permission: Permission): void {
-  if (!actorHas(actor, permission)) throw new AuthorizationError(permission);
-}
 
 /** No configurable field exists for this yet, so it is a fixed platform constant. */
 const RETRY_COOLDOWN_HOURS = 24;
@@ -37,7 +32,7 @@ function round2(value: number): number {
 // layer. Re-exported here so callers have a single import site.
 // ---------------------------------------------------------------------------
 
-import { asRecord, gradeAttempt, gradeQuestion, shuffle } from "@/lib/services/grading";
+import { asRecord, gradeAttempt, shuffle } from "@/lib/services/grading";
 
 export {
   gradeAttempt,

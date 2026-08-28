@@ -116,7 +116,7 @@ function ImageViewer({ lesson }: LessonPlayerProps) {
       />
     );
   }
-  // eslint-disable-next-line @next/next/no-img-element -- private media served from an authenticated route, not eligible for next/image optimization.
+   
   return (
     <div className="flex justify-center rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-sunken)] p-4">
       <img src={src} alt={lesson.title} className="max-h-[70vh] w-auto rounded-md" />
@@ -179,7 +179,7 @@ function ExternalLinkViewer({ lesson, progress }: LessonPlayerProps) {
       </a>
       {opened && progress?.status !== "COMPLETED" && (
         <p className="text-[0.75rem] text-[var(--text-muted)]">
-          Opened. When you're done reviewing it, mark this lesson complete below.
+          Opened. When you&apos;re done reviewing it, mark this lesson complete below.
         </p>
       )}
     </div>

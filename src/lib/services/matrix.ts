@@ -2,7 +2,6 @@ import "server-only";
 import { prisma } from "@/lib/db";
 import type { AssignmentStatus, Prisma, TrainingTargetType, WorkerType } from "@prisma/client";
 import { type Actor, AuthorizationError, getVisibleUserIds } from "@/lib/auth/guard";
-import type { Permission } from "@/lib/permissions";
 import { USER_CONTEXT_INCLUDE, buildUserContext, evaluateCriteria, type UserForContext } from "@/lib/services/assignment";
 
 /**
@@ -61,10 +60,6 @@ export interface MatrixFilters {
   roleKey?: string;
   workerType?: string;
   courseId?: string;
-}
-
-function requirePermission(actor: Actor, permission: Permission): void {
-  if (!actor.permissions.has(permission)) throw new AuthorizationError(permission);
 }
 
 interface TargetLike {
@@ -188,8 +183,11 @@ async function getPeopleRowsMatrix(actor: Actor, filters: MatrixFilters, page: n
     }),
   ]);
 
-  let { columns, complianceCriteriaByKey } = buildColumnsWithCompliance(positionReqs, complianceRules);
-  if (filters.courseId) columns = columns.filter((c) => c.courseId === filters.courseId);
+  const built = buildColumnsWithCompliance(positionReqs, complianceRules);
+  const { complianceCriteriaByKey } = built;
+  const columns = filters.courseId
+    ? built.columns.filter((c) => c.courseId === filters.courseId)
+    : built.columns;
 
   const [assignments, exemptions, completions] = await Promise.all([
     prisma.assignment.findMany({ where: { userId: { in: rowIds } } }),

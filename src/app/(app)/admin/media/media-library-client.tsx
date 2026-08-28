@@ -153,7 +153,7 @@ export function MediaLibraryClient({
             <div key={item.id} className="flex flex-col overflow-hidden rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-card)]">
               <div className="flex h-32 items-center justify-center bg-[var(--surface-sunken)]">
                 {item.kind === "IMAGE" ? (
-                  // eslint-disable-next-line @next/next/no-img-element
+                   
                   <img src={`/api/media/${item.id}`} alt={item.altText ?? ""} className="h-full w-full object-cover" />
                 ) : (
                   <Icon name={KIND_ICON[item.kind]} className="h-8 w-8 text-[var(--text-muted)]" />

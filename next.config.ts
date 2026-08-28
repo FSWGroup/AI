@@ -27,10 +27,40 @@ const nextConfig: NextConfig = {
         ],
       },
       {
-        // Uploaded/untrusted content is served sandboxed under /api/media.
-        source: "/api/media/:path*",
+        /*
+         * Uploaded media is untrusted content, so it is served with a bare
+         * `sandbox` — no script execution at all. The negative lookahead
+         * excludes the SCORM subtree, which needs the different policy below;
+         * without it, both rules would match and emit conflicting headers.
+         */
+        source: "/api/media/:path((?!scorm/).*)",
         headers: [
-          { key: "Content-Security-Policy", value: "sandbox; default-src 'none'; media-src 'self'; img-src 'self'" },
+          {
+            key: "Content-Security-Policy",
+            value: "sandbox; default-src 'none'; media-src 'self'; img-src 'self'",
+          },
+          { key: "X-Content-Type-Options", value: "nosniff" },
+        ],
+      },
+      {
+        /*
+         * SCORM packages are third-party code that must run its own JavaScript
+         * to work at all, so a bare `sandbox` would break every package.
+         *
+         * `allow-scripts` without `allow-same-origin` is the right trade: the
+         * package executes in a unique opaque origin, so it can run its own
+         * code but cannot read this application's cookies, localStorage, or
+         * DOM. Progress reaches the platform only through postMessage, which
+         * the player validates. Granting both allow-scripts and
+         * allow-same-origin together would let a package escape the sandbox
+         * entirely — that combination must never appear here.
+         */
+        source: "/api/media/scorm/:path*",
+        headers: [
+          {
+            key: "Content-Security-Policy",
+            value: "sandbox allow-scripts allow-forms allow-popups allow-downloads",
+          },
           { key: "X-Content-Type-Options", value: "nosniff" },
         ],
       },

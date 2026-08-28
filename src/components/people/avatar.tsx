@@ -17,7 +17,7 @@ export function PersonAvatar({
   className?: string;
 }) {
   if (image) {
-    // eslint-disable-next-line @next/next/no-img-element
+     
     return (
       <img
         src={image}

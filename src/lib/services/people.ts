@@ -4,7 +4,7 @@ import type { Prisma, WorkerType } from "@prisma/client";
 import {
   type Actor,
   AuthorizationError,
-  canManageUser,
+  
   canViewUser,
   getVisibleUserIds,
 } from "@/lib/auth/guard";

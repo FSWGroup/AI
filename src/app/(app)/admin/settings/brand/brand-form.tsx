@@ -61,7 +61,7 @@ export function BrandForm({ initial, canManage }: { initial: BrandSettings; canM
         <div className="overflow-hidden rounded-lg border border-[var(--border-subtle)]">
           <div className="flex items-center gap-2 px-4 py-3" style={{ backgroundColor: values.primaryColor }}>
             {values.logoMediaId ? (
-              // eslint-disable-next-line @next/next/no-img-element
+               
               <img src={`/api/media/${values.logoMediaId}`} alt="" className="h-5 w-auto" />
             ) : (
               <span className="h-5 w-5 rounded-sm bg-white/20" aria-hidden="true" />
