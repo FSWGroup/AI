@@ -890,6 +890,12 @@ async function main() {
   await seedRulesAndCompliance(prisma, userIds, courseIds, positionIds, sopIds);
   await seedAnnouncements(prisma, userIds);
 
+  // Rules and content alone leave every learner surface empty. This runs the
+  // real assignment engine and the real completion path so a fresh install has
+  // truthful, demonstrable state on every screen.
+  const { seedDemonstrationState } = await import("./seed-progress");
+  await seedDemonstrationState(prisma, userIds, courseIds, sopIds);
+
   console.log("\nSeed complete.");
   console.log(`\nDevelopment sign-in password for every seeded account: ${DEV_PASSWORD}`);
   console.log("Accounts:");

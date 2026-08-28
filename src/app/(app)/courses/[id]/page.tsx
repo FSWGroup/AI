@@ -14,6 +14,7 @@ import { Glyph, Icon } from "@/components/icons";
 import { formatMinutes } from "@/lib/utils";
 import { LESSON_TYPE_LABEL } from "@/components/lesson/lesson-type-label";
 import { SelfEnrollButton } from "@/components/course/self-enroll-button";
+import { selfEnrollAction } from "@/lib/actions/course-enrollment";
 
 export async function generateMetadata({ params }: { params: Promise<{ id: string }> }): Promise<Metadata> {
   const { id } = await params;
@@ -64,7 +65,7 @@ export default async function CourseOverviewPage({ params }: { params: Promise<{
               Locked
             </Button>
           ) : canSelfEnrollHere ? (
-            <SelfEnrollButton courseId={courseId} />
+            <SelfEnrollButton courseId={courseId} action={selfEnrollAction} />
           ) : startHref ? (
             <Link href={startHref}>
               <Button size="lg">

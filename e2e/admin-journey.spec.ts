@@ -81,18 +81,13 @@ test.describe("SOP authoring", () => {
     await signIn(page, "trainingAdmin");
     await page.goto("/sops");
 
-    const sopLink = page
-      .getByRole("link")
-      .filter({ hasText: /quote|receive|acceptable use/i })
-      .first();
-
-    if ((await sopLink.count()) === 0) {
-      test.skip(true, "No seeded SOP found");
-      return;
-    }
-
+    // Asserted, not guarded by count(): count() does not auto-wait, so a
+    // conditional skip here passes silently whenever the list is still
+    // rendering — which is exactly when a regression would slip through.
+    const sopLink = page.getByRole("link", { name: /create a customer quote/i });
+    await expect(sopLink).toBeVisible();
     await sopLink.click();
-    await expect(page.locator("h1")).toBeVisible();
+    await expect(page.getByRole("heading", { level: 1 })).toBeVisible();
 
     // The signature workflow: one procedure becomes training, a quiz, a video.
     const actions = page.getByRole("link", {
@@ -108,21 +103,15 @@ test.describe("SOP authoring", () => {
     await signIn(page, "trainingAdmin");
     await page.goto("/sops");
 
-    const sopLink = page.getByRole("link").filter({ hasText: /quote/i }).first();
-    if ((await sopLink.count()) === 0) {
-      test.skip(true, "No seeded SOP found");
-      return;
-    }
-    await sopLink.click();
+    // Read the id from the link's href rather than clicking and parsing the
+    // resulting URL: fewer moving parts, and no dependence on the click having
+    // navigated yet.
+    const sopLink = page.getByRole("link", { name: /create a customer quote/i });
+    await expect(sopLink).toBeVisible();
+    const href = await sopLink.getAttribute("href");
+    expect(href, "the SOP link needs a real target").toMatch(/^\/sops\/[a-z0-9]+$/);
 
-    const url = page.url();
-    const idMatch = url.match(/\/sops\/([^/?]+)/);
-    if (!idMatch?.[1]) {
-      test.skip(true, "Could not resolve the SOP id from the URL");
-      return;
-    }
-
-    await page.goto(`/sops/${idMatch[1]}/versions`);
+    await page.goto(`${href}/versions`);
     await expect(page.locator("h1")).toBeVisible();
     // The seed publishes version 1.0.
     await expect(page.getByText(/1\.0/).first()).toBeVisible();
@@ -183,33 +172,60 @@ test.describe("AI surfaces degrade honestly without credentials", () => {
 });
 
 test.describe("People administration", () => {
-  test("the people directory paginates and filters", async ({ page }) => {
+  test("the people directory lists seeded people and filters them", async ({ page }) => {
     await signIn(page, "hrAdmin");
     await page.goto("/admin/people");
 
     await expect(page.locator("h1")).toBeVisible();
-    // Seeded people should be listed.
-    await expect(page.getByText(/@fswelsford\.com/).first()).toBeVisible();
+
+    /*
+     * The table shows each person by name, position, department and manager.
+     * It deliberately does not print email addresses in the bulk view — they
+     * are searchable, but a directory that renders every address invites
+     * casual bulk copying. Assert on the seeded people themselves.
+     */
+    const rows = page.getByRole("row");
+    await expect(rows.filter({ hasText: /Jordan Pace/i })).toHaveCount(1);
+    expect(await rows.count()).toBeGreaterThan(3);
+
+    /*
+     * Filtering must actually narrow the table, not just reload it. Scoped to
+     * the filter form: the top bar carries its own "Search" control that opens
+     * the command palette, and an unscoped match hit that instead of submitting.
+     */
+    const filters = page.locator("form").filter({ has: page.locator("#admin-people-q") });
+    await filters.locator("#admin-people-q").fill("Jordan");
+    await filters.getByRole("button", { name: /^search$/i }).click();
+
+    await expect(page.getByRole("row").filter({ hasText: /Jordan Pace/i })).toHaveCount(1);
+    await expect(page.getByRole("row").filter({ hasText: /Casey Lund/i })).toHaveCount(0);
   });
 
   test("sensitive fields are not loaded until explicitly revealed", async ({ page }) => {
     await signIn(page, "hrAdmin");
     await page.goto("/people");
 
-    const personLink = page.getByRole("link").filter({ hasText: /jordan|kim|dev/i }).first();
-    if ((await personLink.count()) === 0) {
-      test.skip(true, "No person link found in the directory");
-      return;
-    }
+    const personLink = page.getByRole("link", { name: /jordan pace/i }).first();
+    await expect(personLink).toBeVisible();
+    const href = await personLink.getAttribute("href");
+    await page.goto(href!);
+    await expect(page.getByRole("heading", { level: 1, name: /jordan pace/i })).toBeVisible();
 
-    await personLink.click();
-    await expect(page.locator("h1")).toBeVisible();
+    /*
+     * The security property: no sensitive value may be in the delivered HTML
+     * before someone asks for it. The reveal is a deliberate, audited read, so
+     * the page must ship the control rather than the data.
+     */
+    const html = await page.content();
+    expect(html, "a sensitive value must not be present before it is revealed").not.toMatch(
+      /\b\d{3}-\d{2}-\d{4}\b/,
+    );
 
-    // If the profile offers sensitive fields at all, they must be behind an
-    // explicit action so the audited read is deliberate.
     const reveal = page.getByRole("button", { name: /reveal|show sensitive/i });
     if ((await reveal.count()) > 0) {
       await expect(reveal.first()).toBeVisible();
+      // Still nothing revealed until it is pressed.
+      expect(await page.content()).not.toMatch(/\b\d{3}-\d{2}-\d{4}\b/);
     }
   });
 
@@ -255,13 +271,14 @@ test.describe("Compliance and reporting", () => {
       .filter({ hasText: /completion|overdue|transcript|certification/i })
       .first();
 
-    if ((await reportLink.count()) === 0) {
-      test.skip(true, "No report links found in the catalog");
-      return;
-    }
+    await expect(reportLink).toBeVisible();
+    const href = await reportLink.getAttribute("href");
+    expect(href, "a report link needs a real target").toBeTruthy();
 
-    await reportLink.click();
-    await expect(page.locator("h1")).toBeVisible();
+    // The report must actually run and render, not just be listed.
+    await page.goto(href!);
+    await expect(page.getByRole("heading", { level: 1 })).toBeVisible();
+    await expect(page.getByRole("table").or(page.getByText(/no rows|no results/i)).first()).toBeVisible();
   });
 });
 

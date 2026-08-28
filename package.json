@@ -2,7 +2,7 @@
   "name": "fsw-academy",
   "version": "0.1.0",
   "private": true,
-  "description": "FSW Academy \u2014 internal training, SOP, onboarding, compliance, knowledge-management, and AI learning platform for FSW Group.",
+  "description": "FSW Academy — internal training, SOP, onboarding, compliance, knowledge-management, and AI learning platform for FSW Group.",
   "scripts": {
     "dev": "next dev",
     "build": "next build",
@@ -12,7 +12,7 @@
     "db:migrate": "prisma migrate deploy",
     "db:migrate:dev": "prisma migrate dev",
     "db:generate": "prisma generate",
-    "db:seed": "tsx prisma/seed.ts",
+    "db:seed": "tsx --tsconfig prisma/tsconfig.seed.json prisma/seed.ts",
     "db:reset": "prisma migrate reset --force",
     "worker": "tsx src/worker/index.ts",
     "test": "vitest run --project unit",
@@ -23,7 +23,7 @@
     "e2e:free-port": "node scripts/free-port.mjs"
   },
   "prisma": {
-    "seed": "tsx prisma/seed.ts"
+    "seed": "tsx --tsconfig prisma/tsconfig.seed.json prisma/seed.ts"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.65.0",

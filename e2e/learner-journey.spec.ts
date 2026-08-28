@@ -15,11 +15,15 @@ test.describe("Learner dashboard", () => {
 
     await expect(page.locator("h1")).toBeVisible();
 
-    // The seeded learner is a recent hire with onboarding assignments, so the
-    // dashboard must show something actionable rather than an empty shell.
-    const hasTraining =
-      (await page.getByText(/continue|due|overdue|assigned|welcome/i).count()) > 0;
-    expect(hasTraining, "the learner dashboard should surface assigned training").toBeTruthy();
+    /*
+     * The seeded learner is a recent hire carrying real assignments from the
+     * rule engine. Asserting on a named seeded course rather than a loose
+     * keyword match matters: a pattern like /assigned/ is also satisfied by the
+     * words "No training assigned yet", so an empty dashboard would pass.
+     */
+    await expect(
+      page.getByRole("link", { name: /cybersecurity fundamentals/i }).first(),
+    ).toBeVisible();
   });
 
   test("My Training groups work by urgency and names the assignment reason", async ({ page }) => {
@@ -28,29 +32,36 @@ test.describe("Learner dashboard", () => {
 
     await expect(page.getByRole("heading", { name: "My Training" })).toBeVisible();
 
-    // Rule-driven assignments carry a human-readable reason.
-    const reason = page.getByText(/why you have this/i).first();
-    if ((await reason.count()) > 0) {
-      await expect(reason).toBeVisible();
-    }
+    // Rule-driven assignments carry a generated, human-readable reason. The
+    // seeded learner is in Sales, so this is the reason the engine produced.
+    await expect(page.getByText(/because you are in the Sales department/i).first()).toBeVisible();
 
-    // The filter tabs keep state in the URL so a view is shareable.
-    await page.getByRole("link", { name: /completed/i }).first().click();
+    // The seeded spread always leaves this learner something overdue, so the
+    // urgency grouping has a section to render.
+    await expect(page.getByRole("heading", { name: /overdue/i }).first()).toBeVisible();
+
+    // The filter tabs keep state in the URL so a view is shareable. Scoped to
+    // the filter navigation, because a card can also mention a completion date.
+    const filters = page.getByRole("navigation", { name: /filter training/i });
+    await filters.getByRole("link", { name: /completed/i }).click();
     await expect(page).toHaveURL(/filter=completed/);
+
+    // Switching filters must actually change the view, not just the URL.
+    await expect(page.getByRole("heading", { name: "My Training" })).toBeVisible();
   });
 
   test("the empty state offers a next action rather than a blank screen", async ({ page }) => {
-    // The auditor has no assigned training, so My Training must still be useful.
+    /*
+     * Every active person matches the company-wide cybersecurity rule, so no
+     * account has a permanently empty To-do list to assert against. The
+     * Completed view of someone who has finished nothing is the honest, stable
+     * empty state — and it still has to offer somewhere to go.
+     */
     await signIn(page, "auditor");
-    await page.goto("/my-training");
+    await page.goto("/my-training?filter=completed");
 
-    const emptyState = page.getByText(/no training assigned yet|all caught up/i);
-    if ((await emptyState.count()) > 0) {
-      await expect(emptyState.first()).toBeVisible();
-      // An empty state must always offer somewhere to go.
-      const actions = page.getByRole("link", { name: /catalog|sop library|browse/i });
-      expect(await actions.count()).toBeGreaterThan(0);
-    }
+    await expect(page.getByRole("heading", { name: "My Training" })).toBeVisible();
+    await expect(page.getByRole("link", { name: /browse catalog/i }).first()).toBeVisible();
   });
 });
 
@@ -93,94 +104,142 @@ test.describe("Finding knowledge", () => {
     await signIn(page, "learner");
     await page.goto("/sops");
 
-    await expect(page.locator("h1")).toBeVisible();
-    // Seeded SOPs include a quoting procedure and a receiving procedure.
-    const links = page.getByRole("link");
-    expect(await links.count()).toBeGreaterThan(0);
+    /*
+     * Named seeded procedures, not a link count: every page has navigation
+     * links, so `count() > 0` passes even when the library renders nothing.
+     */
+    await expect(page.getByRole("link", { name: /create a customer quote/i })).toBeVisible();
+    await expect(page.getByRole("link", { name: /receive an inbound shipment/i })).toBeVisible();
   });
 
   test("an SOP renders its body and metadata", async ({ page }) => {
     await signIn(page, "learner");
     await page.goto("/sops");
 
-    const sopLink = page
-      .getByRole("link")
-      .filter({ hasText: /quote|receive|acceptable use|find an sop/i })
-      .first();
-
-    if ((await sopLink.count()) === 0) {
-      test.skip(true, "No seeded SOP link found");
-      return;
-    }
-
+    // Asserted, not guarded by a count(): count() does not auto-wait, so a
+    // conditional skip here would quietly pass whenever the list was still
+    // rendering — exactly the regression this test exists to catch.
+    const sopLink = page.getByRole("link", { name: /create a customer quote/i });
+    await expect(sopLink).toBeVisible();
     await sopLink.click();
-    await expect(page.locator("h1")).toBeVisible();
+
+    await expect(page.getByRole("heading", { level: 1, name: /create a customer quote/i })).toBeVisible();
 
     // The reader shows the procedure body, not just a title.
-    const body = page.locator(".prose-fsw, main");
-    await expect(body.first()).toBeVisible();
+    await expect(page.locator(".prose-fsw").first()).toBeVisible();
   });
 });
 
 test.describe("Working through a course", () => {
-  test("the catalog lists courses and opens one", async ({ page }) => {
+  test("the catalog links each course by title", async ({ page }) => {
     await signIn(page, "learner");
     await page.goto("/catalog");
 
-    await expect(page.locator("h1")).toBeVisible();
+    /*
+     * Each course card's title is its own link. That is what makes the catalog
+     * navigable by assistive technology: the footer actions read "View" and
+     * "View details" on every card, so without the title link a screen reader's
+     * link list could not tell the courses apart.
+     *
+     * This asserts the link's target rather than clicking it. Clicking exercises
+     * Next's client-side router, which is unreliable in this environment — see
+     * the fixme below and KNOWN-ISSUES.md.
+     */
+    const courseLink = page.getByRole("link", { name: /^cybersecurity fundamentals$/i });
+    await expect(courseLink).toBeVisible();
+    const href = await courseLink.getAttribute("href");
+    expect(href).toMatch(/^\/courses\/[a-z0-9]+$/);
 
-    const courseLink = page
-      .getByRole("link")
-      .filter({ hasText: /welcome|cybersecurity|valve|quote|overview|warehouse/i })
-      .first();
-
-    if ((await courseLink.count()) === 0) {
-      test.skip(true, "No seeded course found in the catalog");
-      return;
-    }
-
-    await courseLink.click();
-    await expect(page.locator("h1")).toBeVisible();
+    // The target really renders that course.
+    await page.goto(href!);
+    await expect(
+      page.getByRole("heading", { level: 1, name: /cybersecurity fundamentals/i }),
+    ).toBeVisible();
   });
 
-  test("a course page shows its structure and a way to start", async ({ page }) => {
+  test.fixme(
+    "client-side navigation from the catalog into a course commits",
+    async ({ page }) => {
+      /*
+       * Known defect, tracked in KNOWN-ISSUES.md: in a production build, clicking
+       * a `next/link` into `/courses/[id]` commits only intermittently (~1 attempt
+       * in 3). The click is received and its default prevented, the RSC response
+       * returns 200 with a complete payload in well under a second, then the
+       * transition never commits: no chunk request, no console error, no error
+       * boundary, and the URL is unchanged 45s later. A plain anchor to the same
+       * URL is 100% reliable, and `next dev` is unaffected.
+       *
+       * Ruled out: prefetch on/off, React 19.1.1 and 19.2.8, duplicate React
+       * copies, `scroll-behavior: smooth`, Prisma pool size, server render time
+       * (54-120ms), server action module placement, and parallel/intercepting
+       * routes.
+       */
+      await signIn(page, "learner");
+      await page.goto("/catalog");
+      await page.getByRole("link", { name: /^cybersecurity fundamentals$/i }).click();
+      await expect(page).toHaveURL(/\/courses\//, { timeout: 10_000 });
+    },
+  );
+
+  test("a course page offers a real way to start, which opens a lesson", async ({ page }) => {
     await signIn(page, "learner");
+
     await page.goto("/catalog");
+    const href = await page
+      .getByRole("link", { name: /^cybersecurity fundamentals$/i })
+      .getAttribute("href");
+    await page.goto(href!);
 
-    const courseLink = page
-      .getByRole("link")
-      .filter({ hasText: /welcome to fsw/i })
+    /*
+     * Scoped to the page body: the sidebar's "Help & getting started" link also
+     * matches a loose /start/ pattern, and an unscoped `.first()` picked it up
+     * instead of the course's own action.
+     */
+    const start = page
+      .getByRole("main")
+      .getByRole("link", { name: /^(start|continue)$/i })
       .first();
+    await expect(start).toBeVisible();
 
-    if ((await courseLink.count()) === 0) {
-      test.skip(true, "Welcome course not found");
-      return;
-    }
-
-    await courseLink.click();
-
-    // There must be a real way in — not a decorative button.
-    const start = page.getByRole("link", { name: /start|continue|begin/i }).first();
-    if ((await start.count()) > 0) {
-      await expect(start).toBeVisible();
-      await start.click();
-      // Landing on a lesson URL proves the button is wired up.
-      await expect(page).toHaveURL(/lesson/i, { timeout: 20_000 });
-    }
+    // The action must lead to a real lesson, not sit inert.
+    const lessonHref = await start.getAttribute("href");
+    expect(lessonHref, "the start action needs a real target").toMatch(/lesson/i);
+    await page.goto(lessonHref!);
+    await expect(page.locator("h1")).toBeVisible();
   });
 });
 
 test.describe("Certificates and transcript", () => {
-  test("the certificates page renders with an empty state when none exist", async ({ page }) => {
+  test("a completed course produces a real, downloadable certificate", async ({ page }) => {
     await signIn(page, "learner");
     await page.goto("/certificates");
-    await expect(page.locator("h1")).toBeVisible();
+
+    // The seeded learner completed the welcome course through the real
+    // completion path, so a certificate exists with an FSW serial number.
+    await expect(page.getByText(/welcome to fsw/i).first()).toBeVisible();
+    await expect(page.getByText(/FSW-\d{4}-\d+/).first()).toBeVisible();
+
+    // The download must serve an actual PDF, not a dead link.
+    const link = page.getByRole("link", { name: /download|pdf/i }).first();
+    await expect(link).toBeVisible();
+    const href = await link.getAttribute("href");
+    expect(href, "the certificate download needs a real href").toBeTruthy();
+
+    const response = await page.request.get(href!);
+    expect(response.status(), "the certificate PDF must be served").toBe(200);
+    expect(response.headers()["content-type"]).toContain("pdf");
+    const body = await response.body();
+    // A PDF always starts with the %PDF- magic bytes.
+    expect(body.subarray(0, 5).toString("latin1")).toBe("%PDF-");
   });
 
-  test("the transcript page renders for the signed-in person", async ({ page }) => {
+  test("the transcript lists what the person actually completed", async ({ page }) => {
     await signIn(page, "learner");
     await page.goto("/transcript");
+
     await expect(page.locator("h1")).toBeVisible();
+    // The completion the seed produced must appear as a transcript entry.
+    await expect(page.getByText(/welcome to fsw/i).first()).toBeVisible();
   });
 });
 

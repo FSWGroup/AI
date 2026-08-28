@@ -14,6 +14,7 @@ import { Icon } from "@/components/icons";
 import { formatMinutes } from "@/lib/utils";
 import { LESSON_TYPE_LABEL } from "@/components/lesson/lesson-type-label";
 import { SelfEnrollButton } from "@/components/course/self-enroll-button";
+import { selfEnrollAction } from "@/lib/actions/course-enrollment";
 
 export const metadata: Metadata = { title: "Catalog" };
 
@@ -199,7 +200,27 @@ export default async function CatalogPage({
                 <Card key={course.id} className="flex flex-col">
                   <CardHeader>
                     <div className="flex items-center justify-between gap-2">
-                      <CardTitle className="truncate">{course.title}</CardTitle>
+                      {/*
+                        The title is the card's primary link. Without it the only
+                        links on this page are the footer actions, whose names
+                        ("View", "View details") repeat across every card — a
+                        screen reader's link list would be a row of identical
+                        entries with no way to tell the courses apart.
+
+                        `min-w-0` on the heading with `truncate` on the anchor,
+                        not the reverse: truncating the heading would leave the
+                        inline anchor its full untruncated width, so its box
+                        would extend past the clipped text and no longer match
+                        what the user can see and click.
+                      */}
+                      <CardTitle className="min-w-0">
+                        <Link
+                          href={`/courses/${course.id}`}
+                          className="block truncate rounded-sm hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--focus-ring)]"
+                        >
+                          {course.title}
+                        </Link>
+                      </CardTitle>
                       {course.isRequired && <Badge tone="navy">Required</Badge>}
                     </div>
                   </CardHeader>
@@ -222,16 +243,32 @@ export default async function CatalogPage({
                     )}
                   </CardContent>
                   <CardFooter className="justify-between">
+                    {/*
+                      Each action names its course in the accessible name, so
+                      the repeated visible labels stay short without leaving
+                      assistive technology with ambiguous controls.
+                    */}
                     {course.assignment ? (
-                      <Link href={`/courses/${course.id}`}>
+                      <Link
+                        href={`/courses/${course.id}`}
+                        aria-label={
+                          course.overallPercent > 0
+                            ? `Continue ${course.title} — ${course.overallPercent}% complete`
+                            : `View ${course.title}`
+                        }
+                      >
                         <Button size="sm" variant="outline">
                           {course.overallPercent > 0 ? `${course.overallPercent}% complete` : "View"}
                         </Button>
                       </Link>
                     ) : course.selfEnrollAllowed ? (
-                      <SelfEnrollButton courseId={course.id} />
+                      <SelfEnrollButton
+                        courseId={course.id}
+                        courseTitle={course.title}
+                        action={selfEnrollAction}
+                      />
                     ) : (
-                      <Link href={`/courses/${course.id}`}>
+                      <Link href={`/courses/${course.id}`} aria-label={`View details for ${course.title}`}>
                         <Button size="sm" variant="ghost">
                           View details
                         </Button>

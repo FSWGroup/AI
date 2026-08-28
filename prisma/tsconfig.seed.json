@@ -1,0 +1,10 @@
+{
+  "//": "Seed-only TypeScript config. Identical to the root config except that `server-only` resolves to an empty module, letting the seed call the application's real services. See prisma/server-only-shim.ts.",
+  "extends": "../tsconfig.json",
+  "compilerOptions": {
+    "paths": {
+      "@/*": ["../src/*"],
+      "server-only": ["./server-only-shim.ts"]
+    }
+  }
+}
