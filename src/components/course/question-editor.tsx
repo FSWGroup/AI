@@ -6,6 +6,7 @@ import { QuestionType } from "@prisma/client";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { ConfirmDialog } from "@/components/ui/dialog";
 import { Field, Input, Select, Textarea } from "@/components/ui/input";
 import { EmptyState } from "@/components/ui/empty-state";
 import { Glyph, Icon } from "@/components/icons";
@@ -47,12 +48,15 @@ export function QuestionEditor({
   const [busy, setBusy] = React.useState<string | null>(null);
   const questions = lesson.questions;
 
+  // The application's own dialog, never window.confirm — see components/ui/dialog.
+  const [pendingDelete, setPendingDelete] = React.useState<string | null>(null);
+
   async function handleDelete(questionId: string) {
-    if (!window.confirm("Delete this question?")) return;
     setBusy(questionId);
     const result = await deleteQuestionAction(courseId, questionId);
     setBusy(null);
     if (!result.ok) return toast.error(result.error);
+    setPendingDelete(null);
     onSaved();
   }
 
@@ -107,7 +111,7 @@ export function QuestionEditor({
                 <IconBtn label="Edit question" onClick={() => setEditingId(q.id)}>
                   <Glyph name="edit" className="h-3.5 w-3.5" />
                 </IconBtn>
-                <IconBtn label="Delete question" onClick={() => handleDelete(q.id)} loading={busy === q.id}>
+                <IconBtn label="Delete question" onClick={() => setPendingDelete(q.id)} loading={busy === q.id}>
                   <Glyph name="trash" className="h-3.5 w-3.5" />
                 </IconBtn>
               </div>
@@ -128,6 +132,17 @@ export function QuestionEditor({
           />
         )}
       </CardContent>
+
+      <ConfirmDialog
+        open={pendingDelete !== null}
+        onOpenChange={(open) => !open && setPendingDelete(null)}
+        title="Delete this question?"
+        description="Attempts already recorded against it keep their own snapshot, so past scores are unaffected."
+        confirmLabel="Delete question"
+        danger
+        loading={busy !== null}
+        onConfirm={() => pendingDelete && handleDelete(pendingDelete)}
+      />
     </Card>
   );
 }

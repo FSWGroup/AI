@@ -7,6 +7,7 @@ import { Difficulty } from "@prisma/client";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { ConfirmDialog, PromptDialog } from "@/components/ui/dialog";
 import { Field, Input, Select, Textarea } from "@/components/ui/input";
 import { EmptyState } from "@/components/ui/empty-state";
 import { Glyph, Icon } from "@/components/icons";
@@ -92,35 +93,75 @@ export function CourseBuilder({
   const [changeSummary, setChangeSummary] = React.useState("");
   const [publishing, setPublishing] = React.useState(false);
   const [savingMeta, setSavingMeta] = React.useState(false);
-  const [busy, setBusy] = React.useState<string | null>(null);
+
+  /*
+   * Naming and deletion run through the application's own dialogs. They used to
+   * call window.prompt and window.confirm, which cannot be styled or labelled,
+   * are announced inconsistently, and return null under automation — so "Add
+   * section" could silently do nothing.
+   */
+  type Prompt =
+    | { kind: "add-section" }
+    | { kind: "rename-section"; sectionId: string; current: string }
+    | { kind: "add-lesson"; sectionId: string };
+  type Confirm =
+    | { kind: "delete-section"; sectionId: string }
+    | { kind: "delete-lesson"; lessonId: string };
+
+  const [prompt, setPrompt] = React.useState<Prompt | null>(null);
+  const [confirm, setConfirm] = React.useState<Confirm | null>(null);
+  const [dialogBusy, setDialogBusy] = React.useState(false);
 
   const selectedLesson = course.sections
     .flatMap((s) => s.lessons)
     .find((l) => l.id === selectedLessonId);
 
-  async function handleAddSection() {
-    const title = window.prompt("Section title");
-    if (!title?.trim()) return;
-    setBusy("add-section");
-    const result = await addSectionAction(course.id, title.trim());
-    setBusy(null);
+  /** Runs a prompt's action, keeping the dialog open if the server rejects it. */
+  async function submitPrompt(value: string) {
+    if (!prompt) return;
+    setDialogBusy(true);
+    const result = await (prompt.kind === "add-section"
+      ? addSectionAction(course.id, value)
+      : prompt.kind === "rename-section"
+        ? updateSectionAction(course.id, prompt.sectionId, value)
+        : addLessonAction(course.id, prompt.sectionId, { title: value, type: "RICH_TEXT" }));
+    setDialogBusy(false);
+
     if (!result.ok) return toast.error(result.error);
+    if (prompt.kind === "add-lesson" && "data" in result && result.data) {
+      setSelectedLessonId(result.data.id);
+    }
+    setPrompt(null);
     router.refresh();
   }
 
-  async function handleRenameSection(sectionId: string, current: string) {
-    const title = window.prompt("Section title", current);
-    if (!title?.trim() || title === current) return;
-    const result = await updateSectionAction(course.id, sectionId, title.trim());
+  async function submitConfirm() {
+    if (!confirm) return;
+    setDialogBusy(true);
+    const result =
+      confirm.kind === "delete-section"
+        ? await deleteSectionAction(course.id, confirm.sectionId)
+        : await deleteLessonAction(course.id, confirm.lessonId);
+    setDialogBusy(false);
+
     if (!result.ok) return toast.error(result.error);
+    if (confirm.kind === "delete-lesson" && selectedLessonId === confirm.lessonId) {
+      setSelectedLessonId(null);
+    }
+    setConfirm(null);
     router.refresh();
   }
 
-  async function handleDeleteSection(sectionId: string) {
-    if (!window.confirm("Delete this section and all of its lessons?")) return;
-    const result = await deleteSectionAction(course.id, sectionId);
-    if (!result.ok) return toast.error(result.error);
-    router.refresh();
+  function handleAddSection() {
+    setPrompt({ kind: "add-section" });
+  }
+
+  function handleRenameSection(sectionId: string, current: string) {
+    setPrompt({ kind: "rename-section", sectionId, current });
+  }
+
+  function handleDeleteSection(sectionId: string) {
+    setConfirm({ kind: "delete-section", sectionId });
   }
 
   async function handleMoveSection(sectionId: string, direction: -1 | 1) {
@@ -134,23 +175,12 @@ export function CourseBuilder({
     router.refresh();
   }
 
-  async function handleAddLesson(sectionId: string) {
-    const title = window.prompt("Lesson title");
-    if (!title?.trim()) return;
-    setBusy(`add-lesson-${sectionId}`);
-    const result = await addLessonAction(course.id, sectionId, { title: title.trim(), type: "RICH_TEXT" });
-    setBusy(null);
-    if (!result.ok) return toast.error(result.error);
-    setSelectedLessonId(result.data.id);
-    router.refresh();
+  function handleAddLesson(sectionId: string) {
+    setPrompt({ kind: "add-lesson", sectionId });
   }
 
-  async function handleDeleteLesson(lessonId: string) {
-    if (!window.confirm("Delete this lesson?")) return;
-    const result = await deleteLessonAction(course.id, lessonId);
-    if (!result.ok) return toast.error(result.error);
-    if (selectedLessonId === lessonId) setSelectedLessonId(null);
-    router.refresh();
+  function handleDeleteLesson(lessonId: string) {
+    setConfirm({ kind: "delete-lesson", lessonId });
   }
 
   async function handleMoveLesson(sectionId: string, lessonId: string, direction: -1 | 1) {
@@ -303,9 +333,10 @@ export function CourseBuilder({
         <div className="flex flex-col gap-3">
           <div className="flex items-center justify-between">
             <h2 className="text-[0.9375rem] font-semibold text-[var(--text-primary)]">Sections & lessons</h2>
-            <Button size="sm" variant="outline" loading={busy === "add-section"} onClick={handleAddSection}>
+            {/* "Section" alone names a noun, not the action it performs. */}
+            <Button size="sm" variant="outline" onClick={handleAddSection}>
               <Glyph name="plus" className="h-4 w-4" />
-              Section
+              Add section
             </Button>
           </div>
 
@@ -373,7 +404,6 @@ export function CourseBuilder({
                     variant="ghost"
                     size="sm"
                     className="mt-1 justify-start"
-                    loading={busy === `add-lesson-${section.id}`}
                     onClick={() => handleAddLesson(section.id)}
                   >
                     <Glyph name="plus" className="h-3.5 w-3.5" />
@@ -397,6 +427,44 @@ export function CourseBuilder({
           )}
         </div>
       </div>
+
+      <PromptDialog
+        open={prompt !== null}
+        onOpenChange={(open) => !open && setPrompt(null)}
+        title={
+          prompt?.kind === "rename-section"
+            ? "Rename section"
+            : prompt?.kind === "add-lesson"
+              ? "Add a lesson"
+              : "Add a section"
+        }
+        label={prompt?.kind === "add-lesson" ? "Lesson title" : "Section title"}
+        description={
+          prompt?.kind === "add-lesson"
+            ? "It starts as a rich text lesson. You can change the type once it exists."
+            : undefined
+        }
+        initialValue={prompt?.kind === "rename-section" ? prompt.current : ""}
+        placeholder={prompt?.kind === "add-lesson" ? "e.g. Isolating the line" : "e.g. Before you start"}
+        confirmLabel={prompt?.kind === "rename-section" ? "Rename" : "Add"}
+        loading={dialogBusy}
+        onConfirm={submitPrompt}
+      />
+
+      <ConfirmDialog
+        open={confirm !== null}
+        onOpenChange={(open) => !open && setConfirm(null)}
+        title={confirm?.kind === "delete-section" ? "Delete this section?" : "Delete this lesson?"}
+        description={
+          confirm?.kind === "delete-section"
+            ? "Every lesson inside it is deleted too. Published versions of this course keep their own copy, so learner records are unaffected."
+            : "Published versions of this course keep their own copy, so learner records are unaffected."
+        }
+        confirmLabel={confirm?.kind === "delete-section" ? "Delete section" : "Delete lesson"}
+        danger
+        loading={dialogBusy}
+        onConfirm={submitConfirm}
+      />
     </div>
   );
 }

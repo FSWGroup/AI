@@ -6,6 +6,7 @@ import { toast } from "sonner";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { ConfirmDialog } from "@/components/ui/dialog";
 import { Field, Input, Select, Textarea } from "@/components/ui/input";
 import { EmptyState } from "@/components/ui/empty-state";
 import { Glyph, Icon } from "@/components/icons";
@@ -133,10 +134,16 @@ function ItemsCard({ path }: { path: BuilderPath }) {
     router.refresh();
   }
 
+  // The application's own dialog, never window.confirm — see components/ui/dialog.
+  const [pendingRemove, setPendingRemove] = React.useState<string | null>(null);
+  const [removing, setRemoving] = React.useState(false);
+
   async function handleDelete(itemId: string) {
-    if (!window.confirm("Remove this item from the path?")) return;
+    setRemoving(true);
     const result = await deletePathItemAction(path.id, itemId);
+    setRemoving(false);
     if (!result.ok) return toast.error(result.error);
+    setPendingRemove(null);
     router.refresh();
   }
 
@@ -173,7 +180,7 @@ function ItemsCard({ path }: { path: BuilderPath }) {
                 <IconBtn label="Move down" onClick={() => handleMove(item.id, 1)} disabled={i === path.items.length - 1}>
                   <Glyph name="chevron-down" className="h-3.5 w-3.5" />
                 </IconBtn>
-                <IconBtn label="Remove item" onClick={() => handleDelete(item.id)}>
+                <IconBtn label="Remove item" onClick={() => setPendingRemove(item.id)}>
                   <Glyph name="trash" className="h-3.5 w-3.5" />
                 </IconBtn>
               </div>
@@ -192,6 +199,17 @@ function ItemsCard({ path }: { path: BuilderPath }) {
           />
         )}
       </CardContent>
+
+      <ConfirmDialog
+        open={pendingRemove !== null}
+        onOpenChange={(open) => !open && setPendingRemove(null)}
+        title="Remove this item from the path?"
+        description="The course or procedure itself is not deleted — only its place in this path."
+        confirmLabel="Remove item"
+        danger
+        loading={removing}
+        onConfirm={() => pendingRemove && handleDelete(pendingRemove)}
+      />
     </Card>
   );
 }

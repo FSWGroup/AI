@@ -111,6 +111,12 @@ import { Icon, Glyph } from "@/components/icons";
   `border-[var(--border-subtle)]`, `bg-[var(--brand-primary)]`. Palette steps
   (`navy-700`, `steel-100`, `success-600`) are fine; raw hex is not.
 - Status is never conveyed by color alone — always include text.
+- Never `window.prompt`, `window.confirm` or `window.alert`. Use `ConfirmDialog`
+  or `PromptDialog` from `@/components/ui/dialog`. Native dialogs cannot be
+  styled or labelled, are announced inconsistently by screen readers, are
+  suppressed in some embedded contexts, and return `null` under automation — so
+  a control that depends on one can silently do nothing, which the user cannot
+  tell apart from a broken button.
 
 ### No file-based `loading.tsx` boundaries
 

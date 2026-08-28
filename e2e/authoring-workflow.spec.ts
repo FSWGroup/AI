@@ -10,12 +10,13 @@ import { signIn } from "./helpers";
  * these tests create it, which is what catches a broken editor, a publish path
  * that silently fails, or a draft that never reaches readers.
  *
- * Each run creates one SOP and archives it at the end, so the reader-facing
- * library does not fill up with test procedures. Archiving is part of the real
- * lifecycle, so cleaning up is itself coverage. The platform never hard-deletes
- * an SOP — evidence has to stay referenceable — so archived test procedures do
- * accumulate in the admin list across runs. That is expected; the code prefix
- * E2E makes them obvious.
+ * Each test archives what it created, so the reader-facing library and catalog
+ * stay clean. Archiving is part of the real lifecycle, so cleaning up is itself
+ * coverage. Nothing here hard-deletes: evidence has to stay referenceable, so
+ * archived test content accumulates in the admin lists across runs, and a run
+ * that fails midway can leave a draft behind. Everything is prefixed E2E so it
+ * is obvious, and this suite is why E2E should eventually run against a
+ * disposable database rather than the seeded development one.
  */
 
 /** Unique per run, so a failed run's leftovers can never be mistaken for this one's. */
@@ -124,5 +125,89 @@ test.describe("Authoring an SOP end to end", () => {
     await expect(page.locator("#sop-title")).toBeVisible();
     // Publishing is a separate capability; the create screen must not offer it.
     await expect(page.getByRole("button", { name: /^publish$/i })).toHaveCount(0);
+  });
+});
+
+test.describe("Building a course", () => {
+  test("an author can create a course, add a section and a lesson, and publish it", async ({
+    page,
+  }) => {
+    const suffix = uniqueSuffix();
+    const title = `E2E Valve Isolation Basics ${suffix}`;
+
+    await signIn(page, "trainingAdmin");
+    await page.goto("/admin/training/new");
+
+    await page.locator("#title").fill(title);
+    await page.locator("#description").fill("Created by the end-to-end suite.");
+    await page.locator("#category").fill("Testing");
+    await page.getByRole("button", { name: /^create course$/i }).click();
+
+    // The builder is where authoring happens, so landing there is the real signal.
+    await expect(page).toHaveURL(/\/admin\/training\/[a-z0-9]+\/edit/, { timeout: 20_000 });
+
+    /*
+     * Sections and lessons are named through the application's own dialog. This
+     * used to be `window.prompt`, which Playwright dismisses by default — so the
+     * whole flow was untestable, and in any embedded context it silently did
+     * nothing at all.
+     */
+    await page.getByRole("button", { name: /^add section$/i }).click();
+    const sectionDialog = page.getByRole("dialog");
+    await expect(sectionDialog).toBeVisible();
+    await sectionDialog.getByLabel(/section title/i).fill("Before you start");
+    await sectionDialog.getByRole("button", { name: /^add$/i }).click();
+    await expect(page.getByText("Before you start")).toBeVisible({ timeout: 15_000 });
+
+    await page.getByRole("button", { name: /^add lesson$/i }).first().click();
+    const lessonDialog = page.getByRole("dialog");
+    await expect(lessonDialog).toBeVisible();
+    await lessonDialog.getByLabel(/lesson title/i).fill("Confirming zero pressure");
+    await lessonDialog.getByRole("button", { name: /^add$/i }).click();
+    await expect(page.getByText("Confirming zero pressure")).toBeVisible({ timeout: 15_000 });
+
+    // --- Publish --------------------------------------------------------
+    await page.getByRole("button", { name: /^publish$/i }).click();
+    await page.getByPlaceholder(/what changed/i).fill("First version.");
+    await page.getByRole("button", { name: /^confirm publish$/i }).click();
+    await expect(page.getByText(/course published/i)).toBeVisible({ timeout: 20_000 });
+
+    /*
+     * A published course must reach the catalog, where a learner can find it.
+     * Exact match: each card carries both a title link and a "View details for
+     * <title>" action, so a substring pattern matches two elements.
+     */
+    await page.goto("/catalog");
+    await expect(page.getByRole("link", { name: title, exact: true })).toBeVisible();
+
+    // Archive it so the catalog does not accumulate test courses.
+    await page.goto("/admin/training");
+    const row = page.getByRole("row").filter({ hasText: title });
+    await expect(row).toHaveCount(1);
+    await row.getByRole("button", { name: /archive course/i }).click();
+    await expect(page.getByText(/course archived/i)).toBeVisible({ timeout: 20_000 });
+
+    await page.goto("/catalog");
+    await expect(page.getByRole("link", { name: title, exact: true })).toHaveCount(0);
+  });
+
+  test("deleting a section asks first, in the application's own dialog", async ({ page }) => {
+    await signIn(page, "trainingAdmin");
+    await page.goto("/admin/training");
+
+    // Any seeded course will do; this is about the confirmation, not the course.
+    await page.getByRole("link", { name: /welcome to fsw/i }).first().click();
+    await expect(page).toHaveURL(/\/admin\/training\/[a-z0-9]+/, { timeout: 20_000 });
+
+    const trigger = page.getByRole("button", { name: /delete section/i }).first();
+    await expect(trigger).toBeVisible();
+    await trigger.click();
+
+    // A destructive action must confirm, and cancelling must change nothing.
+    const dialog = page.getByRole("dialog");
+    await expect(dialog).toBeVisible();
+    await expect(dialog.getByText(/every lesson inside it is deleted too/i)).toBeVisible();
+    await dialog.getByRole("button", { name: /^cancel$/i }).click();
+    await expect(dialog).toHaveCount(0);
   });
 });

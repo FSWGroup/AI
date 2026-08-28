@@ -4,6 +4,7 @@ import * as React from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
+import { ConfirmDialog } from "@/components/ui/dialog";
 import { Glyph } from "@/components/icons";
 import { archiveCourseAction, deleteCourseAction, duplicateCourseAction } from "@/app/(app)/admin/training/actions";
 
@@ -18,6 +19,8 @@ export function CourseRowActions({
 }) {
   const router = useRouter();
   const [busy, setBusy] = React.useState<"archive" | "duplicate" | "delete" | null>(null);
+  // The application's own dialog, never window.confirm — see components/ui/dialog.
+  const [confirmDelete, setConfirmDelete] = React.useState(false);
 
   async function run(kind: "archive" | "duplicate" | "delete") {
     setBusy(kind);
@@ -37,10 +40,10 @@ export function CourseRowActions({
         return;
       }
       if (kind === "delete") {
-        if (!window.confirm("Delete this course permanently? This only works if it has no completion history.")) return;
         const result = await deleteCourseAction(courseId);
         if (!result.ok) return toast.error(result.error);
         toast.success("Course deleted.");
+        setConfirmDelete(false);
         router.refresh();
       }
     } finally {
@@ -59,10 +62,21 @@ export function CourseRowActions({
         </Button>
       )}
       {canArchive && (
-        <Button variant="ghost" size="sm" loading={busy === "delete"} onClick={() => run("delete")} aria-label="Delete course">
+        <Button variant="ghost" size="sm" loading={busy === "delete"} onClick={() => setConfirmDelete(true)} aria-label="Delete course">
           <Glyph name="trash" className="h-4 w-4" />
         </Button>
       )}
+
+      <ConfirmDialog
+        open={confirmDelete}
+        onOpenChange={setConfirmDelete}
+        title="Delete this course permanently?"
+        description="This only succeeds if nobody has completion history against it. If they do, archive it instead — records have to stay referenceable."
+        confirmLabel="Delete course"
+        danger
+        loading={busy === "delete"}
+        onConfirm={() => run("delete")}
+      />
     </div>
   );
 }
