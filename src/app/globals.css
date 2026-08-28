@@ -1,0 +1,83 @@
+@import "tailwindcss";
+
+/* ===========================================================================
+   FSW People design tokens
+   Brand direction: FS Welsford industrial-professional — charcoal/navy
+   foundations, restrained industrial steel-blue accents, generous whitespace,
+   clean white surfaces on a subtle gray canvas.
+   =========================================================================== */
+
+@theme {
+  /* Brand */
+  --color-brand-50: #eef4f9;
+  --color-brand-100: #d7e5f1;
+  --color-brand-200: #b3cde3;
+  --color-brand-300: #85acce;
+  --color-brand-400: #5589b4;
+  --color-brand-500: #35699a;
+  --color-brand-600: #1f4e79; /* primary industrial blue */
+  --color-brand-700: #1a4266;
+  --color-brand-800: #173651;
+  --color-brand-900: #142c42;
+
+  /* Charcoal / navy foundation (nav, headers) */
+  --color-ink-50: #f5f7f9;
+  --color-ink-100: #e9edf1;
+  --color-ink-200: #d3dbe2;
+  --color-ink-300: #a9b8c5;
+  --color-ink-400: #7b8fa1;
+  --color-ink-500: #5b7183;
+  --color-ink-600: #46596a;
+  --color-ink-700: #394956;
+  --color-ink-800: #263442;
+  --color-ink-900: #1c2530; /* charcoal-navy */
+  --color-ink-950: #131a22;
+
+  /* Status */
+  --color-ok-500: #1e8e5a;
+  --color-ok-100: #d9f2e5;
+  --color-warn-500: #b45309;
+  --color-warn-100: #fdeed7;
+  --color-danger-500: #b3352c;
+  --color-danger-100: #fbe2e0;
+
+  --font-sans: var(--font-inter), ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+
+  --shadow-card: 0 1px 2px 0 rgb(28 37 48 / 0.05), 0 1px 3px 0 rgb(28 37 48 / 0.06);
+  --shadow-pop: 0 10px 30px -6px rgb(19 26 34 / 0.18), 0 4px 10px -4px rgb(19 26 34 / 0.08);
+
+  --radius-card: 0.625rem;
+}
+
+:root {
+  color-scheme: light;
+}
+
+body {
+  background: #f4f6f8;
+  color: var(--color-ink-900);
+  font-feature-settings: "cv02", "cv03", "cv11";
+  -webkit-font-smoothing: antialiased;
+}
+
+/* Focus visibility (WCAG 2.2) */
+:focus-visible {
+  outline: 2px solid var(--color-brand-500);
+  outline-offset: 2px;
+}
+
+/* Thin scrollbars in tables */
+.fsw-scroll::-webkit-scrollbar {
+  height: 8px;
+  width: 8px;
+}
+.fsw-scroll::-webkit-scrollbar-thumb {
+  background: var(--color-ink-200);
+  border-radius: 4px;
+}
+
+@media print {
+  .no-print {
+    display: none !important;
+  }
+}
