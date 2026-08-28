@@ -342,9 +342,8 @@ async function toAttemptView(
   attemptLimit: number | null,
   oneQuestionAtATime: boolean,
 ): Promise<AttemptView> {
-  const order = (attempt.questionOrder as QuestionOrder | null) ?? {
-    questions: questions.map((q) => ({ questionId: q.id })),
-  };
+  const fallbackOrder: QuestionOrder = { questions: questions.map((q) => ({ questionId: q.id })) };
+  const order = (attempt.questionOrder as QuestionOrder | null) ?? fallbackOrder;
   const orderMap = new Map(order.questions.map((q) => [q.questionId, q.optionOrder]));
   const byId = new Map(questions.map((q) => [q.id, q]));
 
@@ -496,31 +495,28 @@ export async function submitAttempt(
 ): Promise<SubmitAttemptResult> {
   const attempt = await prisma.quizAttempt.findUnique({
     where: { id: attemptId },
-    select: {
-      id: true,
-      userId: true,
-      lessonId: true,
-      status: true,
-      startedAt: true,
-      lesson: {
-        select: {
-          sectionId: true,
-          section: { select: { courseId: true, course: { select: { passingScore: true } } } },
-          questions: { select: { id: true, type: true, config: true, points: true } },
-        },
-      },
-    },
+    select: { id: true, userId: true, lessonId: true, status: true, startedAt: true },
   });
   if (!attempt || attempt.userId !== actor.id) throw new ServiceError("Attempt not found.");
   if (attempt.status !== "IN_PROGRESS") throw new ServiceError("This attempt has already been submitted.");
 
-  const settings = await getSettings();
-  const passingScore = attempt.lesson.section.course.passingScore ?? settings.training.defaultPassingScore;
+  // QuizAttempt.lessonId is a plain scalar FK (no Prisma relation is declared
+  // on Lesson back to QuizAttempt), so the lesson is fetched separately.
+  const lesson = await prisma.lesson.findUniqueOrThrow({
+    where: { id: attempt.lessonId },
+    select: {
+      section: { select: { courseId: true, course: { select: { passingScore: true } } } },
+      questions: { select: { id: true, type: true, config: true, points: true } },
+    },
+  });
 
-  const summary = gradeAttempt(attempt.lesson.questions, answers);
+  const settings = await getSettings();
+  const passingScore = lesson.section.course.passingScore ?? settings.training.defaultPassingScore;
+
+  const summary = gradeAttempt(lesson.questions, answers);
 
   await prisma.$transaction([
-    ...attempt.lesson.questions.map((question) => {
+    ...lesson.questions.map((question) => {
       const result = summary.perQuestion[question.id] ?? {
         isCorrect: null,
         pointsEarned: 0,
@@ -563,7 +559,7 @@ export async function submitAttempt(
   const passed = summary.hasPendingManualGrading ? null : summary.scorePercent >= passingScore;
 
   if (passed) {
-    await markLessonComplete(attempt.userId, attempt.lessonId, attempt.lesson.section.courseId, {
+    await markLessonComplete(attempt.userId, attempt.lessonId, lesson.section.courseId, {
       score: summary.scorePercent,
     });
   }
@@ -594,21 +590,15 @@ export async function gradeResponseManually(
       id: true,
       attemptId: true,
       question: { select: { points: true } },
-      attempt: {
-        select: {
-          id: true,
-          userId: true,
-          lessonId: true,
-          lesson: {
-            select: {
-              section: { select: { courseId: true, course: { select: { passingScore: true } } } },
-            },
-          },
-        },
-      },
+      attempt: { select: { id: true, userId: true, lessonId: true } },
     },
   });
   if (!response) throw new ServiceError("Response not found.");
+
+  const lesson = await prisma.lesson.findUniqueOrThrow({
+    where: { id: response.attempt.lessonId },
+    select: { section: { select: { courseId: true, course: { select: { passingScore: true } } } } },
+  });
 
   const clamped = Math.max(0, Math.min(response.question.points, pointsEarned));
 
@@ -625,7 +615,7 @@ export async function gradeResponseManually(
   const pointsPossible = allResponses.reduce((sum, r) => sum + r.question.points, 0);
   const scorePercent = pointsPossible > 0 ? round2((pointsEarnedTotal / pointsPossible) * 100) : 0;
   const settings = await getSettings();
-  const passingScore = response.attempt.lesson.section.course.passingScore ?? settings.training.defaultPassingScore;
+  const passingScore = lesson.section.course.passingScore ?? settings.training.defaultPassingScore;
   const passed = scorePercent >= passingScore;
 
   await prisma.quizAttempt.update({
@@ -649,12 +639,9 @@ export async function gradeResponseManually(
   });
 
   if (passed) {
-    await markLessonComplete(
-      response.attempt.userId,
-      response.attempt.lessonId,
-      response.attempt.lesson.section.courseId,
-      { score: scorePercent },
-    );
+    await markLessonComplete(response.attempt.userId, response.attempt.lessonId, lesson.section.courseId, {
+      score: scorePercent,
+    });
   }
 }
 
@@ -682,10 +669,10 @@ export async function getAttemptReview(actor: Actor, attemptId: string): Promise
     select: {
       id: true,
       userId: true,
+      lessonId: true,
       status: true,
       scorePercent: true,
       submittedAt: true,
-      lesson: { select: { content: true } },
       responses: {
         select: {
           questionId: true,
@@ -703,7 +690,11 @@ export async function getAttemptReview(actor: Actor, attemptId: string): Promise
     throw new AuthorizationError("training.complete_override");
   }
 
-  const content = (attempt.lesson.content ?? {}) as Record<string, unknown>;
+  const lesson = await prisma.lesson.findUniqueOrThrow({
+    where: { id: attempt.lessonId },
+    select: { content: true },
+  });
+  const content = (lesson.content ?? {}) as Record<string, unknown>;
   const reviewPolicy = (content.reviewPolicy as string) ?? "immediate";
   const showExplanations = content.showExplanations !== false;
   const canReveal =

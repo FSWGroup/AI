@@ -44,9 +44,13 @@ import { assertPermission } from "@/lib/auth/guard";
 const actor = await assertPermission("sop.publish");
 ```
 
-For per-record scoping use `canViewUser`, `canManageUser`, `getVisibleUserIds`
-from `@/lib/auth/guard`. A manager sees their reporting subtree; a learner sees
-themselves.
+For per-record scoping use `canViewUser`, `canManageUser`, `getVisibleUserIds`.
+A manager sees their reporting subtree; a learner sees themselves.
+
+These live in `@/lib/auth/scope` (no session/framework dependency, so they are
+importable from jobs, the REST API, and tests) and are **re-exported from
+`@/lib/auth/guard`** — importing either path works. Import the `Actor` type from
+whichever you already import.
 
 Permission keys live in `src/lib/permissions.ts`. Do not invent new keys without
 adding them there.
