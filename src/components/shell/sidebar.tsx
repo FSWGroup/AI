@@ -82,10 +82,25 @@ export function Sidebar({
         </div>
 
         <div className="flex-1 overflow-y-auto px-2.5 py-3">
+          {/*
+            Each section is a labelled group. An administrator sees both a
+            learner "People" link and an admin "People" link, so without the
+            group name a screen reader announces "People, link" twice with no
+            way to tell them apart. The group label disambiguates them.
+          */}
           {sections.map((section) => (
-            <div key={section.id} className="mb-4 last:mb-0">
+            <div
+              key={section.id}
+              className="mb-4 last:mb-0"
+              {...(section.label
+                ? { role: "group", "aria-labelledby": `nav-section-${section.id}` }
+                : {})}
+            >
               {section.label && (
-                <p className="px-2.5 pb-1.5 pt-1 text-[0.6875rem] font-semibold uppercase tracking-wider text-navy-300/80">
+                <p
+                  id={`nav-section-${section.id}`}
+                  className="px-2.5 pb-1.5 pt-1 text-[0.6875rem] font-semibold uppercase tracking-wider text-navy-300/80"
+                >
                   {section.label}
                 </p>
               )}

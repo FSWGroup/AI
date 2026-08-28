@@ -31,10 +31,10 @@ export async function signIn(page: Page, account: AccountKey | string): Promise<
   await page.goto("/sign-in");
 
   // The password form is the default when password auth is enabled.
-  const emailField = page.getByLabel(/^work email$/i);
+  const emailField = page.getByRole("textbox", { name: /work email/i });
   await expect(emailField).toBeVisible();
   await emailField.fill(email);
-  await page.getByLabel(/^password$/i).fill(SEED_PASSWORD);
+  await page.getByRole("textbox", { name: /^password$/i }).fill(SEED_PASSWORD);
   await page.getByRole("button", { name: /^sign in$/i }).click();
 
   // Landing on /home means the session was established and the shell rendered.
@@ -53,11 +53,18 @@ export async function expectNavItem(
   page: Page,
   label: string,
   present: boolean,
+  section?: "Manager" | "Administration",
 ): Promise<void> {
   const nav = page.getByRole("navigation", { name: "Main navigation" });
-  const link = nav.getByRole("link", { name: label, exact: true });
+
+  // Some labels appear in more than one section — an administrator sees both a
+  // learner "People" link and an admin one — so an optional section scopes the
+  // match to the labelled group.
+  const scope = section ? nav.getByRole("group", { name: section }) : nav;
+  const link = scope.getByRole("link", { name: label, exact: true });
+
   if (present) {
-    await expect(link).toBeVisible();
+    await expect(link.first()).toBeVisible();
   } else {
     await expect(link).toHaveCount(0);
   }

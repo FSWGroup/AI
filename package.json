@@ -18,8 +18,9 @@
     "test": "vitest run --project unit",
     "test:integration": "vitest run --project integration",
     "test:all": "vitest run",
-    "test:e2e": "playwright test",
-    "postinstall": "prisma generate"
+    "test:e2e": "node scripts/free-port.mjs && playwright test",
+    "postinstall": "prisma generate",
+    "e2e:free-port": "node scripts/free-port.mjs"
   },
   "prisma": {
     "seed": "tsx prisma/seed.ts"

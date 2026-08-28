@@ -17,19 +17,22 @@ test.describe("Authentication", () => {
     page,
   }) => {
     await page.goto("/sign-in");
-    await page.getByLabel(/^work email$/i).fill(ACCOUNTS.learner);
-    await page.getByLabel(/^password$/i).fill("definitely-not-the-password");
+    await page.getByRole("textbox", { name: /work email/i }).fill(ACCOUNTS.learner);
+    await page.getByRole("textbox", { name: /^password$/i }).fill("definitely-not-the-password");
     await page.getByRole("button", { name: /^sign in$/i }).click();
 
-    const error = page.getByRole("alert");
-    await expect(error).toBeVisible();
-    await expect(error).toContainText(/didn't match/i);
+    // Scoped to the form's own error: Next.js also renders an empty
+    // route-announcer with role="alert".
+    const formError = page.locator('form [role="alert"]');
+    await expect(formError).toBeVisible();
+    await expect(formError).toContainText(/didn't match/i);
 
-    // A non-existent account produces the same message.
-    await page.getByLabel(/^work email$/i).fill("nobody.here@fswelsford.com");
-    await page.getByLabel(/^password$/i).fill("definitely-not-the-password");
+    // A non-existent account produces the same message, so the response does
+    // not reveal whether the account exists.
+    await page.getByRole("textbox", { name: /work email/i }).fill("nobody.here@fswelsford.com");
+    await page.getByRole("textbox", { name: /^password$/i }).fill("definitely-not-the-password");
     await page.getByRole("button", { name: /^sign in$/i }).click();
-    await expect(page.getByRole("alert")).toContainText(/didn't match/i);
+    await expect(formError).toContainText(/didn't match/i);
   });
 
   test("a learner signs in and reaches their dashboard", async ({ page }) => {
@@ -55,7 +58,7 @@ test.describe("Authentication", () => {
   test("the sign-in page offers only configured providers", async ({ page }) => {
     await page.goto("/sign-in");
     // Password auth is enabled in the test environment.
-    await expect(page.getByLabel(/^work email$/i)).toBeVisible();
+    await expect(page.getByRole("textbox", { name: /work email/i })).toBeVisible();
     // Microsoft SSO is not configured, so no dead button is offered.
     await expect(page.getByRole("button", { name: /continue with microsoft/i })).toHaveCount(0);
   });
@@ -79,8 +82,8 @@ test.describe("Permission-filtered navigation", () => {
 
   test("a manager sees the manager section", async ({ page }) => {
     await signIn(page, "manager");
-    await expectNavItem(page, "Team", true);
-    await expectNavItem(page, "Training Status", true);
+    await expectNavItem(page, "Team", true, "Manager");
+    await expectNavItem(page, "Training Status", true, "Manager");
     // But not platform administration.
     await expectNavItem(page, "Audit Log", false);
     await expectNavItem(page, "Settings", false);
@@ -88,9 +91,11 @@ test.describe("Permission-filtered navigation", () => {
 
   test("a super administrator sees administration", async ({ page }) => {
     await signIn(page, "superAdmin");
-    await expectNavItem(page, "Audit Log", true);
-    await expectNavItem(page, "Settings", true);
-    await expectNavItem(page, "People", true);
+    await expectNavItem(page, "Audit Log", true, "Administration");
+    await expectNavItem(page, "Settings", true, "Administration");
+    // "People" exists in both the learner and administration sections, so the
+    // section scope is what makes this assertion meaningful.
+    await expectNavItem(page, "People", true, "Administration");
   });
 
   test("a contractor gets the narrowed surface", async ({ page }) => {
@@ -126,9 +131,11 @@ test.describe("Accessibility basics", () => {
 
   test("the sign-in form associates labels with inputs", async ({ page }) => {
     await page.goto("/sign-in");
-    // getByLabel only resolves when the label is correctly associated.
-    await expect(page.getByLabel(/^work email$/i)).toBeVisible();
-    await expect(page.getByLabel(/^password$/i)).toBeVisible();
+    // getByLabel resolves through the label-for/id association, so this fails
+    // if a field is ever rendered with an unassociated label. The regex is
+    // unanchored because the label text also contains a decorative asterisk.
+    await expect(page.getByLabel(/work email/i)).toBeVisible();
+    await expect(page.getByLabel(/password/i)).toBeVisible();
   });
 });
 
@@ -137,10 +144,10 @@ test.describe("Session handling", () => {
     // The seeded set has no deactivated account, so this asserts the shape of
     // the failure for an unknown account, which is the same uniform message.
     await page.goto("/sign-in");
-    await page.getByLabel(/^work email$/i).fill("deactivated.person@fswelsford.com");
-    await page.getByLabel(/^password$/i).fill(SEED_PASSWORD);
+    await page.getByRole("textbox", { name: /work email/i }).fill("deactivated.person@fswelsford.com");
+    await page.getByRole("textbox", { name: /^password$/i }).fill(SEED_PASSWORD);
     await page.getByRole("button", { name: /^sign in$/i }).click();
-    await expect(page.getByRole("alert")).toBeVisible();
+    await expect(page.locator('form [role="alert"]')).toBeVisible();
     await expect(page).toHaveURL(/sign-in/);
     expect(request).toBeTruthy();
   });

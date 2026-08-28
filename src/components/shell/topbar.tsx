@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
+import { signOut as nextAuthSignOut } from "next-auth/react";
 import { Glyph } from "@/components/icons";
 import { CommandPalette, type QuickAction } from "@/components/shell/command-palette";
 import { cn, initials } from "@/lib/utils";
@@ -68,6 +69,7 @@ export function Topbar({
   const [notifications, setNotifications] = useState<NotificationItem[]>([]);
   const [unread, setUnread] = useState(unreadCount);
   const [loadingNotifications, setLoadingNotifications] = useState(false);
+  const [signingOut, setSigningOut] = useState(false);
 
   useEffect(() => {
     setUnread(unreadCount);
@@ -297,15 +299,26 @@ export function Topbar({
                   </Link>
                 ))}
               </div>
-              <form action="/api/auth/signout" method="post" className="border-t border-[var(--border-subtle)]">
+              {/*
+                Uses the Auth.js client helper rather than posting the form
+                directly: the sign-out endpoint requires a CSRF token, and a
+                bare POST is rejected — leaving the person signed in while the
+                menu closes as though it worked.
+              */}
+              <div className="border-t border-[var(--border-subtle)]">
                 <button
-                  type="submit"
+                  type="button"
                   role="menuitem"
-                  className="w-full px-3.5 py-2.5 text-left text-[0.8125rem] font-medium text-[var(--text-secondary)] hover:bg-[var(--surface-sunken)] hover:text-[var(--text-primary)]"
+                  onClick={() => {
+                    setSigningOut(true);
+                    void nextAuthSignOut({ callbackUrl: "/sign-in", redirect: true });
+                  }}
+                  disabled={signingOut}
+                  className="w-full px-3.5 py-2.5 text-left text-[0.8125rem] font-medium text-[var(--text-secondary)] hover:bg-[var(--surface-sunken)] hover:text-[var(--text-primary)] disabled:opacity-60"
                 >
-                  Sign out
+                  {signingOut ? "Signing out…" : "Sign out"}
                 </button>
-              </form>
+              </div>
             </div>
           )}
         </div>
