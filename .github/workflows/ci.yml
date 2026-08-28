@@ -1,0 +1,145 @@
+name: CI
+
+on:
+  push:
+    branches: ["**"]
+  pull_request:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  verify:
+    name: Typecheck, lint, test, build
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+
+    services:
+      postgres:
+        image: pgvector/pgvector:pg16
+        env:
+          POSTGRES_USER: fsw
+          POSTGRES_PASSWORD: fsw_ci_password
+          POSTGRES_DB: fsw_academy_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 10
+
+    env:
+      DATABASE_URL: postgresql://fsw:fsw_ci_password@localhost:5432/fsw_academy_test?schema=public
+      TEST_DATABASE_URL: postgresql://fsw:fsw_ci_password@localhost:5432/fsw_academy_test?schema=public
+      SHADOW_DATABASE_URL: postgresql://fsw:fsw_ci_password@localhost:5432/fsw_academy_test?schema=public
+      AUTH_SECRET: ci-secret-not-for-production-use-0000000000
+      FIELD_ENCRYPTION_KEY: Y2ktb25seS1rZXktMzItYnl0ZXMtbG9uZy0xMjM0NTY3OA==
+      APP_URL: http://localhost:3000
+      AUTH_URL: http://localhost:3000
+      STORAGE_DRIVER: local
+      LOCAL_STORAGE_DIR: ./storage
+      NEXT_TELEMETRY_DISABLED: "1"
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Install ffmpeg
+        run: sudo apt-get update && sudo apt-get install -y ffmpeg
+
+      - name: Generate Prisma client
+        run: npx prisma generate
+
+      - name: TypeScript
+        run: npm run typecheck
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Apply migrations
+        run: npx prisma migrate deploy
+
+      - name: Unit tests
+        run: npm run test
+
+      - name: Integration tests
+        run: npm run test:integration
+
+      - name: Production build
+        run: npm run build
+
+  e2e:
+    name: End-to-end (Playwright)
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    services:
+      postgres:
+        image: pgvector/pgvector:pg16
+        env:
+          POSTGRES_USER: fsw
+          POSTGRES_PASSWORD: fsw_ci_password
+          POSTGRES_DB: fsw_academy_e2e
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 10
+
+    env:
+      DATABASE_URL: postgresql://fsw:fsw_ci_password@localhost:5432/fsw_academy_e2e?schema=public
+      SHADOW_DATABASE_URL: postgresql://fsw:fsw_ci_password@localhost:5432/fsw_academy_e2e?schema=public
+      AUTH_SECRET: ci-secret-not-for-production-use-0000000000
+      FIELD_ENCRYPTION_KEY: Y2ktb25seS1rZXktMzItYnl0ZXMtbG9uZy0xMjM0NTY3OA==
+      APP_URL: http://localhost:3000
+      AUTH_URL: http://localhost:3000
+      STORAGE_DRIVER: local
+      LOCAL_STORAGE_DIR: ./storage
+      SEED_PASSWORD: FswAcademy!2026
+      NEXT_TELEMETRY_DISABLED: "1"
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Install ffmpeg
+        run: sudo apt-get update && sudo apt-get install -y ffmpeg
+
+      - name: Install Playwright browsers
+        run: npx playwright install --with-deps chromium
+
+      - name: Migrate and seed
+        run: |
+          npx prisma migrate deploy
+          npm run db:seed
+
+      - name: Build
+        run: npm run build
+
+      - name: Playwright tests
+        run: npm run test:e2e
+
+      - uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: playwright-report
+          path: playwright-report/
+          retention-days: 7

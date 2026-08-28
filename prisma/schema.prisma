@@ -1,0 +1,1564 @@
+// FSW Academy — production data model.
+// Conventions:
+//  - cuid() primary keys
+//  - UTC timestamps everywhere (display-side conversion only)
+//  - Immutable evidence tables (CompletionRecord, Acknowledgement, AuditEvent,
+//    SopVersion, CourseVersion, Certificate) are append-only by service-layer rule.
+//  - JSON columns hold structured editor content and snapshots; their shapes are
+//    defined in src/lib/content/types.ts and validated with zod at the boundary.
+
+generator client {
+  provider        = "prisma-client-js"
+  previewFeatures = ["postgresqlExtensions"]
+}
+
+datasource db {
+  provider          = "postgresql"
+  url               = env("DATABASE_URL")
+  shadowDatabaseUrl = env("SHADOW_DATABASE_URL")
+  extensions        = [vector, pg_trgm, unaccent]
+}
+
+// ---------------------------------------------------------------------------
+// Organization structure
+// ---------------------------------------------------------------------------
+
+model Organization {
+  id        String   @id @default(cuid())
+  name      String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  businessUnits BusinessUnit[]
+}
+
+model BusinessUnit {
+  id             String   @id @default(cuid())
+  organizationId String
+  name           String
+  slug           String   @unique
+  description    String?
+  isActive       Boolean  @default(true)
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  organization Organization @relation(fields: [organizationId], references: [id])
+  departments  Department[]
+  users        User[]
+
+  @@index([organizationId])
+}
+
+model Department {
+  id             String   @id @default(cuid())
+  businessUnitId String
+  name           String
+  description    String?
+  isActive       Boolean  @default(true)
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  businessUnit BusinessUnit @relation(fields: [businessUnitId], references: [id])
+  teams        Team[]
+  positions    Position[]
+  users        User[]
+
+  @@index([businessUnitId])
+}
+
+model Team {
+  id           String   @id @default(cuid())
+  departmentId String
+  name         String
+  description  String?
+  isActive     Boolean  @default(true)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  department Department @relation(fields: [departmentId], references: [id])
+  users      User[]
+
+  @@index([departmentId])
+}
+
+model Location {
+  id        String   @id @default(cuid())
+  name      String
+  country   String // ISO 3166-1 alpha-2
+  state     String? // US state / province code
+  city      String?
+  timezone  String   @default("America/New_York") // IANA
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  users User[]
+}
+
+model Position {
+  id               String   @id @default(cuid())
+  departmentId     String?
+  title            String
+  description      String?
+  responsibilities Json? // string[]
+  toolsUsed        Json? // string[]
+  isActive         Boolean  @default(true)
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  department        Department?                @relation(fields: [departmentId], references: [id])
+  users             User[]
+  skillRequirements PositionSkillRequirement[]
+  trainingRequirements PositionTrainingRequirement[]
+
+  @@index([departmentId])
+}
+
+// Required/recommended training attached to a position.
+model PositionTrainingRequirement {
+  id         String             @id @default(cuid())
+  positionId String
+  targetType TrainingTargetType
+  courseId   String?
+  sopId      String?
+  pathId     String?
+  required   Boolean            @default(true)
+  createdAt  DateTime           @default(now())
+
+  position Position      @relation(fields: [positionId], references: [id], onDelete: Cascade)
+  course   Course?       @relation(fields: [courseId], references: [id])
+  sop      Sop?          @relation(fields: [sopId], references: [id])
+  path     LearningPath? @relation(fields: [pathId], references: [id])
+
+  @@index([positionId])
+}
+
+enum TrainingTargetType {
+  COURSE
+  SOP
+  LEARNING_PATH
+}
+
+// ---------------------------------------------------------------------------
+// Identity, auth, RBAC
+// ---------------------------------------------------------------------------
+
+enum WorkerType {
+  US_EMPLOYEE
+  US_CONTRACTOR
+  PH_EMPLOYEE
+  PH_CONTRACTOR
+  INTL_EMPLOYEE
+  INTL_CONTRACTOR
+}
+
+enum UserStatus {
+  INVITED
+  ACTIVE
+  INACTIVE
+}
+
+model User {
+  id            String     @id @default(cuid())
+  email         String     @unique // work email, login identity
+  emailVerified DateTime?
+  passwordHash  String?
+  name          String // preferred display name
+  legalName     String?
+  personalEmail String?
+  workPhone     String?
+  mobilePhone   String?
+  employeeId    String?    @unique
+  image         String? // profile photo media path
+  title         String?
+  status        UserStatus @default(ACTIVE)
+  workerType    WorkerType @default(US_EMPLOYEE)
+  country       String     @default("US")
+  state         String?
+  timezone      String     @default("America/New_York")
+  language      String     @default("en") // preferred language, BCP-47
+  startDate     DateTime?
+  endDate       DateTime?
+  trainingStartDate DateTime?
+  deactivatedAt DateTime?
+
+  businessUnitId String?
+  departmentId   String?
+  teamId         String?
+  positionId     String?
+  locationId     String?
+  managerId      String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  businessUnit BusinessUnit? @relation(fields: [businessUnitId], references: [id])
+  department   Department?   @relation(fields: [departmentId], references: [id])
+  team         Team?         @relation(fields: [teamId], references: [id])
+  position     Position?     @relation(fields: [positionId], references: [id])
+  location     Location?     @relation(fields: [locationId], references: [id])
+  manager      User?         @relation("ManagerReports", fields: [managerId], references: [id])
+  reports      User[]        @relation("ManagerReports")
+
+  accounts        Account[]
+  sessions        Session[]
+  roles           UserRole[]
+  sensitiveFields SensitiveField[]
+  assignments     Assignment[]     @relation("AssigneeAssignments")
+  lessonProgress  LessonProgress[]
+  completions     CompletionRecord[]
+  acknowledgements Acknowledgement[]
+  certificates    Certificate[]
+  quizAttempts    QuizAttempt[]
+  skills          UserSkill[]
+  skillAssessmentsReceived SkillAssessment[] @relation("SkillAssessee")
+  skillAssessmentsGiven    SkillAssessment[] @relation("SkillAssessor")
+  notifications   Notification[]
+  notificationPrefs NotificationPreference[]
+  favorites       Favorite[]
+  contentViews    ContentView[]
+  feedback        ContentFeedback[]
+  comments        ContentComment[]
+  exemptions      TrainingExemption[] @relation("ExemptUser")
+  sessionAttendance SessionAttendance[]
+  announcementAcks AnnouncementAck[]
+
+  @@index([managerId])
+  @@index([departmentId])
+  @@index([businessUnitId])
+  @@index([positionId])
+  @@index([status])
+}
+
+// Auth.js standard models
+model Account {
+  id                String  @id @default(cuid())
+  userId            String
+  type              String
+  provider          String
+  providerAccountId String
+  refresh_token     String?
+  access_token      String?
+  expires_at        Int?
+  token_type        String?
+  scope             String?
+  id_token          String?
+  session_state     String?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerAccountId])
+  @@index([userId])
+}
+
+model Session {
+  id           String   @id @default(cuid())
+  sessionToken String   @unique
+  userId       String
+  expires      DateTime
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+}
+
+model VerificationToken {
+  identifier String
+  token      String   @unique
+  expires    DateTime
+
+  @@unique([identifier, token])
+}
+
+model Role {
+  id          String  @id @default(cuid())
+  key         String  @unique // e.g. "super_admin", "learner"
+  name        String
+  description String?
+  isSystem    Boolean @default(false)
+
+  permissions RolePermission[]
+  users       UserRole[]
+}
+
+model RolePermission {
+  roleId     String
+  permission String // e.g. "training.publish"
+
+  role Role @relation(fields: [roleId], references: [id], onDelete: Cascade)
+
+  @@id([roleId, permission])
+  @@index([permission])
+}
+
+model UserRole {
+  userId         String
+  roleId         String
+  businessUnitId String? // optional scope; null = organization-wide
+  createdAt      DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  role Role @relation(fields: [roleId], references: [id], onDelete: Cascade)
+
+  @@id([userId, roleId])
+  @@index([roleId])
+}
+
+// Encrypted, permission-gated custom fields. Values are AES-256-GCM sealed;
+// never included in search, AI context, exports, or logs.
+model SensitiveField {
+  id         String   @id @default(cuid())
+  userId     String
+  fieldKey   String // admin-defined key, e.g. "gov_id_last4"
+  ciphertext String // base64(iv || tag || data)
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+  updatedBy  String
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, fieldKey])
+}
+
+model SensitiveFieldDefinition {
+  id          String   @id @default(cuid())
+  fieldKey    String   @unique
+  label       String
+  description String?
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+}
+
+// ---------------------------------------------------------------------------
+// SOPs (policies are SOPs with kind = POLICY — one authoring pipeline)
+// ---------------------------------------------------------------------------
+
+enum SopKind {
+  SOP
+  POLICY
+}
+
+enum ContentStatus {
+  DRAFT
+  IN_REVIEW
+  CHANGES_REQUESTED
+  APPROVED
+  PUBLISHED
+  ARCHIVED
+}
+
+model Sop {
+  id             String        @id @default(cuid())
+  sopCode        String        @unique // human ID, e.g. "OPS-014"
+  kind           SopKind       @default(SOP)
+  title          String
+  summary        String?
+  category       String?
+  departmentId   String?
+  businessUnitId String?
+  ownerId        String?
+  smeId          String?
+  reviewerId     String?
+  approverId     String?
+  status         ContentStatus @default(DRAFT)
+  language       String        @default("en")
+
+  // Draft (working) content — published snapshots live in SopVersion.
+  draftBlocks Json? // Block[]
+  draftMeta   Json? // purpose, scope, definitions, prerequisites, tools, safety...
+
+  currentVersionId String?  @unique
+  reviewCycleDays  Int? // 90 / 180 / 365 / custom
+  lastReviewedAt   DateTime?
+  nextReviewAt     DateTime?
+  aiGenerated      Boolean   @default(false)
+  isDeleted        Boolean   @default(false)
+  createdById      String
+  createdAt        DateTime  @default(now())
+  updatedAt        DateTime  @updatedAt
+
+  currentVersion SopVersion?  @relation("CurrentVersion", fields: [currentVersionId], references: [id])
+  versions       SopVersion[] @relation("SopVersions")
+  positionRequirements PositionTrainingRequirement[]
+  assignments    Assignment[]
+  outdatedReports OutdatedReport[]
+
+  @@index([status])
+  @@index([departmentId])
+  @@index([ownerId])
+  @@index([nextReviewAt])
+}
+
+// Immutable published snapshot of an SOP.
+model SopVersion {
+  id            String   @id @default(cuid())
+  sopId         String
+  versionNumber String // "1.0", "2.1"
+  title         String
+  blocks        Json // full Block[] snapshot
+  meta          Json // full meta snapshot
+  changeSummary String?
+  isMaterial    Boolean  @default(true)
+  authorId      String
+  reviewerId    String?
+  approverId    String?
+  publishedAt   DateTime @default(now())
+
+  sop            Sop   @relation("SopVersions", fields: [sopId], references: [id])
+  currentOf      Sop?  @relation("CurrentVersion")
+  acknowledgements Acknowledgement[]
+
+  @@unique([sopId, versionNumber])
+  @@index([sopId])
+}
+
+model OutdatedReport {
+  id         String    @id @default(cuid())
+  sopId      String
+  reporterId String
+  reason     String
+  status     String    @default("OPEN") // OPEN | RESOLVED | DISMISSED
+  resolvedAt DateTime?
+  resolvedBy String?
+  createdAt  DateTime  @default(now())
+
+  sop Sop @relation(fields: [sopId], references: [id], onDelete: Cascade)
+
+  @@index([sopId, status])
+}
+
+// ---------------------------------------------------------------------------
+// Courses
+// ---------------------------------------------------------------------------
+
+enum LessonType {
+  RICH_TEXT
+  SOP_REF
+  VIDEO
+  AI_VIDEO
+  SCREEN_RECORDING
+  AUDIO
+  DOCUMENT
+  PRESENTATION
+  IMAGE
+  CHECKLIST
+  QUIZ
+  FLASHCARDS
+  SCENARIO
+  SURVEY
+  ACKNOWLEDGEMENT
+  SIGNATURE
+  MANAGER_SIGNOFF
+  PRACTICAL_DEMO
+  ASSIGNMENT_PROJECT
+  EXTERNAL_LINK
+  LIVE_SESSION
+  DISCUSSION
+  DOWNLOAD
+  EMBED
+  FLOWCHART
+}
+
+enum Difficulty {
+  INTRO
+  BEGINNER
+  INTERMEDIATE
+  ADVANCED
+}
+
+model Course {
+  id               String        @id @default(cuid())
+  title            String
+  description      String?
+  thumbnailMediaId String?
+  ownerId          String?
+  category         String?
+  departmentId     String?
+  businessUnitId   String?
+  difficulty       Difficulty    @default(BEGINNER)
+  estimatedMinutes Int?
+  status           ContentStatus @default(DRAFT)
+  language         String        @default("en")
+
+  passingScore          Int? // percent, when course has quizzes
+  attemptLimit          Int? // null = unlimited
+  recertifyMonths       Int? // recertification interval
+  selfEnrollAllowed     Boolean @default(false)
+  requiredVideoPercent  Int     @default(90) // watch % required for video lessons
+
+  currentVersionId String? @unique
+  aiGenerated      Boolean @default(false)
+  isDeleted        Boolean @default(false)
+  createdById      String
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  currentVersion CourseVersion? @relation("CurrentCourseVersion", fields: [currentVersionId], references: [id])
+  versions       CourseVersion[] @relation("CourseVersions")
+  sections       CourseSection[]
+  skills         CourseSkill[]
+  prerequisites  CoursePrerequisite[] @relation("CourseAsTarget")
+  prerequisiteOf CoursePrerequisite[] @relation("CourseAsPrereq")
+  assignments    Assignment[]
+  positionRequirements PositionTrainingRequirement[]
+  pathItems      LearningPathItem[]
+  complianceRules ComplianceRule[]
+  liveSessions   LiveSession[]
+
+  @@index([status])
+  @@index([ownerId])
+  @@index([category])
+}
+
+model CoursePrerequisite {
+  courseId       String
+  prerequisiteId String
+
+  course       Course @relation("CourseAsTarget", fields: [courseId], references: [id], onDelete: Cascade)
+  prerequisite Course @relation("CourseAsPrereq", fields: [prerequisiteId], references: [id], onDelete: Cascade)
+
+  @@id([courseId, prerequisiteId])
+}
+
+model CourseSkill {
+  courseId String
+  skillId  String
+  levelValue Int? // level granted on completion
+
+  course Course @relation(fields: [courseId], references: [id], onDelete: Cascade)
+  skill  Skill  @relation(fields: [skillId], references: [id], onDelete: Cascade)
+
+  @@id([courseId, skillId])
+}
+
+model CourseSection {
+  id       String @id @default(cuid())
+  courseId String
+  title    String
+  order    Int
+
+  course  Course   @relation(fields: [courseId], references: [id], onDelete: Cascade)
+  lessons Lesson[]
+
+  @@index([courseId])
+}
+
+model Lesson {
+  id        String     @id @default(cuid())
+  sectionId String
+  title     String
+  type      LessonType
+  order     Int
+  required  Boolean    @default(true)
+  estimatedMinutes Int?
+  // Type-specific content: rich text blocks, video mediaId, sopId, checklist
+  // items, acknowledgement statement, external URL, etc.
+  content   Json?
+  createdAt DateTime   @default(now())
+  updatedAt DateTime   @updatedAt
+
+  section   CourseSection @relation(fields: [sectionId], references: [id], onDelete: Cascade)
+  questions Question[]
+  progress  LessonProgress[]
+
+  @@index([sectionId])
+}
+
+// Immutable published snapshot of an entire course (structure + lessons + questions).
+model CourseVersion {
+  id            String   @id @default(cuid())
+  courseId      String
+  versionNumber String
+  title         String
+  snapshot      Json // { course meta, sections: [{lessons: [{content, questions}]}] }
+  changeSummary String?
+  authorId      String
+  publishedAt   DateTime @default(now())
+
+  course      Course  @relation("CourseVersions", fields: [courseId], references: [id])
+  currentOf   Course? @relation("CurrentCourseVersion")
+  completions CompletionRecord[]
+  acknowledgements Acknowledgement[]
+
+  @@unique([courseId, versionNumber])
+  @@index([courseId])
+}
+
+// ---------------------------------------------------------------------------
+// Assessments
+// ---------------------------------------------------------------------------
+
+enum QuestionType {
+  MULTIPLE_CHOICE
+  MULTIPLE_SELECT
+  TRUE_FALSE
+  FILL_BLANK
+  SHORT_ANSWER
+  LONG_ANSWER
+  MATCHING
+  ORDERING
+  SCENARIO
+  FILE_SUBMISSION
+}
+
+model Question {
+  id          String       @id @default(cuid())
+  lessonId    String
+  type        QuestionType
+  order       Int
+  prompt      String
+  // options, correct answers, pairs, blanks, rubric — shape depends on type
+  config      Json
+  points      Int          @default(1)
+  required    Boolean      @default(true)
+  explanation String?
+  aiGenerated Boolean      @default(false)
+  isDraft     Boolean      @default(false) // AI-suggested questions await acceptance
+  createdAt   DateTime     @default(now())
+  updatedAt   DateTime     @updatedAt
+
+  lesson    Lesson         @relation(fields: [lessonId], references: [id], onDelete: Cascade)
+  responses QuizResponse[]
+
+  @@index([lessonId])
+}
+
+enum AttemptStatus {
+  IN_PROGRESS
+  SUBMITTED
+  GRADED
+  PASSED
+  FAILED
+}
+
+model QuizAttempt {
+  id              String        @id @default(cuid())
+  userId          String
+  lessonId        String // quiz lesson
+  courseVersionId String?
+  attemptNumber   Int
+  status          AttemptStatus @default(IN_PROGRESS)
+  scorePercent    Float?
+  pointsEarned    Float?
+  pointsPossible  Float?
+  questionOrder   Json? // randomized order evidence
+  startedAt       DateTime      @default(now())
+  submittedAt     DateTime?
+  gradedAt        DateTime?
+  gradedById      String?
+
+  user      User           @relation(fields: [userId], references: [id])
+  responses QuizResponse[]
+
+  @@unique([userId, lessonId, attemptNumber])
+  @@index([userId])
+  @@index([lessonId])
+}
+
+model QuizResponse {
+  id           String   @id @default(cuid())
+  attemptId    String
+  questionId   String
+  // Evidence: snapshot of the question as presented, and the raw answer given.
+  questionSnapshot Json
+  answer       Json
+  isCorrect    Boolean?
+  pointsEarned Float?
+  feedback     String?
+  createdAt    DateTime @default(now())
+
+  attempt  QuizAttempt @relation(fields: [attemptId], references: [id], onDelete: Cascade)
+  question Question    @relation(fields: [questionId], references: [id])
+
+  @@unique([attemptId, questionId])
+}
+
+// ---------------------------------------------------------------------------
+// Learning paths
+// ---------------------------------------------------------------------------
+
+model LearningPath {
+  id          String        @id @default(cuid())
+  title       String
+  description String?
+  ownerId     String?
+  status      ContentStatus @default(DRAFT)
+  thumbnailMediaId String?
+  isDeleted   Boolean       @default(false)
+  createdById String
+  createdAt   DateTime      @default(now())
+  updatedAt   DateTime      @updatedAt
+
+  items       LearningPathItem[]
+  assignments Assignment[]
+  positionRequirements PositionTrainingRequirement[]
+
+  @@index([status])
+}
+
+model LearningPathItem {
+  id       String             @id @default(cuid())
+  pathId   String
+  order    Int
+  label    String? // milestone label, e.g. "Day 1", "Week 1"
+  targetType TrainingTargetType
+  courseId String?
+  sopId    String? // SOP read/ack item
+  required Boolean            @default(true)
+  isMilestone Boolean         @default(false)
+  dueDaysAfterStart Int? // relative due date
+
+  path   LearningPath @relation(fields: [pathId], references: [id], onDelete: Cascade)
+  course Course?      @relation(fields: [courseId], references: [id])
+
+  @@index([pathId])
+}
+
+// ---------------------------------------------------------------------------
+// Assignments & progress
+// ---------------------------------------------------------------------------
+
+enum AssignmentStatus {
+  ASSIGNED
+  IN_PROGRESS
+  COMPLETED
+  OVERDUE
+  WAIVED
+  EXPIRED
+}
+
+enum AssignmentSource {
+  MANUAL
+  RULE
+  POSITION
+  LEARNING_PATH
+  COMPLIANCE
+  RECERTIFICATION
+  SELF_ENROLLED
+}
+
+model Assignment {
+  id         String             @id @default(cuid())
+  userId     String
+  targetType TrainingTargetType
+  courseId   String?
+  sopId      String?
+  pathId     String?
+  // For path-derived course assignments, points to the parent path assignment.
+  parentAssignmentId String?
+
+  status      AssignmentStatus @default(ASSIGNED)
+  source      AssignmentSource @default(MANUAL)
+  sourceRuleId String?
+  reason      String? // human-readable "why was this assigned"
+  assignedById String?
+  assignedAt  DateTime         @default(now())
+  startedAt   DateTime?
+  dueAt       DateTime?
+  completedAt DateTime?
+  waivedAt    DateTime?
+  waivedById  String?
+  waivedReason String?
+
+  user   User          @relation("AssigneeAssignments", fields: [userId], references: [id], onDelete: Cascade)
+  course Course?       @relation(fields: [courseId], references: [id])
+  sop    Sop?          @relation(fields: [sopId], references: [id])
+  path   LearningPath? @relation(fields: [pathId], references: [id])
+  rule   AssignmentRule? @relation(fields: [sourceRuleId], references: [id])
+
+  @@index([userId, status])
+  @@index([courseId])
+  @@index([pathId])
+  @@index([dueAt])
+  @@unique([userId, targetType, courseId, sopId, pathId, parentAssignmentId])
+}
+
+model AssignmentRule {
+  id          String   @id @default(cuid())
+  name        String
+  description String?
+  isActive    Boolean  @default(true)
+  // Criteria: { all: [{field:"workerType", op:"eq", value:"US_EMPLOYEE"}, ...] }
+  criteria    Json
+  targetType  TrainingTargetType
+  courseId    String?
+  sopId       String?
+  pathId      String?
+  dueDays     Int? // due N days after assignment
+  createdById String
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  assignments Assignment[]
+
+  @@index([isActive])
+}
+
+enum LessonProgressStatus {
+  NOT_STARTED
+  IN_PROGRESS
+  COMPLETED
+}
+
+model LessonProgress {
+  id           String               @id @default(cuid())
+  userId       String
+  lessonId     String
+  courseId     String
+  status       LessonProgressStatus @default(NOT_STARTED)
+  // Video: furthest playback second reached + watched % (server-verified cadence)
+  videoPositionSeconds Float?
+  videoWatchedPercent  Float?
+  checklistState Json? // checked item ids
+  startedAt    DateTime?
+  completedAt  DateTime?
+  updatedAt    DateTime             @updatedAt
+
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  lesson Lesson @relation(fields: [lessonId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, lessonId])
+  @@index([userId, courseId])
+}
+
+// Immutable training evidence. Survives later edits/deletes of course content.
+model CompletionRecord {
+  id              String   @id @default(cuid())
+  userId          String
+  userSnapshot    Json // { name, email, employeeId } at completion time
+  targetType      TrainingTargetType
+  courseId        String?
+  courseVersionId String?
+  sopId           String?
+  sopVersionId    String?
+  pathId          String?
+  titleSnapshot   String
+  versionLabel    String?
+  assignmentId    String?
+  assignmentSource AssignmentSource?
+  scorePercent    Float?
+  attemptCount    Int?
+  durationMinutes Int?
+  startedAt       DateTime?
+  completedAt     DateTime @default(now())
+  expiresAt       DateTime?
+  certificateId   String?  @unique
+  managerApprovedById String?
+  overriddenById  String? // completion override actor, audited
+  metadata        Json?
+
+  user          User           @relation(fields: [userId], references: [id])
+  courseVersion CourseVersion? @relation(fields: [courseVersionId], references: [id])
+  certificate   Certificate?   @relation(fields: [certificateId], references: [id])
+
+  @@index([userId, completedAt])
+  @@index([courseId])
+  @@index([expiresAt])
+}
+
+// Immutable acknowledgement / e-signature evidence.
+model Acknowledgement {
+  id              String   @id @default(cuid())
+  userId          String
+  statement       String
+  sopVersionId    String?
+  courseVersionId String?
+  lessonId        String?
+  announcementId  String?
+  signatureMethod String // "checkbox" | "typed_signature"
+  typedSignature  String?
+  ipAddress       String?
+  userAgent       String?
+  acknowledgedAt  DateTime @default(now())
+
+  user          User           @relation(fields: [userId], references: [id])
+  sopVersion    SopVersion?    @relation(fields: [sopVersionId], references: [id])
+  courseVersion CourseVersion? @relation(fields: [courseVersionId], references: [id])
+
+  @@index([userId])
+  @@index([sopVersionId])
+}
+
+model Certificate {
+  id                String    @id @default(cuid())
+  certificateNumber String    @unique // "FSW-2026-000123"
+  userId            String
+  userNameSnapshot  String
+  courseTitleSnapshot String
+  courseId          String?
+  courseVersionId   String?
+  issuedAt          DateTime  @default(now())
+  expiresAt         DateTime?
+  instructorName    String?
+  verificationToken String?   @unique // set only when public verification enabled
+  pdfPath           String?
+  revokedAt         DateTime?
+  revokedReason     String?
+
+  user        User               @relation(fields: [userId], references: [id])
+  completions CompletionRecord[]
+
+  @@index([userId])
+  @@index([expiresAt])
+}
+
+model TrainingExemption {
+  id          String   @id @default(cuid())
+  userId      String
+  targetType  TrainingTargetType
+  courseId    String?
+  sopId       String?
+  pathId      String?
+  reason      String
+  grantedById String
+  expiresAt   DateTime?
+  createdAt   DateTime @default(now())
+
+  user User @relation("ExemptUser", fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+}
+
+// ---------------------------------------------------------------------------
+// Skills
+// ---------------------------------------------------------------------------
+
+model Skill {
+  id          String   @id @default(cuid())
+  name        String   @unique
+  description String?
+  category    String?
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+
+  courses      CourseSkill[]
+  requirements PositionSkillRequirement[]
+  userSkills   UserSkill[]
+  assessments  SkillAssessment[]
+}
+
+// Configurable proficiency scale (seeded: None..Expert, values 0..6).
+model SkillLevel {
+  id    String @id @default(cuid())
+  value Int    @unique
+  name  String
+}
+
+model PositionSkillRequirement {
+  positionId    String
+  skillId       String
+  requiredLevel Int
+  required      Boolean @default(true)
+
+  position Position @relation(fields: [positionId], references: [id], onDelete: Cascade)
+  skill    Skill    @relation(fields: [skillId], references: [id], onDelete: Cascade)
+
+  @@id([positionId, skillId])
+}
+
+enum SkillSource {
+  TRAINING
+  MANAGER_ASSESSMENT
+  PRACTICAL_DEMO
+  CERTIFICATION
+  MANUAL
+}
+
+model UserSkill {
+  userId     String
+  skillId    String
+  level      Int
+  source     SkillSource
+  verifiedById String?
+  evidence   String?
+  updatedAt  DateTime    @updatedAt
+
+  user  User  @relation(fields: [userId], references: [id], onDelete: Cascade)
+  skill Skill @relation(fields: [skillId], references: [id], onDelete: Cascade)
+
+  @@id([userId, skillId])
+}
+
+enum PracticalRating {
+  NOT_DEMONSTRATED
+  NEEDS_COACHING
+  COMPETENT
+  HIGHLY_COMPETENT
+}
+
+model SkillAssessment {
+  id           String          @id @default(cuid())
+  userId       String
+  assessorId   String
+  skillId      String?
+  lessonId     String? // when triggered by a PRACTICAL_DEMO / MANAGER_SIGNOFF lesson
+  courseId     String?
+  rating       PracticalRating
+  comments     String?
+  attachmentMediaId String?
+  reassessAt   DateTime?
+  createdAt    DateTime        @default(now())
+
+  user     User   @relation("SkillAssessee", fields: [userId], references: [id])
+  assessor User   @relation("SkillAssessor", fields: [assessorId], references: [id])
+  skill    Skill? @relation(fields: [skillId], references: [id])
+
+  @@index([userId])
+  @@index([assessorId])
+}
+
+// ---------------------------------------------------------------------------
+// Compliance
+// ---------------------------------------------------------------------------
+
+model ComplianceRule {
+  id             String   @id @default(cuid())
+  name           String
+  jurisdiction   String // e.g. "US-CA", "US-Federal", "PH"
+  requirement    String
+  sourceReference String?
+  courseId       String?
+  // Population criteria — same shape as AssignmentRule.criteria
+  criteria       Json
+  frequencyMonths Int? // null = once
+  effectiveDate  DateTime?
+  expirationDate DateTime?
+  retentionYears Int?
+  ownerId        String?
+  lastVerifiedAt DateTime?
+  isActive       Boolean  @default(true)
+  notes          String?
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  course Course? @relation(fields: [courseId], references: [id])
+
+  @@index([isActive])
+}
+
+// ---------------------------------------------------------------------------
+// Collaboration, feedback, favorites
+// ---------------------------------------------------------------------------
+
+enum EntityType {
+  SOP
+  COURSE
+  LESSON
+  LEARNING_PATH
+  POLICY
+  PERSON
+  SKILL
+  MEDIA
+  ANNOUNCEMENT
+}
+
+model ContentComment {
+  id         String     @id @default(cuid())
+  entityType EntityType
+  entityId   String
+  authorId   String
+  parentId   String?
+  body       String
+  mentions   Json? // userId[]
+  resolved   Boolean    @default(false)
+  resolvedBy String?
+  createdAt  DateTime   @default(now())
+
+  author  User             @relation(fields: [authorId], references: [id])
+  parent  ContentComment?  @relation("Thread", fields: [parentId], references: [id])
+  replies ContentComment[] @relation("Thread")
+
+  @@index([entityType, entityId])
+}
+
+enum FeedbackType {
+  HELPFUL
+  NOT_CLEAR
+  OUTDATED
+  QUESTION
+}
+
+model ContentFeedback {
+  id         String       @id @default(cuid())
+  entityType EntityType
+  entityId   String
+  userId     String
+  type       FeedbackType
+  comment    String?
+  createdAt  DateTime     @default(now())
+
+  user User @relation(fields: [userId], references: [id])
+
+  @@index([entityType, entityId])
+}
+
+model Favorite {
+  userId     String
+  entityType EntityType
+  entityId   String
+  createdAt  DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@id([userId, entityType, entityId])
+}
+
+model ContentView {
+  id         String     @id @default(cuid())
+  userId     String
+  entityType EntityType
+  entityId   String
+  viewedAt   DateTime   @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, viewedAt])
+  @@index([entityType, entityId])
+}
+
+model ApprovalRequest {
+  id         String     @id @default(cuid())
+  entityType EntityType
+  entityId   String
+  stage      String // "SME_REVIEW" | "MANAGER_REVIEW" | "COMPLIANCE_REVIEW"
+  requestedById String
+  assignedToId  String?
+  status     String     @default("PENDING") // PENDING | APPROVED | CHANGES_REQUESTED
+  comment    String?
+  decidedAt  DateTime?
+  decidedById String?
+  createdAt  DateTime   @default(now())
+
+  @@index([entityType, entityId])
+  @@index([assignedToId, status])
+}
+
+// Content relationship graph — powers impact analysis.
+model ContentRelationship {
+  id             String     @id @default(cuid())
+  fromEntityType EntityType
+  fromEntityId   String
+  toEntityType   EntityType
+  toEntityId     String
+  relation       String // "USES" | "REFERENCES" | "GENERATED_FROM" | "TRANSLATES"
+  metadata       Json?
+  createdAt      DateTime   @default(now())
+
+  @@unique([fromEntityType, fromEntityId, toEntityType, toEntityId, relation])
+  @@index([toEntityType, toEntityId])
+}
+
+// ---------------------------------------------------------------------------
+// Media & video
+// ---------------------------------------------------------------------------
+
+enum MediaKind {
+  IMAGE
+  VIDEO
+  AUDIO
+  DOCUMENT
+  CAPTION
+  GENERATED
+}
+
+model MediaAsset {
+  id          String    @id @default(cuid())
+  kind        MediaKind
+  filename    String // sanitized original name
+  title       String?
+  altText     String?
+  mimeType    String
+  sizeBytes   Int
+  storagePath String // provider-relative path
+  sha256      String? // duplicate detection
+  ownerId     String?
+  // Video-specific
+  durationSeconds Float?
+  transcript      String?
+  captionsVtt     String?
+  chapters        Json? // [{title, startSeconds}]
+  processingStatus String? // UPLOADED | PROCESSING | READY | FAILED
+  isDeleted   Boolean   @default(false)
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  @@index([sha256])
+  @@index([ownerId])
+  @@index([kind])
+}
+
+enum VideoJobStatus {
+  QUEUED
+  GENERATING_SCRIPT
+  AWAITING_REVIEW
+  GENERATING_AUDIO
+  CREATING_SCENES
+  RENDERING
+  UPLOADING
+  COMPLETE
+  FAILED
+  CANCELED
+}
+
+model VideoJob {
+  id           String         @id @default(cuid())
+  createdById  String
+  title        String
+  mode         String // "EXPLAINER" | "SCREEN_WALKTHROUGH" | "SLIDES" | "AVATAR" | "QUICK_CLIP" | "SAFETY_BRIEFING"
+  sourceType   String // "PROMPT" | "SOP" | "COURSE" | "DOCUMENT" | "TRANSCRIPT"
+  sourceSopId  String?
+  sourceSopVersion String? // e.g. "2.1" — powers "generated from SOP vX" tracking
+  sourceCourseId String?
+  sourceText   String?
+  prompt       String?
+  // Editable plan: objectives, script, storyboard scenes, narration, knowledge checks
+  plan         Json?
+  voice        String?
+  language     String  @default("en")
+  aspectRatio  String  @default("16:9")
+  provider     String? // resolved VideoProvider key
+  status       VideoJobStatus @default(QUEUED)
+  progress     Int            @default(0)
+  error        String?
+  attemptCount Int            @default(0)
+  outputMediaId String?
+  createdAt    DateTime       @default(now())
+  updatedAt    DateTime       @updatedAt
+
+  @@index([status])
+  @@index([createdById])
+}
+
+// ---------------------------------------------------------------------------
+// AI & RAG
+// ---------------------------------------------------------------------------
+
+model AiJob {
+  id          String   @id @default(cuid())
+  kind        String // "SOP_DRAFT" | "COURSE_DRAFT" | "QUIZ_SUGGEST" | "TRANSLATE" | "QUALITY_CHECK" | "EMBED_CONTENT"
+  createdById String
+  input       Json
+  output      Json?
+  status      String   @default("QUEUED") // QUEUED | RUNNING | COMPLETE | FAILED
+  error       String?
+  provider    String?
+  model       String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([status])
+  @@index([createdById])
+}
+
+// Retrieval corpus. One row per chunk of published, approved content.
+// ACL columns are filtered BEFORE retrieval — never after generation.
+model KnowledgeChunk {
+  id           String     @id @default(cuid())
+  entityType   EntityType
+  entityId     String
+  versionLabel String?
+  title        String
+  sectionPath  String? // e.g. "Procedure > Step 4"
+  content      String
+  language     String     @default("en")
+  // ACL scoping (null = visible to all authenticated users)
+  businessUnitId String?
+  departmentId   String?
+  requiredPermission String?
+  embedding    Unsupported("vector(1536)")?
+  createdAt    DateTime   @default(now())
+
+  @@index([entityType, entityId])
+}
+
+model AiConversation {
+  id        String   @id @default(cuid())
+  userId    String
+  kind      String   @default("ASK_FSW") // ASK_FSW | COACH
+  courseId  String? // coach scope
+  title     String?
+  createdAt DateTime @default(now())
+
+  messages AiMessage[]
+
+  @@index([userId])
+}
+
+model AiMessage {
+  id             String   @id @default(cuid())
+  conversationId String
+  role           String // "user" | "assistant"
+  content        String
+  citations      Json? // [{entityType, entityId, title, sectionPath, versionLabel}]
+  createdAt      DateTime @default(now())
+
+  conversation AiConversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+
+  @@index([conversationId])
+}
+
+// ---------------------------------------------------------------------------
+// Translations
+// ---------------------------------------------------------------------------
+
+model ContentTranslation {
+  id            String     @id @default(cuid())
+  entityType    EntityType
+  entityId      String
+  language      String
+  sourceVersion String? // version label the translation was made from
+  title         String
+  content       Json
+  status        String     @default("DRAFT") // DRAFT | PUBLISHED | OUTDATED
+  translatedById String?
+  aiGenerated   Boolean    @default(true)
+  createdAt     DateTime   @default(now())
+  updatedAt     DateTime   @updatedAt
+
+  @@unique([entityType, entityId, language])
+}
+
+// ---------------------------------------------------------------------------
+// Notifications & announcements
+// ---------------------------------------------------------------------------
+
+enum NotificationType {
+  TRAINING_ASSIGNED
+  TRAINING_DUE_SOON
+  TRAINING_OVERDUE
+  COURSE_COMPLETED
+  ASSESSMENT_FAILED
+  MANAGER_APPROVAL_NEEDED
+  CERTIFICATE_EXPIRING
+  SOP_CHANGED
+  REACK_REQUIRED
+  COMMENT_MENTION
+  REVIEW_REQUESTED
+  CONTENT_REVIEW_DUE
+  ANNOUNCEMENT
+  SYSTEM
+}
+
+model Notification {
+  id        String           @id @default(cuid())
+  userId    String
+  type      NotificationType
+  title     String
+  body      String?
+  linkUrl   String?
+  readAt    DateTime?
+  emailedAt DateTime?
+  createdAt DateTime         @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, readAt])
+  @@index([userId, createdAt])
+}
+
+model NotificationPreference {
+  userId    String
+  type      NotificationType
+  inApp     Boolean @default(true)
+  email     Boolean @default(true)
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@id([userId, type])
+}
+
+model Announcement {
+  id          String    @id @default(cuid())
+  title       String
+  body        String
+  authorId    String
+  // Targeting (null = everyone)
+  businessUnitId String?
+  departmentId   String?
+  teamId         String?
+  locationId     String?
+  roleKey        String?
+  startsAt    DateTime  @default(now())
+  expiresAt   DateTime?
+  pinned      Boolean   @default(false)
+  requiresAck Boolean   @default(false)
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  acks AnnouncementAck[]
+
+  @@index([startsAt, expiresAt])
+}
+
+model AnnouncementAck {
+  announcementId String
+  userId         String
+  acknowledgedAt DateTime @default(now())
+
+  announcement Announcement @relation(fields: [announcementId], references: [id], onDelete: Cascade)
+  user         User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@id([announcementId, userId])
+}
+
+// ---------------------------------------------------------------------------
+// Instructor-led training
+// ---------------------------------------------------------------------------
+
+model LiveSession {
+  id           String   @id @default(cuid())
+  courseId     String?
+  lessonId     String?
+  title        String
+  instructorId String?
+  startsAt     DateTime
+  endsAt       DateTime
+  timezone     String   @default("America/New_York")
+  locationText String? // room or meeting link
+  capacity     Int?
+  createdAt    DateTime @default(now())
+
+  course     Course?             @relation(fields: [courseId], references: [id])
+  attendance SessionAttendance[]
+
+  @@index([startsAt])
+}
+
+model SessionAttendance {
+  sessionId  String
+  userId     String
+  status     String   @default("REGISTERED") // REGISTERED | ATTENDED | NO_SHOW
+  markedById String?
+  markedAt   DateTime?
+
+  session LiveSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  user    User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@id([sessionId, userId])
+}
+
+// ---------------------------------------------------------------------------
+// Platform: settings, audit, jobs, integrations, analytics
+// ---------------------------------------------------------------------------
+
+// Key-value application settings (brand, app name, feature flags, defaults).
+model AppSetting {
+  key       String   @id
+  value     Json
+  updatedAt DateTime @updatedAt
+  updatedBy String?
+}
+
+// Append-only audit trail. No update/delete path exists in the service layer.
+model AuditEvent {
+  id         String   @id @default(cuid())
+  actorId    String? // null = system
+  actorEmail String?
+  action     String // e.g. "sop.publish", "person.sensitive_view"
+  entityType String?
+  entityId   String?
+  requestId  String?
+  ipAddress  String?
+  metadata   Json? // safe, non-sensitive context only
+  createdAt  DateTime @default(now())
+
+  @@index([actorId])
+  @@index([action])
+  @@index([entityType, entityId])
+  @@index([createdAt])
+}
+
+// Postgres-backed job queue for async work (video renders, AI jobs, emails,
+// reminders, link checks). Claimed with FOR UPDATE SKIP LOCKED.
+model Job {
+  id          String    @id @default(cuid())
+  type        String
+  payload     Json
+  status      String    @default("QUEUED") // QUEUED | RUNNING | COMPLETE | FAILED | CANCELED
+  priority    Int       @default(0)
+  runAt       DateTime  @default(now())
+  attempts    Int       @default(0)
+  maxAttempts Int       @default(3)
+  lastError   String?
+  idempotencyKey String? @unique
+  lockedAt    DateTime?
+  lockedBy    String?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  @@index([status, runAt, priority])
+  @@index([type])
+}
+
+model Integration {
+  id        String   @id @default(cuid())
+  key       String   @unique // "microsoft365" | "teams" | "slack" | "hris" | "webhooks" | ...
+  name      String
+  status    String   @default("NOT_CONNECTED") // NOT_CONNECTED | CONNECTED | NEEDS_ATTENTION
+  // Encrypted JSON config (AES-256-GCM) — never returned to the client raw.
+  configCiphertext String?
+  lastCheckedAt DateTime?
+  updatedAt DateTime @updatedAt
+  createdAt DateTime @default(now())
+}
+
+model ApiKey {
+  id         String    @id @default(cuid())
+  name       String
+  keyHash    String    @unique // sha256 of the secret
+  prefix     String // first 8 chars for display
+  scopes     Json // permission keys granted to this key
+  createdById String
+  lastUsedAt DateTime?
+  expiresAt  DateTime?
+  revokedAt  DateTime?
+  createdAt  DateTime  @default(now())
+}
+
+model Webhook {
+  id        String   @id @default(cuid())
+  url       String
+  secret    String // HMAC signing secret (encrypted at rest via app crypto)
+  events    Json // ["training.completed", "sop.published", ...]
+  isActive  Boolean  @default(true)
+  createdById String
+  createdAt DateTime @default(now())
+
+  deliveries WebhookDelivery[]
+}
+
+model WebhookDelivery {
+  id          String    @id @default(cuid())
+  webhookId   String
+  event       String
+  payload     Json
+  status      String    @default("PENDING") // PENDING | DELIVERED | FAILED
+  attempts    Int       @default(0)
+  lastAttemptAt DateTime?
+  responseCode Int?
+  createdAt   DateTime  @default(now())
+
+  webhook Webhook @relation(fields: [webhookId], references: [id], onDelete: Cascade)
+
+  @@index([webhookId, status])
+}
+
+// Privacy-conscious product analytics (no content bodies, no sensitive data).
+model AnalyticsEvent {
+  id        String   @id @default(cuid())
+  userId    String? // nullable to allow anonymization
+  event     String // "course_started", "search_performed", ...
+  entityType String?
+  entityId  String?
+  metadata  Json?
+  createdAt DateTime @default(now())
+
+  @@index([event, createdAt])
+}
+
+// Rate limiting buckets (login attempts, AI calls, API keys).
+model RateLimitBucket {
+  key       String   @id // e.g. "login:1.2.3.4", "ai:userId"
+  count     Int      @default(0)
+  resetAt   DateTime
+}
