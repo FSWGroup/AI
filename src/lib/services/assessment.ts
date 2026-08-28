@@ -116,6 +116,36 @@ function sanitizeConfigForPresentation(
       const choices = Array.isArray(cfg.choices) ? (cfg.choices as { id: string; label: string }[]) : [];
       return { choices: choices.map((c) => ({ id: c.id, label: c.label })) };
     }
+    case "APPLICATION": {
+      /*
+       * Send the application facts and the choices, and nothing else. Both
+       * `correctOptionId` and `reasoning` would hand the learner the answer, so
+       * they are stripped here and revealed only in the review after grading.
+       */
+      const parameters = Array.isArray(cfg.parameters)
+        ? (cfg.parameters as { label?: unknown; value?: unknown }[])
+        : [];
+      const dimensions = Array.isArray(cfg.dimensions)
+        ? (cfg.dimensions as { id?: unknown; label?: unknown; options?: unknown }[])
+        : [];
+
+      return {
+        parameters: parameters.map((p) => ({
+          label: typeof p.label === "string" ? p.label : "",
+          value: typeof p.value === "string" ? p.value : "",
+        })),
+        dimensions: dimensions.map((d) => ({
+          id: typeof d.id === "string" ? d.id : "",
+          label: typeof d.label === "string" ? d.label : "",
+          options: (Array.isArray(d.options) ? (d.options as { id?: unknown; label?: unknown }[]) : []).map(
+            (o) => ({
+              id: typeof o.id === "string" ? o.id : "",
+              label: typeof o.label === "string" ? o.label : "",
+            }),
+          ),
+        })),
+      };
+    }
     case "FILE_SUBMISSION":
       return { instructions: typeof cfg.instructions === "string" ? cfg.instructions : undefined };
     default:
@@ -466,7 +496,74 @@ export interface AttemptReview {
     pointsPossible: number;
     explanation: string | null;
     feedback: string | null;
+    /**
+     * Per-decision breakdown, for APPLICATION questions only.
+     *
+     * This is where a judgment question teaches: the learner sees which of their
+     * selections held up, what the expert would have chosen, and why. Subject to
+     * the same reveal policy as everything else — `correctLabel` and `reasoning`
+     * are withheld until the lesson's policy allows it.
+     */
+    dimensions?: {
+      label: string;
+      chosenLabel: string | null;
+      correctLabel: string | null;
+      isCorrect: boolean;
+      reasoning: string | null;
+    }[];
   }[];
+}
+
+/**
+ * Per-decision breakdown for an APPLICATION response.
+ *
+ * `revealAnswers` and `revealReasoning` follow the lesson's review policy, so a
+ * lesson set to withhold results until a pass does not leak the expert's choice
+ * through this route.
+ */
+function buildApplicationReview(
+  config: unknown,
+  answer: unknown,
+  reveal: { revealAnswers: boolean; revealReasoning: boolean },
+): AttemptReview["responses"][number]["dimensions"] {
+  const cfg = asRecord(config);
+  const dimensions = Array.isArray(cfg.dimensions)
+    ? (cfg.dimensions as {
+        id?: unknown;
+        label?: unknown;
+        options?: unknown;
+        correctOptionId?: unknown;
+        reasoning?: unknown;
+      }[])
+    : [];
+
+  const selections =
+    answer && typeof answer === "object" && !Array.isArray(answer)
+      ? (answer as Record<string, unknown>)
+      : {};
+
+  return dimensions.map((dimension) => {
+    const id = typeof dimension.id === "string" ? dimension.id : "";
+    const options = Array.isArray(dimension.options)
+      ? (dimension.options as { id?: unknown; label?: unknown }[])
+      : [];
+    const labelFor = (optionId: unknown): string | null => {
+      const found = options.find((o) => o.id === optionId);
+      return found && typeof found.label === "string" ? found.label : null;
+    };
+
+    const chosen = selections[id];
+    const correctId = typeof dimension.correctOptionId === "string" ? dimension.correctOptionId : null;
+
+    return {
+      label: typeof dimension.label === "string" ? dimension.label : "",
+      chosenLabel: labelFor(chosen),
+      correctLabel: reveal.revealAnswers && correctId ? labelFor(correctId) : null,
+      isCorrect: typeof chosen === "string" && correctId !== null && chosen === correctId,
+      reasoning:
+        reveal.revealReasoning && typeof dimension.reasoning === "string" ? dimension.reasoning : null,
+    };
+  });
 }
 
 export async function getAttemptReview(actor: Actor, attemptId: string): Promise<AttemptReview> {
@@ -486,7 +583,7 @@ export async function getAttemptReview(actor: Actor, attemptId: string): Promise
           isCorrect: true,
           pointsEarned: true,
           feedback: true,
-          question: { select: { prompt: true, type: true, points: true, explanation: true } },
+          question: { select: { prompt: true, type: true, points: true, explanation: true, config: true } },
         },
       },
     },
@@ -521,6 +618,14 @@ export async function getAttemptReview(actor: Actor, attemptId: string): Promise
       pointsPossible: r.question.points,
       explanation: canReveal && showExplanations ? r.question.explanation : null,
       feedback: r.feedback,
+      ...(r.question.type === "APPLICATION"
+        ? {
+            dimensions: buildApplicationReview(r.question.config, r.answer, {
+              revealAnswers: canReveal,
+              revealReasoning: canReveal && showExplanations,
+            }),
+          }
+        : {}),
     })),
   };
 }

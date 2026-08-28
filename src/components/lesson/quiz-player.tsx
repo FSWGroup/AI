@@ -447,6 +447,65 @@ function QuestionInput({
       );
     }
 
+    case "APPLICATION": {
+      /*
+       * One selection per decision, each rendered as its own labelled group.
+       * The application facts sit above them, because the whole point is that
+       * the learner reasons from the facts rather than recognising a phrase.
+       */
+      const parameters =
+        (presentation.parameters as { label: string; value: string }[] | undefined) ?? [];
+      const dimensions =
+        (presentation.dimensions as
+          | { id: string; label: string; options: { id: string; label: string }[] }[]
+          | undefined) ?? [];
+      const selections = (value as Record<string, string> | undefined) ?? {};
+
+      return (
+        <div className="flex flex-col gap-4">
+          {parameters.length > 0 && (
+            <dl className="grid gap-x-6 gap-y-2 rounded-md border border-[var(--border-subtle)] bg-[var(--surface-sunken)] p-3 sm:grid-cols-2">
+              {parameters.map((parameter) => (
+                <div key={`${parameter.label}-${parameter.value}`} className="flex flex-col">
+                  <dt className="text-[0.6875rem] font-medium tracking-[0.06em] text-[var(--text-muted)] uppercase">
+                    {parameter.label}
+                  </dt>
+                  <dd className="text-[0.875rem] text-[var(--text-primary)]">{parameter.value}</dd>
+                </div>
+              ))}
+            </dl>
+          )}
+
+          {dimensions.map((dimension) => (
+            <fieldset key={dimension.id} className="flex flex-col gap-1.5">
+              <legend className="mb-1 text-[0.8125rem] font-semibold text-[var(--text-primary)]">
+                {dimension.label}
+              </legend>
+              {dimension.options.map((option) => (
+                <label
+                  key={option.id}
+                  className={`flex items-center gap-2 rounded-md border px-3 py-2 text-[0.875rem] transition-colors ${
+                    selections[dimension.id] === option.id
+                      ? "border-[var(--brand-primary)] bg-[var(--surface-sunken)]"
+                      : "border-[var(--border-default)]"
+                  }`}
+                >
+                  <input
+                    type="radio"
+                    name={`${question.id}-${dimension.id}`}
+                    checked={selections[dimension.id] === option.id}
+                    onChange={() => onChange({ ...selections, [dimension.id]: option.id })}
+                    className="h-4 w-4 accent-[var(--brand-primary)]"
+                  />
+                  {option.label}
+                </label>
+              ))}
+            </fieldset>
+          ))}
+        </div>
+      );
+    }
+
     case "FILE_SUBMISSION": {
       const current = (value as { note?: string } | undefined) ?? {};
       return (
@@ -545,6 +604,40 @@ function QuizResultView({
                 </p>
               )}
               {r.explanation && <p className="mt-1 text-[0.8125rem] text-[var(--text-secondary)]">{r.explanation}</p>}
+
+              {/*
+                A judgment question is marked decision by decision. Getting the
+                valve right and the actuation wrong is most of the way there, and
+                the reasoning is the part that turns a score into learning.
+              */}
+              {r.dimensions && r.dimensions.length > 0 && (
+                <ul className="mt-3 flex flex-col gap-2 border-t border-[var(--border-subtle)] pt-3">
+                  {r.dimensions.map((dimension) => (
+                    <li key={dimension.label} className="flex flex-col gap-0.5">
+                      <span className="flex flex-wrap items-baseline gap-x-2">
+                        <span className="text-[0.8125rem] font-semibold text-[var(--text-primary)]">
+                          {dimension.label}
+                        </span>
+                        <Badge tone={dimension.isCorrect ? "success" : "danger"}>
+                          {dimension.isCorrect ? "Right" : "Not this time"}
+                        </Badge>
+                      </span>
+                      <span className="text-[0.8125rem] text-[var(--text-secondary)]">
+                        You chose {dimension.chosenLabel ?? "nothing"}
+                        {!dimension.isCorrect && dimension.correctLabel
+                          ? `; the answer is ${dimension.correctLabel}`
+                          : ""}
+                        .
+                      </span>
+                      {dimension.reasoning && (
+                        <span className="text-[0.8125rem] text-[var(--text-muted)]">
+                          {dimension.reasoning}
+                        </span>
+                      )}
+                    </li>
+                  ))}
+                </ul>
+              )}
             </div>
           ))}
         </div>

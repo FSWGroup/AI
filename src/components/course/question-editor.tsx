@@ -28,6 +28,7 @@ const TYPE_LABEL: Record<string, string> = {
   MATCHING: "Matching",
   ORDERING: "Ordering",
   SCENARIO: "Scenario choice",
+  APPLICATION: "Application judgment (multi-dimension)",
   FILE_SUBMISSION: "File submission (manual grading)",
 };
 
@@ -323,6 +324,8 @@ function ConfigEditor({
       return <OrderingConfig config={config} onChange={onChange} />;
     case "SCENARIO":
       return <ScenarioQuestionConfig config={config} onChange={onChange} />;
+    case "APPLICATION":
+      return <ApplicationQuestionConfig config={config} onChange={onChange} />;
     case "FILE_SUBMISSION":
       return (
         <Field label="Submission instructions" htmlFor="q-file-instructions">
@@ -529,6 +532,232 @@ function ScenarioQuestionConfig({
         <Glyph name="plus" className="h-4 w-4" />
         Add choice
       </Button>
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Application judgment
+// ---------------------------------------------------------------------------
+
+interface AppParameter {
+  label: string;
+  value: string;
+}
+
+interface AppOption {
+  id: string;
+  label: string;
+}
+
+interface AppDimension {
+  id: string;
+  label: string;
+  options: AppOption[];
+  correctOptionId?: string;
+  reasoning?: string;
+  weight?: number;
+}
+
+/**
+ * Authoring for a multi-dimension judgment question.
+ *
+ * The learner is shown a set of application parameters — fluid, pressure,
+ * temperature, whatever the work actually turns on — and makes one selection per
+ * dimension. Each dimension is scored separately, so the author is asked for the
+ * reasoning as well as the answer: a learner who picked the wrong body material
+ * learns from "carbon steel is rated for this temperature and bronze is not",
+ * not from a red cross.
+ */
+function ApplicationQuestionConfig({
+  config,
+  onChange,
+}: {
+  config: Record<string, unknown>;
+  onChange: (config: Record<string, unknown>) => void;
+}) {
+  const parameters = (config.parameters as AppParameter[] | undefined) ?? [];
+  const dimensions = (config.dimensions as AppDimension[] | undefined) ?? [];
+
+  const setParameters = (next: AppParameter[]) => onChange({ ...config, parameters: next });
+  const setDimensions = (next: AppDimension[]) => onChange({ ...config, dimensions: next });
+
+  const patchDimension = (index: number, patch: Partial<AppDimension>) =>
+    setDimensions(dimensions.map((d, i) => (i === index ? { ...d, ...patch } : d)));
+
+  return (
+    <div className="flex flex-col gap-5">
+      <section className="flex flex-col gap-2">
+        <p className="text-[0.75rem] font-medium text-[var(--text-secondary)]">
+          The application
+        </p>
+        <p className="text-[0.75rem] text-[var(--text-muted)]">
+          The facts the learner has to work from. Give them what a real enquiry
+          would carry — no more, so the judgment stays theirs.
+        </p>
+        {parameters.map((parameter, i) => (
+          <div key={i} className="flex items-center gap-2">
+            <Input
+              value={parameter.label}
+              placeholder="Fluid"
+              aria-label={`Parameter ${i + 1} name`}
+              onChange={(e) => setParameters(parameters.map((p, idx) => (idx === i ? { ...p, label: e.target.value } : p)))}
+            />
+            <Input
+              value={parameter.value}
+              placeholder="Saturated steam"
+              aria-label={`Parameter ${i + 1} value`}
+              onChange={(e) => setParameters(parameters.map((p, idx) => (idx === i ? { ...p, value: e.target.value } : p)))}
+            />
+            <Button
+              variant="ghost"
+              size="sm"
+              aria-label={`Remove parameter ${i + 1}`}
+              onClick={() => setParameters(parameters.filter((_, idx) => idx !== i))}
+            >
+              <Glyph name="trash" className="h-4 w-4" />
+            </Button>
+          </div>
+        ))}
+        <Button
+          variant="outline"
+          size="sm"
+          className="self-start"
+          onClick={() => setParameters([...parameters, { label: "", value: "" }])}
+        >
+          <Glyph name="plus" className="h-4 w-4" />
+          Add parameter
+        </Button>
+      </section>
+
+      <section className="flex flex-col gap-3">
+        <p className="text-[0.75rem] font-medium text-[var(--text-secondary)]">
+          Decisions the learner makes
+        </p>
+        {dimensions.length === 0 && (
+          <p className="text-[0.75rem] text-[var(--text-muted)]">
+            Nothing to decide yet. Until a decision has options and a correct
+            answer, this question is sent for manual grading rather than scored.
+          </p>
+        )}
+
+        {dimensions.map((dimension, i) => (
+          <div
+            key={dimension.id}
+            className="flex flex-col gap-2 rounded-md border border-[var(--border-subtle)] bg-[var(--surface-sunken)] p-3"
+          >
+            <div className="flex items-center gap-2">
+              <Input
+                value={dimension.label}
+                placeholder="Body material"
+                aria-label={`Decision ${i + 1} name`}
+                onChange={(e) => patchDimension(i, { label: e.target.value })}
+              />
+              <Button
+                variant="ghost"
+                size="sm"
+                aria-label={`Remove decision ${i + 1}`}
+                onClick={() => setDimensions(dimensions.filter((_, idx) => idx !== i))}
+              >
+                <Glyph name="trash" className="h-4 w-4" />
+              </Button>
+            </div>
+
+            {dimension.options.map((option, oi) => (
+              <div key={option.id} className="flex items-center gap-2 pl-1">
+                <input
+                  type="radio"
+                  name={`app-correct-${dimension.id}`}
+                  checked={dimension.correctOptionId === option.id}
+                  onChange={() => patchDimension(i, { correctOptionId: option.id })}
+                  className="h-4 w-4 accent-[var(--brand-primary)]"
+                  aria-label={`Option ${oi + 1} of ${dimension.label || `decision ${i + 1}`} is correct`}
+                />
+                <Input
+                  value={option.label}
+                  placeholder="Carbon steel"
+                  aria-label={`Decision ${i + 1} option ${oi + 1}`}
+                  onChange={(e) =>
+                    patchDimension(i, {
+                      options: dimension.options.map((o, idx) =>
+                        idx === oi ? { ...o, label: e.target.value } : o,
+                      ),
+                    })
+                  }
+                />
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  aria-label={`Remove decision ${i + 1} option ${oi + 1}`}
+                  onClick={() =>
+                    patchDimension(i, {
+                      options: dimension.options.filter((_, idx) => idx !== oi),
+                      // Clear the answer if it was the option just removed.
+                      ...(dimension.correctOptionId === option.id ? { correctOptionId: undefined } : {}),
+                    })
+                  }
+                >
+                  <Glyph name="trash" className="h-4 w-4" />
+                </Button>
+              </div>
+            ))}
+
+            <Button
+              variant="ghost"
+              size="sm"
+              className="self-start"
+              onClick={() =>
+                patchDimension(i, { options: [...dimension.options, { id: newId(), label: "" }] })
+              }
+            >
+              <Glyph name="plus" className="h-3.5 w-3.5" />
+              Add option
+            </Button>
+
+            <Field
+              label="Why that is the right answer"
+              htmlFor={`app-reasoning-${dimension.id}`}
+              hint="Shown after the learner answers. This is the part that teaches."
+            >
+              <Textarea
+                id={`app-reasoning-${dimension.id}`}
+                rows={2}
+                value={dimension.reasoning ?? ""}
+                onChange={(e) => patchDimension(i, { reasoning: e.target.value })}
+              />
+            </Field>
+
+            <Field
+              label="Weight"
+              htmlFor={`app-weight-${dimension.id}`}
+              hint="How much this decision counts, relative to the others. Leave at 1 unless one decision genuinely matters more."
+            >
+              <Input
+                id={`app-weight-${dimension.id}`}
+                type="number"
+                min={1}
+                value={dimension.weight ?? 1}
+                onChange={(e) => patchDimension(i, { weight: Number(e.target.value) || 1 })}
+              />
+            </Field>
+          </div>
+        ))}
+
+        <Button
+          variant="outline"
+          size="sm"
+          className="self-start"
+          onClick={() =>
+            setDimensions([
+              ...dimensions,
+              { id: newId(), label: "", options: [{ id: newId(), label: "" }] },
+            ])
+          }
+        >
+          <Glyph name="plus" className="h-4 w-4" />
+          Add decision
+        </Button>
+      </section>
     </div>
   );
 }

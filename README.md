@@ -42,7 +42,7 @@ a **video**, and an **assessment** — without maintaining five separate copies.
 **Training**
 - Visual course builder: course → section → lesson → activity, 25 lesson types
 - Video-first learning with real playback tracking (opening a video is not completion)
-- Assessments with 10 question types, attempt history, and per-attempt evidence
+- Assessments with 11 question types — including multi-dimension application judgment, scored per decision — plus attempt history and per-attempt evidence
 - Learning paths with relative due dates ("Day 1", "Week 1", "Day 30")
 - Certificates as generated PDFs, with recertification cycles
 
@@ -296,9 +296,9 @@ npm run test:e2e          # end-to-end — real browser
 
 | Layer | Count | Covers |
 |---|---|---|
-| Unit | 156 | Permission catalog invariants, assignment criteria evaluation, quiz grading for all ten question types, timezone-aware due dates, content transforms, field encryption |
-| Integration | 128 | Authorization boundaries, evidence immutability, AI retrieval filtering, video progress anti-scrub, certificate PDFs, the job queue, SOP lifecycle, assignment idempotency |
-| End-to-end | 5 specs | Authentication and permission-filtered navigation, security boundaries, the learner journey, the administrator journey, mobile, accessibility |
+| Unit | 169 | Permission catalog invariants, assignment criteria evaluation, quiz grading for all eleven question types, timezone-aware due dates, content transforms, field encryption |
+| Integration | 172 | Authorization boundaries and data scope, evidence immutability, AI retrieval filtering, video progress anti-scrub, certificate PDFs, the job queue, SOP lifecycle, assignment idempotency, knowledge risk, the manager brief, application-question scoring |
+| End-to-end | 108 across 9 specs | Authentication and permission-filtered navigation, security boundaries, the learner journey, the authoring workflow, application questions, insight surfaces, the administrator journey, mobile, accessibility |
 
 Notable: `npm run test:e2e` frees the port first, because the harness
 deliberately refuses to reuse an existing server — a leftover process serves a

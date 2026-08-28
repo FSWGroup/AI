@@ -1135,6 +1135,70 @@ export const DEMO_COURSES: CourseSpec[] = [
                 config: { acceptableAnswers: ["check", "check valve", "non-return"] },
                 points: 1,
               },
+              {
+                /*
+                 * Judgment, not recall. The learner is given what a real enquiry
+                 * carries and has to make three linked decisions; each is scored
+                 * separately, and the reasoning is shown afterwards. Demonstration
+                 * content — have an application engineer verify the answers before
+                 * this is used to assess anyone.
+                 */
+                type: "APPLICATION",
+                prompt:
+                  "An enquiry comes in for a new isolation valve. Work from the application below and make the three selections you would put on the quote.",
+                config: {
+                  parameters: [
+                    { label: "Service", value: "Saturated steam, isolation only" },
+                    { label: "Line size", value: '2" NPS' },
+                    { label: "Design pressure", value: "150 psig" },
+                    { label: "Design temperature", value: "366 °F" },
+                    { label: "Operation", value: "Manual, infrequent" },
+                  ],
+                  dimensions: [
+                    {
+                      id: "valve-type",
+                      label: "Valve type",
+                      weight: 2,
+                      options: [
+                        { id: "gate", label: "Gate valve" },
+                        { id: "globe", label: "Globe valve" },
+                        { id: "butterfly", label: "Resilient-seated butterfly valve" },
+                      ],
+                      correctOptionId: "gate",
+                      reasoning:
+                        "Isolation only, operated infrequently, so a gate valve is the conventional choice: full bore when open and very little pressure drop. A globe valve is for throttling, and a resilient seat is not suitable at this temperature.",
+                    },
+                    {
+                      id: "body-material",
+                      label: "Body material",
+                      weight: 2,
+                      options: [
+                        { id: "bronze", label: "Bronze" },
+                        { id: "carbon-steel", label: "Carbon steel" },
+                        { id: "pvc", label: "PVC" },
+                      ],
+                      correctOptionId: "carbon-steel",
+                      reasoning:
+                        "At 366 °F, carbon steel is the standard body. Bronze is limited well below this on steam service, and PVC is not a candidate anywhere near these temperatures.",
+                    },
+                    {
+                      id: "end-connection",
+                      label: "End connection",
+                      options: [
+                        { id: "threaded", label: "Threaded NPT" },
+                        { id: "flanged", label: "Flanged, Class 150" },
+                        { id: "socket-weld", label: "Socket weld" },
+                      ],
+                      correctOptionId: "flanged",
+                      reasoning:
+                        'Class 150 flanged suits a 2" steam line: it matches the pressure class and can be removed for maintenance. Threaded joints are generally avoided on steam at this size.',
+                    },
+                  ],
+                },
+                explanation:
+                  "Three decisions, scored separately. Getting the type right and the material wrong is most of the way there — which is the point: this is the judgment the job actually needs.",
+                points: 5,
+              },
             ],
           },
         ],

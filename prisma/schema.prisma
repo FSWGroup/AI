@@ -599,6 +599,11 @@ enum QuestionType {
   ORDERING
   SCENARIO
   FILE_SUBMISSION
+  /// Multi-dimension judgment: given a set of application parameters, the
+  /// learner makes several linked selections and each is scored separately,
+  /// with the expert's reasoning revealed afterwards. Built for technical
+  /// selection work, where the skill is judgment rather than recall.
+  APPLICATION
 }
 
 model Question {

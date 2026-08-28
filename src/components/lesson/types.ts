@@ -153,5 +153,13 @@ export interface QuizReview {
     pointsPossible: number;
     explanation: string | null;
     feedback: string | null;
+    /** Per-decision breakdown, present only for APPLICATION questions. */
+    dimensions?: {
+      label: string;
+      chosenLabel: string | null;
+      correctLabel: string | null;
+      isCorrect: boolean;
+      reasoning: string | null;
+    }[];
   }[];
 }

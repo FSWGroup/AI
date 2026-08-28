@@ -154,7 +154,38 @@ Question ──► QuizAttempt ──► QuizResponse
 
 `Question.config` is type-specific: `{options, correctIndex}`,
 `{options, correctIndexes}`, `{correct}`, `{acceptableAnswers}`,
-`{acceptableKeywords}`, `{pairs}`, `{items}`.
+`{acceptableKeywords}`, `{pairs}`, `{items}`, `{choices}`.
+
+`APPLICATION` is the judgment type, for work where the skill is choosing the
+right thing rather than recalling a definition. Its config carries the facts a
+real enquiry would arrive with and the decisions the learner has to make:
+
+```jsonc
+{
+  "parameters": [{ "label": "Design temperature", "value": "366 °F" }],
+  "dimensions": [
+    {
+      "id": "body-material",
+      "label": "Body material",
+      "weight": 2,                    // optional, defaults to 1
+      "options": [{ "id": "carbon-steel", "label": "Carbon steel" }],
+      "correctOptionId": "carbon-steel",
+      "reasoning": "Rated for this temperature; bronze is not."
+    }
+  ]
+}
+```
+
+The answer is `{ dimensionId: optionId }`. Each dimension is graded separately
+and scored by weight, so getting the valve right and the material wrong earns
+most of the marks rather than none — and the review shows the reasoning per
+decision, which is the part that teaches. A dimension without a
+`correctOptionId` makes the whole question fall to manual grading rather than
+awarding marks or asserting a confident "incorrect".
+
+`sanitizeConfigForPresentation` strips `correctOptionId`, `reasoning` and
+`weight` before the question reaches the browser, and the per-decision review
+withholds the expert's choice until the lesson's review policy allows it.
 
 `Question.isDraft` exists so AI-suggested questions are stored but not live until
 a human accepts them.

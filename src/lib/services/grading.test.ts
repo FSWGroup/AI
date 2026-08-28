@@ -425,3 +425,176 @@ describe("pass thresholds behave at the boundary", () => {
     expect(summary.scorePercent >= 80).toBe(false);
   });
 });
+
+describe("APPLICATION", () => {
+  /** Three dimensions, equally weighted unless a test says otherwise. */
+  const config = {
+    parameters: [
+      { label: "Fluid", value: "Saturated steam" },
+      { label: "Temperature", value: "400 °F" },
+    ],
+    dimensions: [
+      {
+        id: "type",
+        label: "Valve type",
+        options: [{ id: "globe" }, { id: "ball" }, { id: "butterfly" }],
+        correctOptionId: "globe",
+        reasoning: "Throttling service on steam wants a globe valve.",
+      },
+      {
+        id: "body",
+        label: "Body material",
+        options: [{ id: "carbon" }, { id: "bronze" }],
+        correctOptionId: "carbon",
+        reasoning: "Carbon steel is rated for the temperature; bronze is not.",
+      },
+      {
+        id: "actuation",
+        label: "Actuation",
+        options: [{ id: "manual" }, { id: "pneumatic" }],
+        correctOptionId: "pneumatic",
+        reasoning: "Modulating control needs a pneumatic actuator.",
+      },
+    ],
+  };
+
+  it("awards full marks when every dimension is right", () => {
+    const result = gradeQuestion(
+      "APPLICATION",
+      config,
+      { type: "globe", body: "carbon", actuation: "pneumatic" },
+      9,
+    );
+    expect(result).toEqual({
+      isCorrect: true,
+      pointsEarned: 9,
+      pointsPossible: 9,
+      needsManualGrading: false,
+    });
+  });
+
+  it("gives partial credit per dimension rather than all or nothing", () => {
+    // Right valve and body, wrong actuation: two thirds of the judgment.
+    const result = gradeQuestion(
+      "APPLICATION",
+      config,
+      { type: "globe", body: "carbon", actuation: "manual" },
+      9,
+    );
+    expect(result.pointsEarned).toBe(6);
+    // Partial credit must not be reported as correct.
+    expect(result.isCorrect).toBe(false);
+    expect(result.needsManualGrading).toBe(false);
+  });
+
+  it("treats an unanswered dimension as wrong, never as skipped", () => {
+    const result = gradeQuestion("APPLICATION", config, { type: "globe" }, 9);
+    expect(result.pointsEarned).toBe(3);
+    expect(result.isCorrect).toBe(false);
+  });
+
+  it("awards nothing for an entirely wrong answer", () => {
+    const result = gradeQuestion(
+      "APPLICATION",
+      config,
+      { type: "ball", body: "bronze", actuation: "manual" },
+      9,
+    );
+    expect(result.pointsEarned).toBe(0);
+    expect(result.isCorrect).toBe(false);
+  });
+
+  it("honours dimension weights", () => {
+    const weighted = {
+      dimensions: [
+        { id: "a", correctOptionId: "yes", weight: 3 },
+        { id: "b", correctOptionId: "yes", weight: 1 },
+      ],
+    };
+    // The heavy dimension right, the light one wrong: three quarters.
+    expect(gradeQuestion("APPLICATION", weighted, { a: "yes", b: "no" }, 8).pointsEarned).toBe(6);
+    // And the reverse.
+    expect(gradeQuestion("APPLICATION", weighted, { a: "no", b: "yes" }, 8).pointsEarned).toBe(2);
+  });
+
+  it("treats a nonsensical weight as 1 rather than erasing the dimension", () => {
+    const odd = {
+      dimensions: [
+        { id: "a", correctOptionId: "yes", weight: 0 },
+        { id: "b", correctOptionId: "yes", weight: -5 },
+        { id: "c", correctOptionId: "yes", weight: "heavy" },
+      ],
+    };
+    // All three fall back to weight 1, so one correct of three earns a third.
+    const result = gradeQuestion("APPLICATION", odd, { a: "yes", b: "no", c: "no" }, 9);
+    expect(result.pointsEarned).toBe(3);
+  });
+
+  it("rounds to two decimals like every other type", () => {
+    const three = {
+      dimensions: [
+        { id: "a", correctOptionId: "yes" },
+        { id: "b", correctOptionId: "yes" },
+        { id: "c", correctOptionId: "yes" },
+      ],
+    };
+    // One of three from 10 points is 3.333…
+    expect(gradeQuestion("APPLICATION", three, { a: "yes" }, 10).pointsEarned).toBe(3.33);
+  });
+
+  it("defers to a human when no dimension is configured", () => {
+    // An authoring gap must never award marks, and must not assert "wrong".
+    const result = gradeQuestion("APPLICATION", { dimensions: [] }, { a: "yes" }, 5);
+    expect(result).toEqual({
+      isCorrect: null,
+      pointsEarned: 0,
+      pointsPossible: 5,
+      needsManualGrading: true,
+    });
+  });
+
+  it("defers to a human when a dimension has no declared correct option", () => {
+    const incomplete = {
+      dimensions: [
+        { id: "a", correctOptionId: "yes" },
+        // The author added a dimension and never said what the right answer is.
+        { id: "b" },
+      ],
+    };
+    const result = gradeQuestion("APPLICATION", incomplete, { a: "yes", b: "no" }, 6);
+    expect(result.needsManualGrading).toBe(true);
+    expect(result.isCorrect).toBeNull();
+    expect(result.pointsEarned).toBe(0);
+  });
+
+  it("defers to a human when the config is missing entirely", () => {
+    expect(gradeQuestion("APPLICATION", {}, { a: "yes" }, 4).needsManualGrading).toBe(true);
+    expect(gradeQuestion("APPLICATION", undefined, { a: "yes" }, 4).needsManualGrading).toBe(true);
+  });
+
+  it("scores an unanswered question as incorrect, not as gradeable-with-marks", () => {
+    for (const answer of [undefined, null, "globe", 3, [], true]) {
+      const result = gradeQuestion("APPLICATION", config, answer, 9);
+      expect(result.pointsEarned, `answer ${JSON.stringify(answer)}`).toBe(0);
+      expect(result.isCorrect, `answer ${JSON.stringify(answer)}`).toBe(false);
+      expect(result.needsManualGrading, `answer ${JSON.stringify(answer)}`).toBe(false);
+    }
+  });
+
+  it("ignores a selection for a dimension that does not exist", () => {
+    const result = gradeQuestion(
+      "APPLICATION",
+      config,
+      { type: "globe", body: "carbon", actuation: "pneumatic", nonsense: "whatever" },
+      9,
+    );
+    expect(result.pointsEarned).toBe(9);
+    expect(result.isCorrect).toBe(true);
+  });
+
+  it("does not credit a non-string selection that loosely equals the answer", () => {
+    const numeric = { dimensions: [{ id: "a", correctOptionId: "1" }] };
+    // A number 1 is not the option id "1"; loose equality here would be a bug.
+    expect(gradeQuestion("APPLICATION", numeric, { a: 1 }, 5).pointsEarned).toBe(0);
+  });
+});

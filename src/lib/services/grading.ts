@@ -47,6 +47,7 @@ export function asRecord(value: unknown): Record<string, unknown> {
  *  - ORDERING: number[], a permutation of 0..items.length-1 in the learner's chosen order
  *  - SCENARIO: string (chosen choice id)
  *  - FILE_SUBMISSION: { mediaId?: string; note?: string }
+ *  - APPLICATION: Record<dimensionId, optionId> — one selection per dimension
  */
 export function gradeQuestion(type: QuestionType, config: unknown, answer: unknown, points: number): GradeResult {
   const cfg = asRecord(config);
@@ -159,6 +160,81 @@ export function gradeQuestion(type: QuestionType, config: unknown, answer: unkno
       const chosen = choices.find((c) => c.id === chosenId);
       const isCorrect = Boolean(chosen?.correct);
       return { isCorrect, pointsEarned: isCorrect ? points : 0, pointsPossible, needsManualGrading: false };
+    }
+
+    case "APPLICATION": {
+      /*
+       * Multi-dimension judgment, scored per dimension with partial credit.
+       *
+       * The point of this type is that selecting the right valve body but the
+       * wrong actuation is not simply "wrong" — it is most of the way there, and
+       * a score that says otherwise teaches nothing. Each dimension carries an
+       * optional weight so an author can say that body material matters more
+       * than, say, a connection type.
+       */
+      const dimensions = Array.isArray(cfg.dimensions)
+        ? (cfg.dimensions as { id?: unknown; correctOptionId?: unknown; weight?: unknown }[])
+        : [];
+
+      /*
+       * A dimension is only gradeable if it has an id and a declared correct
+       * option. Anything else is an authoring gap, and the safe response to an
+       * authoring gap is to ask a human — never to award full marks, and never
+       * to record a confident "incorrect" the learner cannot argue with.
+       */
+      const gradeable = dimensions.filter(
+        (d): d is { id: string; correctOptionId: string; weight?: unknown } =>
+          typeof d.id === "string" &&
+          d.id.length > 0 &&
+          typeof d.correctOptionId === "string" &&
+          d.correctOptionId.length > 0,
+      );
+
+      if (gradeable.length === 0 || gradeable.length !== dimensions.length) {
+        return { isCorrect: null, pointsEarned: 0, pointsPossible, needsManualGrading: true };
+      }
+
+      // A non-positive or non-numeric weight is meaningless; treat it as 1
+      // rather than letting it silently erase a dimension from the score.
+      const weightOf = (d: { weight?: unknown }): number =>
+        typeof d.weight === "number" && Number.isFinite(d.weight) && d.weight > 0 ? d.weight : 1;
+
+      const totalWeight = gradeable.reduce((sum, d) => sum + weightOf(d), 0);
+      if (totalWeight <= 0) {
+        return { isCorrect: null, pointsEarned: 0, pointsPossible, needsManualGrading: true };
+      }
+
+      /*
+       * An answer that is not an object earns nothing. It must not be coerced
+       * into an empty set of selections that then reads as "every dimension
+       * answered wrongly but gradeable" — the distinction matters because an
+       * unanswered question and a wrong answer are different facts.
+       */
+      const given =
+        answer && typeof answer === "object" && !Array.isArray(answer)
+          ? (answer as Record<string, unknown>)
+          : undefined;
+      if (!given) {
+        return { isCorrect: false, pointsEarned: 0, pointsPossible, needsManualGrading: false };
+      }
+
+      let earnedWeight = 0;
+      for (const dimension of gradeable) {
+        const selected = given[dimension.id];
+        if (typeof selected === "string" && selected === dimension.correctOptionId) {
+          earnedWeight += weightOf(dimension);
+        }
+      }
+
+      const fraction = earnedWeight / totalWeight;
+      return {
+        // Correct means every dimension correct. Partial credit is reflected in
+        // the points, not by relaxing what "correct" means.
+        isCorrect: fraction === 1,
+        pointsEarned: round2(points * fraction),
+        pointsPossible,
+        needsManualGrading: false,
+      };
     }
 
     case "FILE_SUBMISSION":
