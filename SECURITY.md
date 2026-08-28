@@ -254,3 +254,38 @@ decision recorded in the audit trail.
 
 To report a suspected vulnerability in this application, contact the FSW IT Administrator
 directly rather than filing it in a shared tracker.
+
+---
+
+## Internal security review
+
+A structured review was performed against this codebase covering: missing authorization in
+server actions, IDOR in route handlers and server components, data leakage, XSS, secrets and
+PII in logs, mass assignment, and authentication weaknesses.
+
+**Nine issues were found and fixed.** Each has a regression test in
+`tests/integration/security-regressions.test.ts`.
+
+| # | Severity | Issue | Fix |
+|---|---|---|---|
+| 1 | **Critical** | MFA bypass. `getSession()` does not check `mfaPassed` (correctly — the `/mfa` page needs it), but the account-security page and all four MFA-management actions used it, so a session holding only a stolen password could open that page and turn MFA off, or enroll an attacker-controlled secret. | Added `getFullSession()`, which rejects a session that has not cleared MFA, and switched every MFA-management action and both account pages to it. Disabling MFA now also requires re-entering the password. Verified live with `scripts/verify-mfa-fix.mjs`. |
+| 2 | High | Goal hijack. `saveGoalAction` authorized the *submitted* fields, not the stored goal, so any employee could pass a company goal's id with their own worker id and take it over. Company goal ids were rendered into every user's alignment dropdown. | Editing now loads the stored goal and authorizes against it (owner, their manager, or `talent.admin`). |
+| 3 | High | Task read IDOR. The task detail drawer fetched by id with no ownership check and serialized the task and its full comment thread — including offboarding and disciplinary detail — to any signed-in user who knew an id. | The read path now uses the same `loadOwnedTask()` guard as the mutations. |
+| 4 | Medium | Emergency contact IDOR. The update was keyed on `contactId` alone while authorization was on the submitted `workerId`, so any user could overwrite another worker's emergency contact, with the audit entry misattributed. | The update is scoped by `workerId` as well as `id`, and a zero-row result raises. |
+| 5 | Medium | No MFA throttling. Failed TOTP verification had no attempt limit, and the three-window tolerance made a six-digit code brute-forceable given a password and a session. | MFA failures now increment the same counter as password sign-in and trigger the same 15-minute lockout. |
+| 6 | Medium | Activation tokens (7-day life) could re-activate a live account, reset its password, and issue a session with `mfaPassed: true` regardless of whether MFA was enabled. | Activation now requires `status === 'INVITED'`, revokes existing sessions, and only marks MFA passed when the account has none. `resendInviteAction` refuses non-invited users. |
+| 7 | Medium-low | Date of birth is `pii.view`-gated, but the dashboard and calendar exposed birthday month/day for every worker to every user, including contractors, and the calendar's month parameter allowed enumerating the whole company. | Celebration display is now an explicit per-worker opt-out (`Worker.showBirthday`, self-editable), and the year never leaves the server — only month/day reach the component tree. |
+| 8 | Low | Login user enumeration. The account-not-found path skipped bcrypt (a ~250 ms timing oracle), and a locked account returned a distinct message. | Both paths now perform an equivalent bcrypt comparison against a fixed dummy hash and return the same generic message. |
+| 9 | Low | PTO requests accepted a client-supplied `hours` value with no upper bound, so a worker could book two weeks off while debiting half an hour. | Declared hours are now clamped to the working hours actually in the range; under-declaring (half days) is still allowed. |
+
+Three lower-severity items were also addressed: `docs.write` actions now perform a
+per-document access check so the permission stays safe to delegate more narrowly; the
+onboarding list is scoped to a manager's own reports rather than showing every instance
+org-wide; and `saveFeedbackAction` restricts `visibility` to a known set. Raw Prisma error
+objects are no longer logged from profile edits, where the payload can contain a home
+address or date of birth.
+
+**Categories found clean:** mass assignment (explicit allowlists throughout), XSS (both
+`dangerouslySetInnerHTML` sites render text escaped at write time by permission-gated
+actions), route-handler IDOR (document downloads and exports enforce every documented
+layer), and secrets in logs.

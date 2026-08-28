@@ -77,6 +77,7 @@ export async function OverviewTab({ worker, access, ctx }: { worker: WorkerPaylo
                   homeState: worker.homeState ?? '',
                   homePostal: worker.homePostal ?? '',
                   timezone: worker.timezone,
+                  showBirthday: String(worker.showBirthday),
                 }}
               />
             ) : undefined

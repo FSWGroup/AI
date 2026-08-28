@@ -30,6 +30,18 @@ export async function saveGoalAction(_prev: ActionResult, formData: FormData): P
       if (!allowed) throw new AuthzError();
     }
 
+    // Editing an existing goal must be authorized against the goal as STORED.
+    // Checking only the submitted fields would let anyone pass someone else's
+    // goal id with their own workerId and take the goal over.
+    if (goalId) {
+      const existing = await db.goal.findUniqueOrThrow({ where: { id: goalId } });
+      const mayEdit =
+        can(ctx, 'talent.admin') ||
+        (existing.workerId !== null &&
+          (existing.workerId === ctx.workerId || (await isManagerOf(ctx, existing.workerId))));
+      if (!mayEdit) throw new AuthzError('You cannot edit this goal.');
+    }
+
     const data = {
       title,
       description: String(formData.get('description') ?? '') || null,
@@ -260,8 +272,15 @@ export async function saveFeedbackAction(_prev: ActionResult, formData: FormData
     if (!aboutId || !body) return { error: 'Pick a person and write the feedback.' };
     const kind = String(formData.get('kind') ?? 'FEEDBACK');
     if (kind === 'PRIVATE_HR' && !can(ctx, 'cases.write')) throw new AuthzError();
+    const requested = String(formData.get('visibility') ?? 'MANAGER');
     const visibility =
-      kind === 'PRAISE' ? 'PUBLIC' : kind === 'PRIVATE_HR' ? 'HR' : String(formData.get('visibility') ?? 'MANAGER');
+      kind === 'PRAISE'
+        ? 'PUBLIC'
+        : kind === 'PRIVATE_HR'
+          ? 'HR'
+          : (['SUBJECT', 'MANAGER', 'HR'] as const).includes(requested as 'SUBJECT' | 'MANAGER' | 'HR')
+            ? requested
+            : 'MANAGER';
     await db.feedback.create({
       data: { aboutId, authorId: ctx.workerId, kind, visibility, body: body.slice(0, 4000) },
     });

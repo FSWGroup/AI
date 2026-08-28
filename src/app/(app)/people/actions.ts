@@ -18,7 +18,9 @@ function fail(error: unknown): { error: string } {
   if (error instanceof z.ZodError) {
     return { error: error.issues.map((i) => i.message).join(' ') };
   }
-  console.error('people action error:', error);
+  // Log the message only — a raw Prisma error object can echo the submitted
+  // payload, which for profile edits includes home address and date of birth.
+  console.error('people action error:', error instanceof Error ? error.message : 'unknown error');
   return { error: 'Something went wrong saving this. Please try again.' };
 }
 
@@ -87,6 +89,8 @@ export async function createWorkerAction(_prev: ActionResult, formData: FormData
 // ---------------------------------------------------------------------------
 
 const SELF_EDITABLE = ['preferredName', 'phone', 'personalEmail', 'pronouns', 'homeStreet', 'homeCity', 'homeState', 'homePostal', 'homeCountry', 'timezone'] as const;
+/** Booleans need checkbox handling rather than string assignment. */
+const SELF_EDITABLE_FLAGS = ['showBirthday'] as const;
 const HR_EDITABLE = [...SELF_EDITABLE, 'legalFirstName', 'middleName', 'lastName', 'suffix', 'workEmail', 'dateOfBirth', 'citizenship', 'localCurrency', 'engagementModel'] as const;
 
 export async function updateProfileAction(_prev: ActionResult, formData: FormData): Promise<ActionResult> {
@@ -98,7 +102,7 @@ export async function updateProfileAction(_prev: ActionResult, formData: FormDat
     if (!access.self && !canHrEdit) throw new AuthzError();
 
     const allowed = canHrEdit ? HR_EDITABLE : SELF_EDITABLE;
-    const data: Record<string, string | Date | null> = {};
+    const data: Record<string, string | Date | boolean | null> = {};
     const before: Record<string, string | null> = {};
     const worker = await db.worker.findUniqueOrThrow({ where: { id: workerId } });
 
@@ -117,6 +121,11 @@ export async function updateProfileAction(_prev: ActionResult, formData: FormDat
       }
       const prior = worker[key as keyof typeof worker];
       before[key] = prior instanceof Date ? prior.toISOString().slice(0, 10) : ((prior as string | null) ?? null);
+    }
+    for (const flag of SELF_EDITABLE_FLAGS) {
+      if (!formData.has(`${flag}__present`)) continue;
+      before[flag] = String(worker[flag as keyof typeof worker] ?? '');
+      (data as Record<string, boolean>)[flag] = formData.get(flag) === 'on';
     }
     if (Object.keys(data).length === 0) return { error: 'Nothing to save.' };
 
@@ -147,10 +156,13 @@ export async function saveEmergencyContactAction(_prev: ActionResult, formData: 
     if (!name || !phone) return { error: 'Name and phone are required.' };
     const id = String(formData.get('contactId') ?? '');
     if (id) {
-      await db.emergencyContact.update({
-        where: { id },
+      // Scope by workerId as well as id: authorization above was on workerId,
+      // so an unscoped update would let a caller edit another worker's contact.
+      const updated = await db.emergencyContact.updateMany({
+        where: { id, workerId },
         data: { name, phone, relationship: String(formData.get('relationship') ?? '') || null },
       });
+      if (updated.count === 0) throw new AuthzError('That emergency contact does not belong to this worker.');
     } else {
       await db.emergencyContact.create({
         data: { workerId, name, phone, relationship: String(formData.get('relationship') ?? '') || null },

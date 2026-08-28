@@ -32,6 +32,9 @@ export async function uploadDocumentAction(_prev: ActionResult, formData: FormDa
     if (documentId) {
       // New version of an existing document
       const doc = await db.document.findUniqueOrThrow({ where: { id: documentId }, include: { versions: { orderBy: { version: 'desc' }, take: 1 } } });
+      // docs.write is HR-only today, but check the individual document too so
+      // the permission stays safe to delegate more narrowly later.
+      if (!(await canAccessDocument(ctx, doc))) throw new AuthzError();
       await db.documentVersion.create({
         data: {
           documentId,
@@ -180,6 +183,7 @@ export async function deleteDocumentAction(formData: FormData): Promise<void> {
   const ctx = await requirePermission('docs.write');
   const documentId = String(formData.get('documentId') ?? '');
   const doc = await db.document.findUniqueOrThrow({ where: { id: documentId } });
+  if (!(await canAccessDocument(ctx, doc))) throw new AuthzError();
   if (doc.retentionDate && doc.retentionDate > new Date()) {
     throw new AuthzError(`This record is under retention until ${doc.retentionDate.toDateString()}.`);
   }

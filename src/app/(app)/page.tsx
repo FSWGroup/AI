@@ -112,7 +112,7 @@ export default async function HomePage() {
 
   // Birthdays & anniversaries this week (visible to all)
   const soonWorkers = await db.worker.findMany({
-    where: { status: { in: ['ACTIVE', 'ONBOARDING', 'ON_LEAVE'] }, deletedAt: null },
+    where: { status: { in: ['ACTIVE', 'ONBOARDING', 'ON_LEAVE'] }, deletedAt: null, showBirthday: true },
     select: { id: true, legalFirstName: true, preferredName: true, lastName: true, dateOfBirth: true, hireDate: true },
   });
   const inNext7 = (d: Date | null) => {

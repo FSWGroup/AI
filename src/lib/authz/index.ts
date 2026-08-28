@@ -55,10 +55,17 @@ export function can(ctx: Ctx, permission: Permission): boolean {
   return ctx.permissions.has(permission);
 }
 
-/** For pages: redirect unauthenticated users to login. */
+/**
+ * For pages: send unauthenticated users to login. A user who has signed in but
+ * not yet cleared MFA goes to the challenge rather than back to a login form
+ * they have already completed.
+ */
 export async function requireCtx(): Promise<Ctx> {
   const ctx = await getCtx();
-  if (!ctx) redirect('/login');
+  if (!ctx) {
+    const session = await getSession();
+    redirect(session && session.user.mfaEnabled && !session.mfaPassed ? '/mfa' : '/login');
+  }
   return ctx;
 }
 

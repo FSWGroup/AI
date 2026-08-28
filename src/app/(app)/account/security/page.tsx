@@ -1,7 +1,7 @@
 import type { Metadata } from 'next';
 import { redirect } from 'next/navigation';
 import { db } from '@/lib/db';
-import { getSession } from '@/lib/auth/session';
+import { getFullSession } from '@/lib/auth/session';
 import { fmtDateTime } from '@/lib/format';
 import { Card, CardBody, CardHeader, PageHeader, Badge } from '@/components/ui';
 import { MfaSection } from './mfa-section';
@@ -11,7 +11,7 @@ import { SubmitButton } from '@/components/ui/client';
 export const metadata: Metadata = { title: 'Security & sessions' };
 
 export default async function SecurityPage() {
-  const session = await getSession();
+  const session = await getFullSession();
   if (!session) redirect('/login');
 
   const sessions = await db.session.findMany({

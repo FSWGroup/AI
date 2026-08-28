@@ -39,10 +39,20 @@ export default async function CalendarPage({
     }),
     db.department.findMany({ where: { active: true }, orderBy: { name: 'asc' } }),
     db.worker.findMany({
-      where: { status: { in: ['ACTIVE', 'ONBOARDING'] }, deletedAt: null },
-      select: { id: true, legalFirstName: true, preferredName: true, lastName: true, dateOfBirth: true, hireDate: true },
+      where: { status: { in: ['ACTIVE', 'ONBOARDING'] }, deletedAt: null, showBirthday: true, dateOfBirth: { not: null } },
+      select: { id: true, legalFirstName: true, preferredName: true, lastName: true, dateOfBirth: true },
     }),
   ]);
+
+  // Celebrations expose month and day only — the year never leaves the server.
+  const birthdayIndex = new Map<string, { id: string; name: string }[]>();
+  for (const w of workers) {
+    if (!w.dateOfBirth) continue;
+    const key = `${w.dateOfBirth.getUTCMonth()}-${w.dateOfBirth.getUTCDate()}`;
+    const list = birthdayIndex.get(key) ?? [];
+    list.push({ id: w.id, name: fullName(w) });
+    birthdayIndex.set(key, list);
+  }
 
   const days: Date[] = [];
   for (let d = gridStart; d <= gridEnd; d = addDays(d, 1)) days.push(d);
@@ -87,9 +97,7 @@ export default async function CalendarPage({
               const iso = isoDate(day);
               const dayPto = ptoRequests.filter((r) => isoDate(r.startDate) <= iso && iso <= isoDate(r.endDate));
               const dayHolidays = holidays.filter((h) => isoDate(h.observedDate ?? h.date) === iso);
-              const birthdays = workers.filter(
-                (w) => w.dateOfBirth && w.dateOfBirth.getUTCMonth() === day.getUTCMonth() && w.dateOfBirth.getUTCDate() === day.getUTCDate(),
-              );
+              const birthdays = inMonth ? (birthdayIndex.get(`${day.getUTCMonth()}-${day.getUTCDate()}`) ?? []) : [];
               const isToday = iso === isoDate(today);
               return (
                 <div
@@ -126,8 +134,8 @@ export default async function CalendarPage({
                     ))}
                     {dayPto.length > 3 ? <div className="text-[10.5px] text-ink-400">+{dayPto.length - 3} more out</div> : null}
                     {birthdays.map((w) => (
-                      <div key={w.id} className="truncate rounded bg-warn-100 px-1.5 py-0.5 text-[10.5px] text-warn-500" title={`${fullName(w)}'s birthday`}>
-                        🎂 {fullName(w)}
+                      <div key={w.id} className="truncate rounded bg-warn-100 px-1.5 py-0.5 text-[10.5px] text-warn-500" title={`${w.name}'s birthday`}>
+                        🎂 {w.name}
                       </div>
                     ))}
                   </div>

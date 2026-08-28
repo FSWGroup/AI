@@ -8,6 +8,7 @@ import {
 } from '@/components/ui';
 import { FilterSelect } from '@/components/ui/client';
 import { TaskDetailDrawer, NewTaskButton } from './task-ui';
+import { loadOwnedTask } from './actions';
 import type { Prisma } from '@/generated/prisma/client';
 
 export const metadata: Metadata = { title: 'Tasks' };
@@ -82,7 +83,10 @@ export default async function TasksPage({
 
   // Detail drawer data
   const openTaskId = params.task;
-  const openTask = openTaskId
+  // Authorize the read: loadOwnedTask throws unless the caller owns the task,
+  // holds its role queue, created it, or is an onboarding admin.
+  const mayOpen = openTaskId ? await loadOwnedTask(ctx, openTaskId).then(() => true).catch(() => false) : false;
+  const openTask = openTaskId && mayOpen
     ? await db.task.findUnique({
         where: { id: openTaskId },
         include: {

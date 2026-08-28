@@ -9,6 +9,7 @@ import {
   createSession,
   destroySession,
   getSession,
+  getFullSession,
   markSessionMfaPassed,
   revokeAllSessions,
 } from '@/lib/auth/session';
@@ -32,6 +33,12 @@ export type ActionResult = { error?: string; success?: string } | void;
 const MAX_FAILED_LOGINS = 8;
 const LOCKOUT_MINUTES = 15;
 
+/**
+ * A real bcrypt hash (of a random value nobody holds) compared against on the
+ * account-not-found path so that every sign-in attempt costs the same work.
+ */
+const DUMMY_PASSWORD_HASH = '$2b$12$C6UzMDM.H6dfI/f/IKcEe.5Z8Cg7hqEjm5qKfsQFPvZ7hRJIoLdBK';
+
 // ---------------------------------------------------------------------------
 // Sign in (with login throttling + MFA hand-off)
 // ---------------------------------------------------------------------------
@@ -47,11 +54,18 @@ export async function signIn(_prev: ActionResult, formData: FormData): Promise<A
   const genericError = { error: 'Incorrect email or password.' };
 
   if (!user || !user.passwordHash || user.status === 'DEACTIVATED' || user.status === 'SUSPENDED') {
+    // Spend the same ~250ms of bcrypt work as a real verification, so response
+    // time does not reveal whether the address exists.
+    await verifyPassword(parsed.data.password, DUMMY_PASSWORD_HASH);
     await auditAnonymous('auth.login_failed', { email });
     return genericError;
   }
   if (user.lockedUntil && user.lockedUntil > new Date()) {
-    return { error: 'Too many failed attempts. Try again in a few minutes.' };
+    // Same generic message: a distinct "locked" response would let an attacker
+    // confirm an address exists by deliberately tripping the lockout.
+    await verifyPassword(parsed.data.password, DUMMY_PASSWORD_HASH);
+    await auditAnonymous('auth.login_blocked', { email });
+    return genericError;
   }
 
   const ok = await verifyPassword(parsed.data.password, user.passwordHash);
@@ -87,11 +101,31 @@ export async function verifyMfa(_prev: ActionResult, formData: FormData): Promis
   const session = await getSession();
   if (!session) redirect('/login');
   if (!session.user.mfaEnabled || session.mfaPassed) redirect('/');
+
+  // A six-digit code with a three-window tolerance is brute-forceable without
+  // a limit, so MFA shares the same lockout counter as password sign-in.
+  if (session.user.lockedUntil && session.user.lockedUntil > new Date()) {
+    return { error: 'Too many incorrect codes. Try again in a few minutes.' };
+  }
+
   const code = String(formData.get('code') ?? '');
   if (!session.user.mfaSecretEnc || !verifyTotp(decryptField(session.user.mfaSecretEnc), code)) {
+    const failed = session.user.failedLoginCount + 1;
+    await db.user.update({
+      where: { id: session.user.id },
+      data: {
+        failedLoginCount: failed,
+        lockedUntil: failed >= MAX_FAILED_LOGINS ? new Date(Date.now() + LOCKOUT_MINUTES * 60_000) : null,
+      },
+    });
     await auditAnonymous('auth.mfa_failed', { email: session.user.email });
     return { error: 'That code is not valid. Codes rotate every 30 seconds.' };
   }
+
+  await db.user.update({
+    where: { id: session.user.id },
+    data: { failedLoginCount: 0, lockedUntil: null },
+  });
   await markSessionMfaPassed(session.id);
   redirect('/');
 }
@@ -139,6 +173,14 @@ export async function activateAccount(_prev: ActionResult, formData: FormData): 
   if (!row || row.kind !== 'ACTIVATION' || row.usedAt || row.expiresAt < new Date()) {
     return { error: 'This activation link is invalid or has expired. Ask HR to send a new one.' };
   }
+  const user = await db.user.findUnique({ where: { id: row.userId } });
+  // An activation link is valid for 7 days. It must never be a way to reset an
+  // already-live account's password or to sidestep its second factor — that is
+  // what the (2-hour, session-revoking) password reset flow is for.
+  if (!user || user.status !== 'INVITED') {
+    await db.authToken.update({ where: { id: row.id }, data: { usedAt: new Date() } });
+    return { error: 'This account is already active. Use “Forgot your password?” instead.' };
+  }
   await db.$transaction([
     db.authToken.update({ where: { id: row.id }, data: { usedAt: new Date() } }),
     db.user.update({
@@ -146,9 +188,10 @@ export async function activateAccount(_prev: ActionResult, formData: FormData): 
       data: { passwordHash: await hashPassword(password), status: 'ACTIVE', passwordChangedAt: new Date() },
     }),
   ]);
+  await revokeAllSessions(row.userId);
   await db.auditEvent.create({ data: { actorUserId: row.userId, action: 'auth.account_activated' } });
-  await createSession(row.userId, { mfaPassed: true });
-  redirect('/');
+  await createSession(row.userId, { mfaPassed: !user.mfaEnabled });
+  redirect(user.mfaEnabled ? '/mfa' : '/');
 }
 
 // ---------------------------------------------------------------------------
@@ -213,7 +256,7 @@ export async function resetPassword(_prev: ActionResult, formData: FormData): Pr
 // ---------------------------------------------------------------------------
 
 export async function beginMfaEnrollment(): Promise<{ error?: string; secret?: string; uri?: string }> {
-  const session = await getSession();
+  const session = await getFullSession();
   if (!session) return { error: 'Not signed in.' };
   const secret = generateTotpSecret();
   const jar = await cookies();
@@ -228,7 +271,7 @@ export async function beginMfaEnrollment(): Promise<{ error?: string; secret?: s
 }
 
 export async function confirmMfaEnrollment(_prev: ActionResult, formData: FormData): Promise<ActionResult> {
-  const session = await getSession();
+  const session = await getFullSession();
   if (!session) return { error: 'Not signed in.' };
   const jar = await cookies();
   const pending = jar.get('fsw_mfa_pending')?.value;
@@ -248,9 +291,14 @@ export async function confirmMfaEnrollment(_prev: ActionResult, formData: FormDa
   return { success: 'Two-factor authentication is now on for your account.' };
 }
 
-export async function disableMfa(): Promise<ActionResult> {
-  const session = await getSession();
+export async function disableMfa(_prev: ActionResult, formData: FormData): Promise<ActionResult> {
+  const session = await getFullSession();
   if (!session) return { error: 'Not signed in.' };
+  const password = String(formData.get('password') ?? '');
+  if (!session.user.passwordHash || !(await verifyPassword(password, session.user.passwordHash))) {
+    await auditAnonymous('auth.mfa_disable_failed', { email: session.user.email });
+    return { error: 'That password is not correct.' };
+  }
   await db.user.update({
     where: { id: session.user.id },
     data: { mfaSecretEnc: null, mfaEnabled: false },
@@ -262,7 +310,7 @@ export async function disableMfa(): Promise<ActionResult> {
 }
 
 export async function revokeOtherSessions(): Promise<ActionResult> {
-  const session = await getSession();
+  const session = await getFullSession();
   if (!session) return { error: 'Not signed in.' };
   await revokeAllSessions(session.user.id, session.id);
   await db.auditEvent.create({

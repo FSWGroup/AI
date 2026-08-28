@@ -31,10 +31,19 @@ export async function requestPtoAction(_prev: ActionResult, formData: FormData):
     });
     if (!assignment) return { error: 'That leave policy is not assigned to you.' };
 
-    const hours = formData.get('hours')
-      ? Number(formData.get('hours'))
-      : await workingHours(ctx.workerId, start, end);
-    if (!Number.isFinite(hours) || hours <= 0) return { error: 'The selected range contains no working hours.' };
+    // The optional hours field exists for half-days, so it may be lower than
+    // the range implies — but never higher, or someone could book two weeks
+    // off while debiting half an hour.
+    const availableHours = await workingHours(ctx.workerId, start, end);
+    const requestedHours = formData.get('hours') ? Number(formData.get('hours')) : availableHours;
+    if (!Number.isFinite(requestedHours) || requestedHours <= 0) {
+      return { error: 'The selected range contains no working hours.' };
+    }
+    if (availableHours <= 0) return { error: 'The selected range contains no working days.' };
+    if (requestedHours > availableHours) {
+      return { error: `That range covers ${availableHours} working hours — you cannot request more than that.` };
+    }
+    const hours = requestedHours;
 
     const balance = await ptoBalance(ctx.workerId, policyId);
     const pendingAgg = await db.ptoRequest.aggregate({

@@ -11,7 +11,8 @@ export const metadata: Metadata = { title: 'Onboarding' };
 export default async function OnboardingPage() {
   const ctx = await requireCtx();
   const isAdmin = can(ctx, 'onboarding.admin');
-  const isManager = ctx.workerId ? (await allReportIds(ctx.workerId)).length > 0 : false;
+  const reportIds = ctx.workerId ? await allReportIds(ctx.workerId) : [];
+  const isManager = reportIds.length > 0;
   if (!isAdmin && !isManager) return <DeniedState />;
 
   const candidates = isAdmin
@@ -34,7 +35,7 @@ export default async function OnboardingPage() {
     <div>
       <PageHeader
         title="Onboarding"
-        description="Checklist progress for everyone joining FSW Group."
+        description={isAdmin ? 'Checklist progress for everyone joining FSW Group.' : 'Onboarding progress for your team.'}
         actions={isAdmin ? <ButtonLink variant="secondary" href="/ops/templates">Manage templates</ButtonLink> : undefined}
       />
       {isAdmin ? (
@@ -46,7 +47,7 @@ export default async function OnboardingPage() {
           />
         </div>
       ) : null}
-      <LifecycleList kind="ONBOARDING" />
+      <LifecycleList kind="ONBOARDING" restrictToWorkerIds={isAdmin ? undefined : reportIds} />
     </div>
   );
 }

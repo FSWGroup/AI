@@ -3,7 +3,7 @@
 import { useActionState, useState } from 'react';
 import { beginMfaEnrollment, confirmMfaEnrollment, disableMfa, type ActionResult } from '@/app/(auth)/actions';
 import { Badge, Button, Field, FormError, FormSuccess, Input } from '@/components/ui';
-import { SubmitButton, ConfirmSubmit } from '@/components/ui/client';
+import { ActionForm, SubmitButton } from '@/components/ui/client';
 
 export function MfaSection({ enabled }: { enabled: boolean }) {
   const [enrollment, setEnrollment] = useState<{ secret: string; uri: string } | null>(null);
@@ -16,20 +16,21 @@ export function MfaSection({ enabled }: { enabled: boolean }) {
 
   if (enabled) {
     return (
-      <div className="flex items-center justify-between">
-        <Badge tone="green">Enabled</Badge>
-        <ConfirmSubmit
-          action={async () => {
-            await disableMfa();
-            location.reload();
-          }}
-          title="Turn off two-factor authentication?"
-          description="Your account will only be protected by your password."
-          confirmLabel="Turn off"
-          variant="dangerGhost"
-        >
-          Turn off
-        </ConfirmSubmit>
+      <div className="space-y-3">
+        <div className="flex items-center justify-between">
+          <Badge tone="green">Enabled</Badge>
+        </div>
+        <ActionForm action={disableMfa} className="flex flex-wrap items-end gap-2">
+          <Field
+            label="Confirm your password to turn it off"
+            htmlFor="mfa-off-password"
+            required
+            className="flex-1"
+          >
+            <Input id="mfa-off-password" name="password" type="password" autoComplete="current-password" required />
+          </Field>
+          <SubmitButton variant="dangerGhost">Turn off</SubmitButton>
+        </ActionForm>
       </div>
     );
   }

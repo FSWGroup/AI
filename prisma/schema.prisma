@@ -229,7 +229,10 @@ model Worker {
   workEmail       String?      @unique
   personalEmail   String? // restricted visibility
   phone           String?
-  dateOfBirth     DateTime? // restricted visibility
+  dateOfBirth     DateTime? // restricted visibility (pii.view)
+  // Celebration display is opt-out and shows month/day only — never the year,
+  // and never the dateOfBirth value itself. See §51 privacy-by-design.
+  showBirthday    Boolean      @default(true)
   homeStreet      String? // restricted visibility
   homeCity        String?
   homeState       String?

@@ -9,7 +9,12 @@ import { createTask } from '@/lib/tasks';
 import type { ActionResult } from '@/app/(auth)/actions';
 import type { Ctx } from '@/lib/authz';
 
-async function loadOwnedTask(ctx: Ctx, taskId: string) {
+/**
+ * Load a task the caller is entitled to see or act on. Used by both the
+ * mutation actions and the detail drawer — the read path must apply the same
+ * check, or any signed-in user could open any task by id.
+ */
+export async function loadOwnedTask(ctx: Ctx, taskId: string) {
   const task = await db.task.findUnique({ where: { id: taskId } });
   if (!task) throw new AuthzError('Task not found.');
   const isOwner =

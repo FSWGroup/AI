@@ -6,10 +6,27 @@ import { ConfirmSubmit } from '@/components/ui/client';
 import { cancelLifecycleAction } from './actions';
 import type { LifecycleKind } from '@/generated/prisma/enums';
 
-/** Shared onboarding/offboarding instance table (admin view). */
-export async function LifecycleList({ kind, status }: { kind: LifecycleKind; status?: string }) {
+/**
+ * Shared onboarding/offboarding instance table.
+ *
+ * Admins see every instance; a manager without onboarding.admin sees only
+ * their own reports, so the page can safely be opened by managers.
+ */
+export async function LifecycleList({
+  kind,
+  status,
+  restrictToWorkerIds,
+}: {
+  kind: LifecycleKind;
+  status?: string;
+  restrictToWorkerIds?: string[];
+}) {
   const instances = await db.lifecycleInstance.findMany({
-    where: { kind, ...(status ? { status } : {}) },
+    where: {
+      kind,
+      ...(status ? { status } : {}),
+      ...(restrictToWorkerIds ? { workerId: { in: restrictToWorkerIds } } : {}),
+    },
     orderBy: [{ status: 'asc' }, { startDate: 'desc' }],
     take: 60,
     include: {

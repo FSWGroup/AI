@@ -70,6 +70,21 @@ export const getSession = cache(async () => {
   return session;
 });
 
+/**
+ * A session that has cleared MFA (or belongs to a user without MFA enabled).
+ *
+ * getSession() deliberately returns pre-MFA sessions, because the /mfa page
+ * itself needs one. Everything else — including the account security screen
+ * that can turn MFA off — must use this, or an attacker holding only a
+ * password could disable the second factor before completing it.
+ */
+export async function getFullSession() {
+  const session = await getSession();
+  if (!session) return null;
+  if (session.user.mfaEnabled && !session.mfaPassed) return null;
+  return session;
+}
+
 export async function destroySession() {
   const jar = await cookies();
   const token = jar.get(SESSION_COOKIE)?.value;

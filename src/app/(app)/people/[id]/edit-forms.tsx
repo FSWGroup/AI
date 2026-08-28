@@ -101,6 +101,16 @@ export function ProfileEditDrawer({
               </Field>
             </div>
           </fieldset>
+          <label className="flex items-center gap-2 text-sm text-ink-700">
+            <input type="hidden" name="showBirthday__present" value="1" />
+            <input
+              type="checkbox"
+              name="showBirthday"
+              defaultChecked={initial.showBirthday !== 'false'}
+              className="h-4 w-4 rounded border-ink-300"
+            />
+            Show my birthday on the team calendar (month and day only)
+          </label>
           <Field label="Timezone" htmlFor="timezone">
             <Select id="timezone" name="timezone" defaultValue={initial.timezone}>
               {['America/New_York', 'America/Chicago', 'America/Denver', 'America/Los_Angeles', 'Asia/Manila'].map((tz) => (
