@@ -102,7 +102,7 @@ export default async function SopReaderPage({ params }: { params: Promise<{ id: 
         <div className="flex flex-col gap-5">
           {sop.isDraft && (
             <div role="note" className="rounded-md border border-info-100 bg-info-50 px-4 py-2.5 text-[0.8125rem] text-info-700 print:hidden">
-              You're viewing the unpublished draft. Learners see the last published version instead.
+              You&rsquo;re viewing the unpublished draft. Learners see the last published version instead.
             </div>
           )}
 

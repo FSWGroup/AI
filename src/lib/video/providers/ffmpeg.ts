@@ -145,6 +145,18 @@ interface SceneSvgOptions {
 }
 
 /**
+ * Bottom edge of the logo/header row, in pixels, for a given frame width.
+ * Width-based (not height-based) so it reads at a consistent visual weight
+ * across 16:9, 9:16, and 1:1 — shared by the scene SVG (bullets must start
+ * below it) and by burned captions (which must not collide with it either).
+ */
+function headerRowBottom(width: number): number {
+  const logoUnit = width * 0.012;
+  const logoY = width * 0.033;
+  return logoY + logoUnit * 6.5;
+}
+
+/**
  * One FSW-branded slide: a navy field, the FSW mark, a lower-third title
  * band in the accent color, up to a few on-screen bullet lines, and a
  * chapter indicator. Pure geometry and text — no external image assets are
@@ -166,15 +178,10 @@ function buildSceneSvg(opts: SceneSvgOptions): string {
 
   const bulletMaxChars = Math.max(14, Math.floor((width - marginX * 2) / (bulletFontSize * 0.56)));
 
-  // Every header-row measurement is width-based (not height-based) so the
-  // header reads at a consistent visual weight across 16:9, 9:16, and 1:1 —
-  // and so bulletsAreaTop, derived from the same units, never collides with
-  // the logo row regardless of aspect ratio.
   const logoUnit = Math.round(width * 0.012);
   const logoX = marginX;
   const logoY = Math.round(width * 0.033);
-  const headerRowBottom = logoY + logoUnit * 6.5;
-  const bulletsAreaTop = Math.round(headerRowBottom + logoUnit * 4);
+  const bulletsAreaTop = Math.round(headerRowBottom(width) + logoUnit * 4);
 
   // Bullets must stay clear of the lower-third band, whatever the aspect ratio.
   const bulletsAreaHeight = Math.max(0, bandY - Math.round(height * 0.03) - bulletsAreaTop);
@@ -323,44 +330,80 @@ async function concatClips(clipPaths: string[], listPath: string, outPath: strin
   await runFfmpeg(["-y", "-f", "concat", "-safe", "0", "-i", listPath, "-c", "copy", outPath]);
 }
 
+/** Best-effort path to a real TrueType font file, for filters that need one directly. */
+const DEJAVU_BOLD_FONT = "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf";
+const DEJAVU_REGULAR_FONT = "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf";
+
+function resolveFontFile(): string {
+  if (fsSync.existsSync(DEJAVU_BOLD_FONT)) return DEJAVU_BOLD_FONT;
+  if (fsSync.existsSync(DEJAVU_REGULAR_FONT)) return DEJAVU_REGULAR_FONT;
+  return DEJAVU_BOLD_FONT; // let ffmpeg raise a clear error if truly missing
+}
+
+/** Escape a filesystem path for use as a value inside an ffmpeg filtergraph argument. */
+function escapeFilterPath(value: string): string {
+  return value.replace(/\\/g, "/").replace(/:/g, "\\:").replace(/'/g, "\\'");
+}
+
+/**
+ * Burns captions in using one `drawtext` layer per caption cue, each reading
+ * its line from its own text file (sidestepping ffmpeg's escaping rules for
+ * inline text entirely) and gated to its time window with `enable=between(...)`.
+ *
+ * This is deliberately not the `subtitles` filter: that filter renders
+ * WebVTT through a libass ASS conversion whose default script resolution
+ * does not track the actual output frame size in this environment, which
+ * blew caption text up to several times the intended size. Driving drawtext
+ * directly from the same scene timings used to render the video keeps sizing
+ * and position exactly under our control.
+ */
 async function burnInCaptions(
   inputPath: string,
-  vttPath: string,
+  timings: SceneTiming[],
+  workDir: string,
   outPath: string,
   width: number,
   height: number,
 ): Promise<void> {
-  // ffmpeg's subtitles filter converts WebVTT to ASS internally and otherwise
-  // assumes a low default script resolution, which blows font sizes up on a
-  // real HD/portrait frame. `original_size` pins the coordinate space to the
-  // actual frame, and top alignment keeps captions clear of our own lower-
-  // third title band.
-  const escapedVtt = vttPath.replace(/:/g, "\\:").replace(/'/g, "'\\''");
-  const fontSize = Math.max(14, Math.round(width * 0.024));
-  const marginV = Math.round(height * 0.05);
-  const forceStyle = [
-    "FontName=DejaVu Sans",
-    `FontSize=${fontSize}`,
-    "PrimaryColour=&H00FFFFFF",
-    "OutlineColour=&H00102845",
-    "BorderStyle=1",
-    "Outline=2",
-    "Alignment=8",
-    `MarginV=${marginV}`,
-  ].join(",");
+  const fontSize = Math.max(14, Math.round(width * 0.026));
+  const maxCharsPerLine = Math.max(16, Math.floor((width * 0.86) / (fontSize * 0.52)));
+  const marginTop = Math.round(headerRowBottom(width) + width * 0.02);
+  const fontFile = escapeFilterPath(resolveFontFile());
 
-  await runFfmpeg([
-    "-y",
-    "-i",
-    inputPath,
-    "-vf",
-    `subtitles=${escapedVtt}:original_size=${width}x${height}:force_style='${forceStyle}'`,
-    "-c:v",
-    "libx264",
-    "-c:a",
-    "copy",
-    outPath,
-  ]);
+  const filters: string[] = [];
+  for (const [i, timing] of timings.entries()) {
+    const raw = (timing.scene.narration || timing.scene.onScreenText.join(" ")).trim();
+    if (!raw) continue;
+    const lines = wrapText(raw, maxCharsPerLine, 2);
+    const textFilePath = path.join(workDir, `caption-${i}.txt`);
+    await fs.writeFile(textFilePath, lines.join("\n"), "utf8");
+
+    const start = timing.startSeconds.toFixed(2);
+    const end = (timing.startSeconds + timing.durationSeconds).toFixed(2);
+    const escapedTextFile = escapeFilterPath(textFilePath);
+
+    filters.push(
+      [
+        "drawtext=",
+        `fontfile='${fontFile}':`,
+        `textfile='${escapedTextFile}':`,
+        `fontsize=${fontSize}:`,
+        "fontcolor=white:",
+        "line_spacing=6:",
+        "box=1:boxcolor=black@0.55:boxborderw=14:",
+        "x=(w-text_w)/2:",
+        `y=${marginTop}:`,
+        `enable='between(t\\,${start}\\,${end})'`,
+      ].join(""),
+    );
+  }
+
+  if (filters.length === 0) {
+    await fs.copyFile(inputPath, outPath);
+    return;
+  }
+
+  await runFfmpeg(["-y", "-i", inputPath, "-vf", filters.join(","), "-c:v", "libx264", "-c:a", "copy", outPath]);
 }
 
 export class FfmpegVideoProvider implements VideoProvider {
@@ -440,7 +483,7 @@ export class FfmpegVideoProvider implements VideoProvider {
       if (process.env.FFMPEG_BURN_CAPTIONS === "1" && captionsVtt.trim().length > 0) {
         const burnedPath = path.join(workDir, "final.mp4");
         try {
-          await burnInCaptions(concatOutPath, vttPath, burnedPath, dims.width, dims.height);
+          await burnInCaptions(concatOutPath, timings, workDir, burnedPath, dims.width, dims.height);
           finalPath = burnedPath;
         } catch (error) {
           // Caption burn-in is a nice-to-have; never fail the whole render over it.

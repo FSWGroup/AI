@@ -47,7 +47,7 @@ export function ReportOutdatedDialog({ sopId }: { sopId: string }) {
         <Dialog.Content className="fixed left-1/2 top-1/2 z-50 w-[calc(100%-2rem)] max-w-md -translate-x-1/2 -translate-y-1/2 rounded-lg border border-[var(--border-default)] bg-[var(--surface-card)] p-5 shadow-lg focus:outline-none">
           <Dialog.Title className="text-[0.9375rem] font-semibold text-[var(--text-primary)]">Report outdated information</Dialog.Title>
           <Dialog.Description className="mt-1.5 text-[0.8125rem] text-[var(--text-muted)]">
-            Tell the SOP owner what looks wrong or out of date. They'll be notified right away.
+            Tell the SOP owner what looks wrong or out of date. They&rsquo;ll be notified right away.
           </Dialog.Description>
           <Field label="What needs to change?" htmlFor="report-outdated-reason" required error={error} className="mt-4">
             <Textarea

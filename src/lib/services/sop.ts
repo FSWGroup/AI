@@ -458,7 +458,7 @@ export async function restoreSopVersion(actor: Actor, sopId: string, versionId: 
   const version = await prisma.sopVersion.findUnique({ where: { id: versionId } });
   if (!version || version.sopId !== sopId) throw new SopValidationError("That version could not be found.");
 
-  const sop = await prisma.sop.findUnique({ where: { id: sopId }, select: { status: true, isDeleted: true } });
+  const sop = await prisma.sop.findUnique({ where: { id: sopId }, select: { isDeleted: true } });
   if (!sop || sop.isDeleted) throw new SopValidationError("That SOP no longer exists.");
 
   const updated = await prisma.sop.update({
@@ -467,7 +467,9 @@ export async function restoreSopVersion(actor: Actor, sopId: string, versionId: 
       title: version.title,
       draftBlocks: toJson(parseBlocks(version.blocks)),
       draftMeta: toJson(parseMeta(version.meta)),
-      status: sop.status === "DRAFT" ? "DRAFT" : "DRAFT",
+      // Restoring an older version starts a fresh editing cycle — any pending
+      // review/approval on the current draft no longer applies.
+      status: "DRAFT",
     },
   });
 

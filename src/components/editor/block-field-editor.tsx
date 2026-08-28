@@ -643,7 +643,7 @@ function AiExplanationEditor({ block, onChange }: { block: Extracted<"ai_explana
   return (
     <div className="flex flex-col gap-3">
       <p className="text-[0.75rem] text-[var(--text-muted)]">
-        Rendered with a visible "AI-generated" badge so readers always know its origin.
+        Rendered with a visible &ldquo;AI-generated&rdquo; badge so readers always know its origin.
       </p>
       <Field label="Text" htmlFor={`${block.id}-text`}>
         <Textarea rows={4} value={block.text} onChange={(e) => onChange({ ...block, text: e.target.value })} />

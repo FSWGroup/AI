@@ -101,11 +101,19 @@ function isSafeZipEntryName(name: string): boolean {
 }
 
 export async function sniffIsScormZip(buffer: Buffer): Promise<boolean> {
+  const names = listZipEntryNames(buffer);
+  return names.some((n) => n.toLowerCase() === "imsmanifest.xml");
+}
+
+/** Lists entry names in a ZIP without decompressing anything — used to verify
+ * a file really is a ZIP, and (for OOXML) that it contains the expected
+ * marker part, before trusting its extension. Returns [] for anything that
+ * doesn't parse as a ZIP central directory. */
+export function listZipEntryNames(buffer: Buffer): string[] {
   try {
-    const entries = readZipEntries(buffer);
-    return entries.some((e) => e.name.toLowerCase() === "imsmanifest.xml");
+    return readZipEntries(buffer).map((e) => e.name);
   } catch {
-    return false;
+    return [];
   }
 }
 

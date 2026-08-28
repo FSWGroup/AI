@@ -207,7 +207,7 @@ export function AdminSopTable({ items, ownerOptions }: { items: AdminSopRow[]; o
           <Dialog.Content className="fixed left-1/2 top-1/2 z-50 w-[calc(100%-2rem)] max-w-sm -translate-x-1/2 -translate-y-1/2 rounded-lg border border-[var(--border-default)] bg-[var(--surface-card)] p-5 shadow-lg focus:outline-none">
             <Dialog.Title className="text-[0.9375rem] font-semibold text-[var(--text-primary)]">Archive {selected.size} SOP{selected.size === 1 ? "" : "s"}?</Dialog.Title>
             <Dialog.Description className="mt-1.5 text-[0.8125rem] text-[var(--text-muted)]">
-              Archived SOPs stop appearing in the learner library. You can change status back later from each SOP's editor.
+              Archived SOPs stop appearing in the learner library. You can change status back later from each SOP&rsquo;s editor.
             </Dialog.Description>
             <div className="mt-4 flex justify-end gap-2">
               <Dialog.Close asChild>
