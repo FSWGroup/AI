@@ -321,6 +321,34 @@ export async function listVideoJobsAction(): Promise<ActionResult<VideoJobSummar
   });
 }
 
+export interface VideoJobDetailData {
+  id: string;
+  title: string;
+  mode: string;
+  status: string;
+  progress: number;
+  error: string | null;
+  plan: VideoPlan | null;
+  outputMediaId: string | null;
+  sourceSopId: string | null;
+  sourceCourseId: string | null;
+}
+
+export async function getVideoJobAction(videoJobId: string): Promise<ActionResult<VideoJobDetailData>> {
+  return runAction("getVideoJob", async () => {
+    await assertPermission("ai.video");
+    const job = await prisma.videoJob.findUnique({
+      where: { id: videoJobId },
+      select: {
+        id: true, title: true, mode: true, status: true, progress: true, error: true, plan: true,
+        outputMediaId: true, sourceSopId: true, sourceCourseId: true,
+      },
+    });
+    if (!job) return fail("That video job no longer exists.");
+    return ok({ ...job, plan: job.plan as unknown as VideoPlan | null });
+  });
+}
+
 export async function checkVideoOutdatedAction(mediaId: string): Promise<ActionResult<VideoOutdatedInfo>> {
   return runAction("checkVideoOutdated", async () => {
     await assertPermission("ai.video");

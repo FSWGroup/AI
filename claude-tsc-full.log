@@ -1,0 +1,1 @@
+src/app/(app)/admin/video-studio/[id]/page.tsx(8,32): error TS2307: Cannot find module '@/components/ai/video-job-detail' or its corresponding type declarations.
