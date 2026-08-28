@@ -14,7 +14,6 @@ import { Card, CardHeader, CardTitle, CardContent, CardFooter } from "@/componen
 import { Button } from "@/components/ui/button";
 import { Field, Input, Select, Textarea } from "@/components/ui/input";
 import { EmptyState } from "@/components/ui/empty-state";
-import { Badge } from "@/components/ui/badge";
 import { Icon, Glyph } from "@/components/icons";
 import { BlockEditor } from "@/components/ai/block-editor";
 import { AiGeneratedBadge } from "@/components/ai/ai-badge";

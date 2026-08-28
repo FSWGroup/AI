@@ -1232,7 +1232,9 @@ export function computeContentHealthScore(input: SopHealthInput): HealthScoreRes
     detail: input.hasBeenPublished ? "At least one version is published." : "Never published.",
   });
 
-  const metaFilled = input.purpose.trim().length > 0 && input.scope.trim().length > 0;
+  // Defensive: callers derive these from a JSON column, so treat a missing
+  // value as empty rather than throwing inside a pure scorer.
+  const metaFilled = (input.purpose ?? "").trim().length > 0 && (input.scope ?? "").trim().length > 0;
   factors.push({
     label: "Purpose and scope are documented",
     weight: 10,

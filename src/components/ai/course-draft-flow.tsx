@@ -280,26 +280,28 @@ export function CourseDraftFlow({ available, initialSopId }: { available: boolea
 
         {outline.sections.map((section, sIndex) => (
           <Card key={sIndex}>
-            <CardHeader className="flex-row items-center justify-between">
-              <Input
-                aria-label="Section title"
-                value={section.title}
-                onChange={(e) => {
-                  const sections = [...outline.sections];
-                  sections[sIndex] = { ...section, title: e.target.value };
-                  setOutline({ ...outline, sections });
-                }}
-                className="max-w-sm font-semibold"
-              />
-              <Button
-                type="button"
-                variant="ghost"
-                size="icon"
-                aria-label="Remove section"
-                onClick={() => setOutline({ ...outline, sections: outline.sections.filter((_, i) => i !== sIndex) })}
-              >
-                <Glyph name="trash" className="h-4 w-4" />
-              </Button>
+            <CardHeader>
+              <div className="flex items-center justify-between gap-2">
+                <Input
+                  aria-label="Section title"
+                  value={section.title}
+                  onChange={(e) => {
+                    const sections = [...outline.sections];
+                    sections[sIndex] = { ...section, title: e.target.value };
+                    setOutline({ ...outline, sections });
+                  }}
+                  className="max-w-sm font-semibold"
+                />
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="icon"
+                  aria-label="Remove section"
+                  onClick={() => setOutline({ ...outline, sections: outline.sections.filter((_, i) => i !== sIndex) })}
+                >
+                  <Glyph name="trash" className="h-4 w-4" />
+                </Button>
+              </div>
             </CardHeader>
             <CardContent className="flex flex-col gap-2">
               {section.lessons.map((lesson, lIndex) => (
