@@ -786,6 +786,71 @@ export async function seedDemoData(db: PrismaClient, ctx: SeedContext) {
     },
   });
 
+  // --- Skills and certifications --------------------------------------------
+  // Deliberately seeded to show real coverage risk: the forklift certification
+  // has one verified holder (single point of failure) and OSHA 30 has one that
+  // has already lapsed (uncovered).
+  const forklift = await db.skill.create({
+    data: {
+      name: 'Forklift operation (sit-down)', category: 'EQUIPMENT', isCertification: true,
+      isCritical: true, validityMonths: 36,
+      description: 'Powered industrial truck certification per OSHA 1910.178.',
+    },
+  });
+  const osha30 = await db.skill.create({
+    data: {
+      name: 'OSHA 30 (General Industry)', category: 'SAFETY', isCertification: true,
+      isCritical: true, validityMonths: 60,
+      description: 'Thirty-hour general industry safety course.',
+    },
+  });
+  const p21Skill = await db.skill.create({
+    data: { name: 'Prophet 21', category: 'SYSTEM', description: 'Order entry, inventory and purchasing in the ERP.' },
+  });
+  const valveSizing = await db.skill.create({
+    data: { name: 'Valve sizing & selection', category: 'PRODUCT', isCritical: true, description: 'Sizing control and isolation valves to a customer spec.' },
+  });
+  await db.skill.create({
+    data: { name: 'Tagalog', category: 'LANGUAGE', description: 'Spoken and written Tagalog.' },
+  });
+
+  const inThreeWeeks = new Date(Date.now() + 21 * 86_400_000);
+  const lastMonth = new Date(Date.now() - 30 * 86_400_000);
+
+  // Forklift: one verified holder → single point of failure.
+  await db.workerSkill.create({
+    data: {
+      workerId: warehouse.id, skillId: forklift.id, level: 4,
+      verifiedById: ctx.adminUserId, verifiedAt: new Date(), acquiredAt: new Date(Date.now() - 200 * 86_400_000),
+      expiresAt: inThreeWeeks, note: '[DEMO] Renewal due — booked with the training vendor.',
+    },
+  });
+  // OSHA 30: the only recorded holder has already lapsed → uncovered.
+  await db.workerSkill.create({
+    data: {
+      workerId: opsLead.id, skillId: osha30.id, level: 4,
+      verifiedById: ctx.adminUserId, verifiedAt: lastMonth, expiresAt: lastMonth,
+      note: '[DEMO] Lapsed — renewal not yet scheduled.',
+    },
+  });
+  // Healthy coverage on the ERP.
+  for (const w of [salesperson, warehouse, opsLead, finLead]) {
+    await db.workerSkill.create({
+      data: { workerId: w.id, skillId: p21Skill.id, level: w.id === finLead.id ? 5 : 3, sourceType: 'MANUAL' },
+    });
+  }
+  await db.workerSkill.create({
+    data: {
+      workerId: salesperson.id, skillId: valveSizing.id, level: 4,
+      verifiedById: ctx.adminUserId, verifiedAt: new Date(),
+    },
+  });
+  await db.workerSkill.create({
+    data: {
+      workerId: engineer.id, skillId: valveSizing.id, level: 5,
+      verifiedById: ctx.adminUserId, verifiedAt: new Date(),
+    },
+  });
   // An open pulse survey
   await db.survey.create({
     data: {

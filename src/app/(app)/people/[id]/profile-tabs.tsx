@@ -12,6 +12,8 @@ import {
   JobChangeDrawer, CompChangeForm, ContractorForm, PaymentForm, OffboardingForm,
 } from './edit-forms';
 import type { Prisma } from '@/generated/prisma/client';
+import { certificationState, SKILL_LEVELS } from '@/lib/skills';
+import { RecordSkillButton, RemoveSkillButton } from '@/app/(app)/skills/skills-ui';
 
 type WorkerPayload = Prisma.WorkerGetPayload<{
   include: {
@@ -766,6 +768,103 @@ export async function TimelineTab({ worker, access, ctx }: { worker: WorkerPaylo
           </ol>
         </CardBody>
       )}
+    </Card>
+  );
+}
+
+/**
+ * Skills and certifications for one person. Anyone who can see this profile
+ * in detail can see what the person can do; recording and verifying are gated
+ * in the server action, not here.
+ */
+export async function SkillsTab({ worker, access, ctx }: { worker: WorkerPayload; access: WorkerAccess; ctx: Ctx }) {
+  const [held, catalog] = await Promise.all([
+    db.workerSkill.findMany({
+      where: { workerId: worker.id },
+      include: { skill: true },
+      orderBy: [{ skill: { isCritical: 'desc' } }, { skill: { name: 'asc' } }],
+    }),
+    db.skill.findMany({ where: { active: true }, orderBy: { name: 'asc' } }),
+  ]);
+  const canRecord = access.self || can(ctx, 'skills.admin');
+  const canVerify = can(ctx, 'skills.admin');
+  const verifierIds = [...new Set(held.map((h) => h.verifiedById).filter(Boolean))] as string[];
+  const verifiers = verifierIds.length
+    ? await db.user.findMany({
+        where: { id: { in: verifierIds } },
+        select: { id: true, email: true, worker: { select: { legalFirstName: true, preferredName: true, lastName: true } } },
+      })
+    : [];
+  const verifierName = (id: string | null) => {
+    if (!id) return null;
+    const u = verifiers.find((v) => v.id === id);
+    return u?.worker ? `${u.worker.preferredName || u.worker.legalFirstName} ${u.worker.lastName}` : (u?.email ?? 'someone');
+  };
+  const unrecorded = catalog.filter((c) => !held.some((h) => h.skillId === c.id));
+
+  return (
+    <Card>
+      <CardHeader
+        title="Skills & certifications"
+        description="Levels run 1 Aware · 2 Working · 3 Proficient · 4 Expert · 5 Can teach it."
+        actions={
+          canRecord ? (
+            <RecordSkillButton
+              workerId={worker.id}
+              canVerify={canVerify}
+              skills={unrecorded.map((s) => ({
+                id: s.id,
+                name: s.name,
+                isCertification: s.isCertification,
+                validityMonths: s.validityMonths,
+              }))}
+            />
+          ) : undefined
+        }
+      />
+      <CardBody>
+        {held.length === 0 ? (
+          <EmptyState
+            title="No skills recorded yet"
+            description={
+              canRecord
+                ? 'Record what this person can do — certifications get a renewal date automatically.'
+                : 'Nothing has been recorded for this person.'
+            }
+          />
+        ) : (
+          <ul className="space-y-2">
+            {held.map((row) => {
+              const state = certificationState(row.expiresAt);
+              return (
+                <li key={row.id} className="flex flex-wrap items-start justify-between gap-3 rounded-md border border-ink-100 px-3.5 py-3">
+                  <div className="min-w-0">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <span className="text-sm font-medium text-ink-900">{row.skill.name}</span>
+                      <Badge tone="blue">{`${row.level} · ${SKILL_LEVELS[row.level] ?? ''}`}</Badge>
+                      {row.skill.isCritical ? <Badge tone="red">critical</Badge> : null}
+                      {state === 'EXPIRED' ? <Badge tone="red">expired</Badge> : null}
+                      {state === 'EXPIRING' ? <Badge tone="amber">renew soon</Badge> : null}
+                      {row.verifiedAt ? (
+                        <Badge tone="green">verified</Badge>
+                      ) : row.skill.isCritical ? (
+                        <Badge tone="amber">unverified</Badge>
+                      ) : null}
+                    </div>
+                    <div className="mt-0.5 text-[12px] text-ink-500">
+                      {row.acquiredAt ? `since ${fmtDate(row.acquiredAt)}` : 'no date recorded'}
+                      {row.expiresAt ? ` · expires ${fmtDate(row.expiresAt)}` : ''}
+                      {row.verifiedAt ? ` · verified by ${verifierName(row.verifiedById)} on ${fmtDate(row.verifiedAt)}` : ''}
+                      {row.note ? ` · ${row.note}` : ''}
+                    </div>
+                  </div>
+                  {canRecord ? <RemoveSkillButton workerSkillId={row.id} /> : null}
+                </li>
+              );
+            })}
+          </ul>
+        )}
+      </CardBody>
     </Card>
   );
 }

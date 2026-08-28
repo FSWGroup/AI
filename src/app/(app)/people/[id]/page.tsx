@@ -6,6 +6,7 @@ import { fullName, humanize, fmtDate, tenureLabel } from '@/lib/format';
 import { Avatar, Badge, PageHeader, StatusBadge, cx } from '@/components/ui';
 import {
   OverviewTab, JobTab, CompTab, DocumentsTab, TimelineTab, TimeOffTab, AssetsTab, ContractorTab, OnboardingTab,
+  SkillsTab,
 } from './profile-tabs';
 
 export default async function WorkerProfilePage({
@@ -46,6 +47,7 @@ export default async function WorkerProfilePage({
     { key: 'time-off', label: 'Time Off', show: canSeeDetail },
     { key: 'documents', label: 'Documents', show: access.self || can(ctx, 'docs.read_all') },
     { key: 'assets', label: 'Equipment & Access', show: canSeeDetail },
+    { key: 'skills', label: 'Skills', show: canSeeDetail && can(ctx, 'skills.read') },
     { key: 'onboarding', label: 'Onboarding', show: canSeeDetail },
     { key: 'contractor', label: 'Contractor', show: worker.workerType !== 'EMPLOYEE' && (access.hr || access.self || access.manager) },
     { key: 'timeline', label: 'Timeline', show: canSeeDetail },
@@ -119,6 +121,9 @@ export default async function WorkerProfilePage({
       {activeTab === 'time-off' && canSeeDetail && <TimeOffTab worker={worker} />}
       {activeTab === 'documents' && (access.self || can(ctx, 'docs.read_all')) && <DocumentsTab worker={worker} ctx={ctx} />}
       {activeTab === 'assets' && canSeeDetail && <AssetsTab worker={worker} ctx={ctx} />}
+      {activeTab === 'skills' && canSeeDetail && can(ctx, 'skills.read') && (
+        <SkillsTab worker={worker} access={access} ctx={ctx} />
+      )}
       {activeTab === 'onboarding' && canSeeDetail && <OnboardingTab worker={worker} />}
       {activeTab === 'contractor' && worker.workerType !== 'EMPLOYEE' && <ContractorTab worker={worker} ctx={ctx} access={access} />}
       {activeTab === 'timeline' && canSeeDetail && <TimelineTab worker={worker} access={access} ctx={ctx} />}

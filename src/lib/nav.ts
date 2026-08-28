@@ -60,6 +60,7 @@ export const NAV_GROUPS: NavGroup[] = [
       { label: '1:1s', href: '/talent/one-on-ones', permission: null },
       { label: 'Feedback', href: '/talent/feedback', permission: null },
       { label: 'Training', href: '/training', permission: null },
+      { label: 'Skills', href: '/skills', permission: 'skills.read' },
     ],
   },
   {
@@ -67,6 +68,8 @@ export const NAV_GROUPS: NavGroup[] = [
     items: [
       { label: 'Compensation', href: '/comp', permission: 'comp.read' },
       { label: 'Salary Bands', href: '/comp/bands', permission: 'comp.bands' },
+      { label: 'Comp Cycles', href: '/comp/cycles', permission: 'comp.cycle' },
+      { label: 'Pay Equity', href: '/comp/equity', permission: 'comp.equity' },
       { label: 'Benefits', href: '/benefits', permission: null },
       { label: 'Payroll Hub', href: '/payroll', permission: 'payroll.read' },
     ],
@@ -89,6 +92,7 @@ export const NAV_GROUPS: NavGroup[] = [
     items: [
       { label: 'Reports', href: '/reports', permission: 'reports.run' },
       { label: 'Executive Dashboard', href: '/insights/executive', permission: 'exec.dashboard' },
+      { label: 'Workforce Analytics', href: '/insights/workforce', permission: 'insights.workforce' },
     ],
   },
   {

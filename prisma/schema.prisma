@@ -297,6 +297,10 @@ model Worker {
 
   @@index([status, workerType])
   @@index([lastName, legalFirstName])
+  skills           WorkerSkill[]
+  compProposals    CompProposal[]
+  referralsMade    Referral[]        @relation("ReferralsMade")
+  shiftAssignments ShiftAssignment[]
 }
 
 // Effective-dated employment. The "current" record has effectiveTo = null.
@@ -512,6 +516,7 @@ model JobRequisition {
   applications Application[]
   offers       Offer[]
   boardPostings JobBoardPosting[]
+  skillRequirements JobSkillRequirement[]
 }
 
 model Candidate {
@@ -534,6 +539,8 @@ model Candidate {
   updatedAt    DateTime @updatedAt
 
   applications Application[]
+  referrals    Referral[]
+  talentPool   TalentPoolEntry?
 }
 
 model PipelineStage {
@@ -1732,4 +1739,305 @@ model ReportDefinition {
   schedule  Json? // { cron?, recipients? } — scheduled-report architecture
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+}
+
+// ---------------------------------------------------------------------------
+// Skills and certifications (§ skills inventory)
+//
+// Distinct from Training: training records that someone *took a course*, this
+// records that someone *can do a thing* — and, for a distributor, whether the
+// certification behind it is still current. Coverage risk (who is one person
+// deep on a critical skill) falls out of the same data.
+// ---------------------------------------------------------------------------
+
+model Skill {
+  id          String   @id @default(cuid())
+  name        String   @unique
+  category    String // SAFETY | EQUIPMENT | PRODUCT | SYSTEM | LANGUAGE | LEADERSHIP | TRADE | OTHER
+  description String?
+  // A certification expires and must be renewed (forklift, OSHA 30). A plain
+  // skill does not. Drives the expiry watch and the compliance surface.
+  isCertification Boolean @default(false)
+  // Losing every holder of a critical skill stops work. Surfaced in coverage.
+  isCritical  Boolean  @default(false)
+  // Renewal interval for certifications, in months.
+  validityMonths Int?
+  // Optional course that grants this skill when completed.
+  courseId    String?
+  active      Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  workerSkills WorkerSkill[]
+  jobRequirements JobSkillRequirement[]
+
+  @@index([category, active])
+}
+
+model WorkerSkill {
+  id         String    @id @default(cuid())
+  workerId   String
+  skillId    String
+  // 1 Aware · 2 Working · 3 Proficient · 4 Expert · 5 Can teach it
+  level      Int       @default(3)
+  // A self-reported skill is a claim; a verified one has a named person behind
+  // it. Coverage reporting can require verification for critical skills.
+  verifiedById String?
+  verifiedAt DateTime?
+  acquiredAt DateTime?
+  expiresAt  DateTime?
+  // Evidence: certificate document, training assignment that granted it.
+  documentId String?
+  sourceType String    @default("MANUAL") // MANUAL | TRAINING | IMPORT
+  note       String?
+  createdAt  DateTime  @default(now())
+  updatedAt  DateTime  @updatedAt
+
+  worker Worker @relation(fields: [workerId], references: [id], onDelete: Cascade)
+  skill  Skill  @relation(fields: [skillId], references: [id], onDelete: Cascade)
+
+  @@unique([workerId, skillId])
+  @@index([skillId, expiresAt])
+  @@index([expiresAt])
+}
+
+model JobSkillRequirement {
+  id            String  @id @default(cuid())
+  skillId       String
+  // Requirements attach either to a requisition (what this opening needs) or
+  // to a job family + level (what the role needs in general).
+  requisitionId String?
+  jobFamily     String?
+  jobLevel      String?
+  minLevel      Int     @default(3)
+  required      Boolean @default(true) // false = nice to have
+
+  skill       Skill           @relation(fields: [skillId], references: [id], onDelete: Cascade)
+  requisition JobRequisition? @relation(fields: [requisitionId], references: [id], onDelete: Cascade)
+
+  @@index([requisitionId])
+  @@index([jobFamily, jobLevel])
+}
+
+// ---------------------------------------------------------------------------
+// Compensation cycles and pay equity (§ comp planning)
+//
+// Merit planning happens here instead of in a spreadsheet, and lands as a
+// single effective-dated Compensation row per worker at the end. Budget is
+// allocated down the org and rolled up live so a manager can see the effect
+// of a proposal before submitting it.
+// ---------------------------------------------------------------------------
+
+model CompCycle {
+  id            String    @id @default(cuid())
+  name          String
+  status        String    @default("DRAFT") // DRAFT | PLANNING | IN_REVIEW | APPROVED | APPLIED | CANCELED
+  effectiveDate DateTime // when approved increases take effect
+  // Total pool as a percentage of eligible base pay, and/or an absolute amount.
+  budgetPct     Decimal?  @db.Decimal(5, 2)
+  budgetAmount  Decimal?  @db.Decimal(14, 2)
+  currency      String    @default("USD")
+  // Eligibility: { legalEntityIds?, departmentIds?, workerTypes?, minTenureMonths? }
+  eligibility   Json      @default("{}")
+  guidance      String?
+  opensAt       DateTime?
+  closesAt      DateTime?
+  createdById   String?
+  appliedAt     DateTime?
+  appliedById   String?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  budgets   CompCycleBudget[]
+  proposals CompProposal[]
+
+  @@index([status])
+}
+
+/** Budget delegated to one manager for their part of the org. */
+model CompCycleBudget {
+  id            String  @id @default(cuid())
+  cycleId       String
+  managerId     String
+  amount        Decimal @db.Decimal(14, 2)
+  currency      String  @default("USD")
+  note          String?
+
+  cycle CompCycle @relation(fields: [cycleId], references: [id], onDelete: Cascade)
+
+  @@unique([cycleId, managerId])
+}
+
+model CompProposal {
+  id             String    @id @default(cuid())
+  cycleId        String
+  workerId       String
+  // Snapshot at planning time so the roll-up is stable even if someone's pay
+  // changes mid-cycle for another reason.
+  currentAmount  Decimal   @db.Decimal(14, 2)
+  currency       String    @default("USD")
+  rateType       String    @default("ANNUAL")
+  proposedAmount Decimal?  @db.Decimal(14, 2)
+  increasePct    Decimal?  @db.Decimal(6, 3)
+  reason         String    @default("MERIT") // MERIT | PROMOTION | MARKET | EQUITY
+  proposedTitle  String?
+  proposedLevel  String?
+  justification  String?
+  status         String    @default("DRAFT") // DRAFT | SUBMITTED | APPROVED | REJECTED | APPLIED
+  proposedById   String?
+  submittedAt    DateTime?
+  decidedById    String?
+  decidedAt      DateTime?
+  decisionNote   String?
+  appliedAt      DateTime?
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+
+  cycle  CompCycle @relation(fields: [cycleId], references: [id], onDelete: Cascade)
+  worker Worker    @relation(fields: [workerId], references: [id], onDelete: Cascade)
+
+  @@unique([cycleId, workerId])
+  @@index([cycleId, status])
+}
+
+// ---------------------------------------------------------------------------
+// Hiring funnel: referrals and talent pool (§ own the funnel)
+// ---------------------------------------------------------------------------
+
+model Referral {
+  id            String    @id @default(cuid())
+  referrerWorkerId String
+  candidateId   String?
+  requisitionId String?
+  // Captured before a Candidate record exists, when someone refers a friend.
+  candidateName String
+  candidateEmail String?
+  candidatePhone String?
+  relationship  String? // FORMER_COLLEAGUE | FRIEND | FAMILY | INDUSTRY | OTHER
+  note          String?
+  status        String    @default("SUBMITTED") // SUBMITTED | LINKED | HIRED | CLOSED
+  // Bonus is recorded, never paid by this system — payroll pays it.
+  bonusAmount   Decimal?  @db.Decimal(12, 2)
+  bonusCurrency String    @default("USD")
+  bonusStatus   String    @default("NONE") // NONE | PENDING | APPROVED | PAID | FORFEITED
+  bonusEligibleAt DateTime? // usually the referred hire's 90-day mark
+  bonusApprovedById String?
+  closedReason  String?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  referrer  Worker     @relation("ReferralsMade", fields: [referrerWorkerId], references: [id], onDelete: Cascade)
+  candidate Candidate? @relation(fields: [candidateId], references: [id])
+
+  @@index([referrerWorkerId])
+  @@index([status])
+  @@index([candidateEmail])
+}
+
+/**
+ * Silver medallists. Someone interviewed well and lost to a stronger
+ * candidate; that is worth remembering rather than leaving as a rejected row.
+ */
+model TalentPoolEntry {
+  id            String    @id @default(cuid())
+  candidateId   String
+  addedById     String?
+  reason        String? // why they are worth revisiting
+  jobFamily     String?
+  strengthNote  String?
+  // Consent and hygiene: we do not keep people forever without a reason.
+  reviewBy      DateTime?
+  lastContactedAt DateTime?
+  status        String    @default("ACTIVE") // ACTIVE | CONTACTED | PLACED | REMOVED
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  candidate Candidate @relation(fields: [candidateId], references: [id], onDelete: Cascade)
+
+  @@unique([candidateId])
+  @@index([status, jobFamily])
+}
+
+// ---------------------------------------------------------------------------
+// Hourly workforce operations (§ shifts, overtime, breaks)
+// ---------------------------------------------------------------------------
+
+model ShiftTemplate {
+  id          String  @id @default(cuid())
+  name        String  @unique
+  locationId  String?
+  startTime   String // "06:00" local to the location
+  endTime     String // "14:30"
+  breakMinutes Int    @default(30)
+  color       String?
+  active      Boolean @default(true)
+
+  shifts Shift[]
+}
+
+model Shift {
+  id           String    @id @default(cuid())
+  templateId   String?
+  locationId   String?
+  departmentId String?
+  date         DateTime // the local calendar day the shift belongs to
+  startsAt     DateTime
+  endsAt       DateTime
+  breakMinutes Int       @default(30)
+  role         String? // "Picker", "Driver", "Counter Sales"
+  // Draft shifts are invisible to workers. Publishing is an explicit act so a
+  // schedule cannot be half-changed in front of the people working it.
+  status       String    @default("DRAFT") // DRAFT | PUBLISHED | CANCELED
+  publishedAt  DateTime?
+  publishedById String?
+  note         String?
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+
+  template    ShiftTemplate? @relation(fields: [templateId], references: [id])
+  assignments ShiftAssignment[]
+
+  @@index([date, status])
+  @@index([locationId, date])
+}
+
+model ShiftAssignment {
+  id        String   @id @default(cuid())
+  shiftId   String
+  workerId  String
+  status    String   @default("ASSIGNED") // ASSIGNED | ACCEPTED | DECLINED | NO_SHOW | COMPLETED
+  assignedById String?
+  respondedAt DateTime?
+  note      String?
+  createdAt DateTime @default(now())
+
+  shift  Shift  @relation(fields: [shiftId], references: [id], onDelete: Cascade)
+  worker Worker @relation(fields: [workerId], references: [id], onDelete: Cascade)
+
+  @@unique([shiftId, workerId])
+  @@index([workerId])
+}
+
+/**
+ * Meal and rest break rules, as data rather than code, because they are
+ * jurisdictional and they change. Same shape as ComplianceRule: every rule
+ * carries where it applies and the authority behind it.
+ */
+model BreakRule {
+  id            String   @id @default(cuid())
+  jurisdiction  String // "US-PA", "US-CA", "PH"
+  name          String
+  // Applies once a shift reaches this many minutes...
+  afterMinutes  Int
+  // ...requiring a break of at least this long.
+  breakMinutes  Int
+  paid          Boolean  @default(false)
+  kind          String   @default("MEAL") // MEAL | REST
+  appliesToMinors Boolean @default(false)
+  sourceUrl     String?
+  note          String?
+  active        Boolean  @default(true)
+  createdAt     DateTime @default(now())
+
+  @@index([jurisdiction, active])
 }
