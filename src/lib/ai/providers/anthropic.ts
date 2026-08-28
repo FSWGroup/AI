@@ -18,7 +18,7 @@ export class AnthropicTextProvider implements TextAIProvider {
 
   constructor(apiKey: string, model?: string) {
     this.client = new Anthropic({ apiKey });
-    this.model = model ?? process.env.ANTHROPIC_MODEL ?? "claude-sonnet-4-5-20250929";
+    this.model = model ?? process.env.ANTHROPIC_MODEL ?? "claude-sonnet-5";
   }
 
   async generate(request: TextGenerationRequest): Promise<TextGenerationResult> {
