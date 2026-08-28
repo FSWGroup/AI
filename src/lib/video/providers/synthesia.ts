@@ -39,7 +39,9 @@ export class SynthesiaVideoProvider implements VideoProvider {
 
   async render(request: VideoRenderRequest): Promise<VideoRenderResult> {
     const apiKey = this.apiKey();
-    const avatar = process.env.SYNTHESIA_AVATAR_ID?.trim() || "anna_costume1_cameraA";
+    // The author's per-job "voice/avatar" choice from the Video Studio wizard
+    // takes precedence over the environment default.
+    const avatar = request.voice?.trim() || process.env.SYNTHESIA_AVATAR_ID?.trim() || "anna_costume1_cameraA";
     const background = process.env.SYNTHESIA_BACKGROUND_ID?.trim();
 
     const input: SynthesiaScriptInput[] = request.scenes.map((scene) => ({

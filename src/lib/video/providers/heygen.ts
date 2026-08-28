@@ -42,7 +42,10 @@ export class HeyGenVideoProvider implements VideoProvider {
     const apiKey = this.apiKey();
     const dims = ASPECT_RATIO_DIMENSIONS[request.aspectRatio as AspectRatio] ?? ASPECT_RATIO_DIMENSIONS["16:9"];
 
-    const avatarId = process.env.HEYGEN_AVATAR_ID?.trim() || "default";
+    // The author's per-job "voice/avatar" choice from the Video Studio wizard
+    // takes precedence over the environment default, so a real HeyGen avatar
+    // ID typed into that field actually selects that presenter.
+    const avatarId = request.voice?.trim() || process.env.HEYGEN_AVATAR_ID?.trim() || "default";
     const voiceId = process.env.HEYGEN_VOICE_ID?.trim();
 
     const videoInputs: HeygenVideoInput[] = request.scenes.map((scene) => ({
