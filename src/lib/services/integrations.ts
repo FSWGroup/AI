@@ -2,7 +2,13 @@ import "server-only";
 import { prisma } from "@/lib/db";
 import { encryptJson, decryptJson, encryptField, decryptField, sha256, randomToken, signPayload } from "@/lib/crypto";
 import { recordAudit, AUDIT_ACTIONS } from "@/lib/audit";
-import { enqueueJob, JOB_TYPES, type ClaimedJob } from "@/lib/jobs/queue";
+import { enqueueJob, JOB_TYPES } from "@/lib/jobs/queue";
+import { getEmailProvider } from "@/lib/email";
+import { genericNotificationEmail } from "@/lib/email/templates";
+import { getSettings } from "@/lib/settings";
+import { logger } from "@/lib/logger";
+import { extractLinks, type Block } from "@/lib/content/types";
+import { track } from "@/lib/services/analytics";
 import type { Actor } from "@/lib/auth/guard";
 import { ALL_PERMISSIONS, type Permission } from "@/lib/permissions";
 
@@ -470,8 +476,8 @@ export async function triggerWebhookEvent(event: WebhookEventName, payload: Reco
  * generic job-queue backoff (src/lib/jobs/queue.ts) reschedules it; gives up
  * quietly once the delivery's own attempt count is exhausted.
  */
-export async function handleDeliverWebhookJob(job: ClaimedJob): Promise<void> {
-  const deliveryId = job.payload.deliveryId;
+export async function handleDeliverWebhookJob(payload: Record<string, unknown>): Promise<void> {
+  const deliveryId = payload.deliveryId;
   if (typeof deliveryId !== "string") throw new Error("deliver_webhook job missing deliveryId");
 
   const delivery = await prisma.webhookDelivery.findUnique({ where: { id: deliveryId } });
@@ -503,4 +509,158 @@ export async function handleDeliverWebhookJob(job: ClaimedJob): Promise<void> {
   if (!exhausted) {
     throw new Error(result.error ?? `Webhook delivery failed (HTTP ${result.responseCode ?? "network error"})`);
   }
+}
+
+// ---------------------------------------------------------------------------
+// Remaining worker job handlers
+//
+// The worker (src/worker/index.ts) resolves SEND_EMAIL, CHECK_LINKS,
+// RETENTION_SWEEP, and TRANSCRIBE_MEDIA from this module alongside
+// DELIVER_WEBHOOK above, so all five live together here.
+// ---------------------------------------------------------------------------
+
+/** Payload shape enqueued by src/lib/notifications.ts's notify(). */
+export async function handleSendEmailJob(payload: Record<string, unknown>): Promise<void> {
+  const userId = payload.userId;
+  if (typeof userId !== "string") throw new Error("send_email job missing userId");
+
+  const user = await prisma.user.findUnique({ where: { id: userId }, select: { name: true, email: true, status: true } });
+  if (!user || user.status === "INACTIVE") return; // Deactivated since being queued.
+
+  const [settings, appUrl] = [await getSettings(), process.env.APP_URL ?? "http://localhost:3000"];
+  const title = typeof payload.title === "string" ? payload.title : "Notification";
+  const body = typeof payload.body === "string" ? payload.body : title;
+  const linkUrl = typeof payload.linkUrl === "string" ? payload.linkUrl : undefined;
+
+  const rendered = genericNotificationEmail(
+    { brand: settings.brand, appUrl, recipientName: user.name },
+    {
+      subject: title,
+      heading: title,
+      body,
+      url: linkUrl ? `${appUrl}${linkUrl}` : undefined,
+      ctaLabel: linkUrl ? "View in FSW Academy" : undefined,
+    },
+  );
+
+  await getEmailProvider().send({ to: user.email, subject: rendered.subject, html: rendered.html, text: rendered.text });
+
+  const notificationId = payload.notificationId;
+  if (typeof notificationId === "string") {
+    await prisma.notification.update({ where: { id: notificationId }, data: { emailedAt: new Date() } }).catch(() => {});
+  }
+}
+
+/**
+ * Scans published SOP and course content for external links and records any
+ * that fail to resolve, so the Content Health report (reports.ts) can surface
+ * "broken links." There is no dedicated broken-link table — findings are
+ * recorded as analytics events (event: "broken_link_detected") and read back
+ * by contentHealth() in src/lib/services/reports.ts.
+ */
+export async function handleCheckLinksJob(_payload: Record<string, unknown>): Promise<void> {
+  const [sops, courses] = await Promise.all([
+    prisma.sop.findMany({
+      where: { isDeleted: false, status: "PUBLISHED" },
+      select: { id: true, title: true, currentVersion: { select: { blocks: true } } },
+    }),
+    prisma.course.findMany({
+      where: { isDeleted: false, status: "PUBLISHED" },
+      select: {
+        id: true,
+        title: true,
+        sections: { select: { lessons: { select: { id: true, content: true } } } },
+      },
+    }),
+  ]);
+
+  const targets: { entityType: "SOP" | "COURSE"; entityId: string; url: string }[] = [];
+  for (const sop of sops) {
+    const blocks = (sop.currentVersion?.blocks as Block[] | undefined) ?? [];
+    for (const url of extractLinks(blocks)) targets.push({ entityType: "SOP", entityId: sop.id, url });
+  }
+  for (const course of courses) {
+    for (const section of course.sections) {
+      for (const lesson of section.lessons) {
+        const content = lesson.content as { externalUrl?: string } | null;
+        if (content?.externalUrl) targets.push({ entityType: "COURSE", entityId: course.id, url: content.externalUrl });
+      }
+    }
+  }
+
+  let checked = 0;
+  let broken = 0;
+  for (const target of targets.slice(0, 500)) {
+    checked += 1;
+    try {
+      const response = await fetch(target.url, { method: "HEAD", signal: AbortSignal.timeout(6000), redirect: "follow" });
+      if (!response.ok) {
+        broken += 1;
+        await track(null, "broken_link_detected", { type: target.entityType, id: target.entityId }, { url: target.url, status: response.status });
+      }
+    } catch {
+      broken += 1;
+      await track(null, "broken_link_detected", { type: target.entityType, id: target.entityId }, { url: target.url, status: 0 });
+    }
+  }
+
+  logger.info("link check completed", { checked, broken });
+}
+
+/**
+ * Prunes data past its configured retention window. `CompletionRecord`,
+ * `Acknowledgement`, `Certificate`, `AuditEvent`, `SopVersion`,
+ * `CourseVersion`, `QuizAttempt`, and `QuizResponse` are append-only evidence
+ * per CONVENTIONS.md and are never touched here, regardless of age — this
+ * sweep only prunes operational data that carries no evidentiary purpose:
+ * analytics events, delivered/failed webhook deliveries, finished jobs, and
+ * expired rate-limit buckets.
+ */
+export async function handleRetentionSweepJob(_payload: Record<string, unknown>): Promise<void> {
+  const settings = await getSettings();
+  const analyticsCutoff = new Date();
+  analyticsCutoff.setFullYear(analyticsCutoff.getFullYear() - settings.privacy.analyticsRetentionYears);
+
+  const operationalCutoff = new Date(Date.now() - 90 * 24 * 60 * 60 * 1000);
+
+  const [analyticsDeleted, deliveriesDeleted, jobsDeleted, rateLimitDeleted] = await Promise.all([
+    prisma.analyticsEvent.deleteMany({ where: { createdAt: { lt: analyticsCutoff } } }),
+    prisma.webhookDelivery.deleteMany({
+      where: { status: { in: ["DELIVERED", "FAILED"] }, createdAt: { lt: operationalCutoff } },
+    }),
+    prisma.job.deleteMany({ where: { status: { in: ["COMPLETE", "FAILED", "CANCELED"] }, updatedAt: { lt: operationalCutoff } } }),
+    prisma.rateLimitBucket.deleteMany({ where: { resetAt: { lt: new Date() } } }),
+  ]);
+
+  logger.info("retention sweep completed", {
+    analyticsDeleted: analyticsDeleted.count,
+    deliveriesDeleted: deliveriesDeleted.count,
+    jobsDeleted: jobsDeleted.count,
+    rateLimitDeleted: rateLimitDeleted.count,
+  });
+}
+
+/**
+ * No speech-to-text capability is declared in src/lib/providers/registry.ts —
+ * only text-to-speech (ai_tts) exists there, which is a different capability.
+ * Until a real transcription provider is wired up, this handler always takes
+ * the honest fallback path: mark the asset READY with an empty transcript
+ * rather than leaving it stuck PROCESSING forever.
+ */
+export async function handleTranscribeMediaJob(payload: Record<string, unknown>): Promise<void> {
+  const mediaId = payload.mediaId;
+  if (typeof mediaId !== "string") throw new Error("transcribe_media job missing mediaId");
+
+  const asset = await prisma.mediaAsset.findUnique({ where: { id: mediaId } });
+  if (!asset || asset.isDeleted) return;
+
+  await prisma.mediaAsset.update({
+    where: { id: mediaId },
+    data: {
+      processingStatus: "READY",
+      transcript: asset.transcript ?? "",
+    },
+  });
+
+  logger.info("media transcription skipped: no transcription provider configured", { mediaId });
 }

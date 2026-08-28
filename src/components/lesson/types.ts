@@ -80,4 +80,76 @@ export interface LessonPlayerProps {
   onComplete: () => void;
   /** Called after any non-terminal progress update, so the shell can refresh. */
   onProgress: () => void;
+  /**
+   * Bound server action for ACKNOWLEDGEMENT/SIGNATURE lessons. The action
+   * itself reads IP and User-Agent from request headers server-side — the
+   * client only supplies the typed signature, never the evidence fields.
+   */
+  acknowledge?: (input: { typedSignature?: string }) => Promise<{ ok: boolean; error?: string }>;
+  /** Bound server action for MANAGER_SIGNOFF / PRACTICAL_DEMO lessons — records a manager's rating for one of their reviewable teammates. */
+  assessPractical?: (input: {
+    userId: string;
+    rating: "NOT_DEMONSTRATED" | "NEEDS_COACHING" | "COMPETENT" | "HIGHLY_COMPETENT";
+    comments?: string;
+  }) => Promise<{ ok: boolean; error?: string }>;
+  /** Bound server action for ASSIGNMENT_PROJECT lessons. */
+  submitProject?: (input: { mediaId?: string; note?: string }) => Promise<{ ok: boolean; error?: string }>;
+  /** Bound server action for LIVE_SESSION lessons. */
+  registerForSession?: () => Promise<{ ok: boolean; error?: string }>;
+  /** Bound server action for DISCUSSION lessons. */
+  postComment?: (input: { body: string; parentId?: string }) => Promise<{ ok: boolean; error?: string }>;
+
+  // Quiz engine actions (QUIZ lessons only).
+  startQuizAttempt?: () => Promise<{ ok: boolean; error?: string; data?: QuizAttemptView }>;
+  submitQuizAttempt?: (
+    attemptId: string,
+    answers: Record<string, unknown>,
+  ) => Promise<{ ok: boolean; error?: string; data?: QuizSubmitResult }>;
+  getQuizReview?: (attemptId: string) => Promise<{ ok: boolean; error?: string; data?: QuizReview }>;
+}
+
+export interface QuizPresentedQuestion {
+  id: string;
+  type: string;
+  order: number;
+  prompt: string;
+  points: number;
+  required: boolean;
+  presentation: Record<string, unknown>;
+  explanation: string | null;
+}
+
+export interface QuizAttemptView {
+  id: string;
+  status: string;
+  attemptNumber: number;
+  attemptsRemaining: number | null;
+  questions: QuizPresentedQuestion[];
+  oneQuestionAtATime: boolean;
+}
+
+export interface QuizSubmitResult {
+  status: string;
+  scorePercent: number;
+  pointsEarned: number;
+  pointsPossible: number;
+  passed: boolean | null;
+  hasPendingManualGrading: boolean;
+}
+
+export interface QuizReview {
+  id: string;
+  status: string;
+  scorePercent: number | null;
+  responses: {
+    questionId: string;
+    prompt: string;
+    type: string;
+    answer: unknown;
+    isCorrect: boolean | null;
+    pointsEarned: number | null;
+    pointsPossible: number;
+    explanation: string | null;
+    feedback: string | null;
+  }[];
 }

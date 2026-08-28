@@ -11,7 +11,7 @@ import type { LessonPlayerProps } from "@/components/lesson/types";
 
 const REPORT_INTERVAL_MS = 10_000;
 
-export function VideoPlayer({ lesson, course, progress, extra, onComplete, onProgress }: LessonPlayerProps) {
+export function VideoPlayer({ lesson, course, progress, onComplete, onProgress }: LessonPlayerProps) {
   const videoRef = React.useRef<HTMLVideoElement>(null);
   const resumedRef = React.useRef(false);
   const lastReportedRef = React.useRef(0);
@@ -20,7 +20,6 @@ export function VideoPlayer({ lesson, course, progress, extra, onComplete, onPro
 
   const content = lesson.content as { mediaId?: string | null; externalUrl?: string | null };
   const src = content.externalUrl ?? (content.mediaId ? `/api/media/${content.mediaId}` : null);
-  const captionsVtt = typeof extra?.sopBlocks === "string" ? undefined : undefined; // reserved
   const captionsDataUrl = (lesson.content as { captionsVttDataUrl?: string }).captionsVttDataUrl;
 
   const report = React.useCallback(
