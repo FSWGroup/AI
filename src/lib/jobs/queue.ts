@@ -48,31 +48,44 @@ export async function enqueueJob(
   payload: Record<string, unknown>,
   options: EnqueueOptions = {},
 ): Promise<string | null> {
-  try {
-    const job = await prisma.job.create({
-      data: {
-        type,
-        payload: payload as Prisma.InputJsonValue,
-        runAt: options.runAt ?? new Date(),
-        priority: options.priority ?? 0,
-        maxAttempts: options.maxAttempts ?? 3,
-        idempotencyKey: options.idempotencyKey ?? null,
-      },
-      select: { id: true },
-    });
-    return job.id;
-  } catch (error) {
-    // Unique violation on idempotencyKey means the job already exists.
-    if (
-      typeof error === "object" &&
-      error !== null &&
-      "code" in error &&
-      (error as { code: string }).code === "P2002"
-    ) {
-      return null;
-    }
-    throw error;
+  const runAt = options.runAt ?? new Date();
+  const priority = options.priority ?? 0;
+  const maxAttempts = options.maxAttempts ?? 3;
+
+  if (options.idempotencyKey) {
+    /*
+     * ON CONFLICT DO NOTHING rather than catching a unique violation.
+     *
+     * A collision here is normal operation, not an error: every worker
+     * schedules the same recurring work each minute and all but one is meant to
+     * be discarded. Letting the constraint throw would emit a "Unique
+     * constraint failed" line from the Prisma error logger every minute in
+     * production, burying real failures in noise.
+     */
+    const rows = await prisma.$queryRaw<{ id: string }[]>`
+      INSERT INTO "Job" ("id", "type", "payload", "status", "priority", "runAt",
+                         "attempts", "maxAttempts", "idempotencyKey",
+                         "createdAt", "updatedAt")
+      VALUES (gen_random_uuid()::text, ${type}, ${payload as Prisma.InputJsonValue}::jsonb,
+              'QUEUED', ${priority}, ${runAt}, 0, ${maxAttempts},
+              ${options.idempotencyKey}, NOW(), NOW())
+      ON CONFLICT ("idempotencyKey") DO NOTHING
+      RETURNING "id"
+    `;
+    return rows[0]?.id ?? null;
   }
+
+  const job = await prisma.job.create({
+    data: {
+      type,
+      payload: payload as Prisma.InputJsonValue,
+      runAt,
+      priority,
+      maxAttempts,
+    },
+    select: { id: true },
+  });
+  return job.id;
 }
 
 export interface ClaimedJob {
