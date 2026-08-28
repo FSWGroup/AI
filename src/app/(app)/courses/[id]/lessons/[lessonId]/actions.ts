@@ -14,6 +14,7 @@ import {
   recordAcknowledgement,
   recordPracticalAssessment,
   submitAssignmentProject,
+  recordLessonProgress,
   ServiceError as CompletionError,
 } from "@/lib/services/completion";
 import type { PracticalRating } from "@prisma/client";
@@ -203,6 +204,15 @@ export async function registerForSessionAction(lessonId: string): Promise<Outcom
     create: { sessionId: liveSessionId, userId: actor.id, status: "REGISTERED" },
     update: {},
   });
+
+  // Registering is the learner-actionable completion event for this lesson type —
+  // actual attendance is tracked separately on the session for reporting.
+  try {
+    await recordLessonProgress(actor, lessonId, { markComplete: true });
+  } catch (error) {
+    console.error("[courses.lesson.registerForSession] progress update failed", error);
+  }
+
   await revalidateLesson(lessonId);
   return { ok: true };
 }

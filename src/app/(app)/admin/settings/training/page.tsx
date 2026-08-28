@@ -22,7 +22,7 @@ export default async function TrainingSettingsPage() {
             { key: "defaultRequiredVideoPercent", label: "Required video watch percentage", type: "number", hint: "0–100" },
             { key: "defaultPassingScore", label: "Default quiz passing score", type: "number", hint: "0–100" },
           ]}
-          initialValues={settings.training}
+          initialValues={settings.training as unknown as Record<string, unknown>}
         />
       </div>
     </div>

@@ -29,7 +29,7 @@ export default async function FeatureFlagsSettingsPage() {
             { key: "aiVideoStudio", label: "AI Video Studio", type: "checkbox" },
             { key: "translations", label: "Translations", type: "checkbox" },
           ]}
-          initialValues={settings.features}
+          initialValues={settings.features as unknown as Record<string, unknown>}
         />
       </div>
     </div>

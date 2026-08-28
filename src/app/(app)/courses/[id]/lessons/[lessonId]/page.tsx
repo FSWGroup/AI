@@ -1,9 +1,13 @@
+import Link from "next/link";
 import { notFound } from "next/navigation";
 import type { Metadata } from "next";
 import { requirePermission, actorHas, getVisibleUserIds } from "@/lib/auth/guard";
 import { prisma } from "@/lib/db";
 import { getCourseForLearner } from "@/lib/services/course";
 import { PageBody } from "@/components/page-header";
+import { EmptyState } from "@/components/ui/empty-state";
+import { Button } from "@/components/ui/button";
+import { Icon } from "@/components/icons";
 import { LessonPageShell, type ShellSection } from "@/components/lesson/lesson-page-shell";
 import type { LessonPlayerProps } from "@/components/lesson/types";
 import * as actions from "./actions";
@@ -35,6 +39,23 @@ export default async function LessonPage({
   ]);
 
   if (!courseData || !lessonRow || !courseMeta || lessonRow.section.courseId !== courseId) notFound();
+
+  if (courseData.blocked) {
+    return (
+      <PageBody>
+        <EmptyState
+          icon={<Icon name="sop" className="h-5 w-5" />}
+          title="Prerequisites required"
+          description="Complete this course's prerequisites before starting its lessons."
+          actions={
+            <Link href={`/courses/${courseId}`}>
+              <Button size="sm">Back to course overview</Button>
+            </Link>
+          }
+        />
+      </PageBody>
+    );
+  }
 
   const flatLessons = courseData.course.sections.flatMap((s) => s.lessons);
   const currentIndex = flatLessons.findIndex((l) => l.id === lessonId);

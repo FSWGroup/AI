@@ -21,7 +21,7 @@ export default async function NotificationsSettingsPage() {
             { key: "reminderDaysBefore", label: "Remind before due date (days)", type: "number-list", hint: "Comma-separated, e.g. 7, 1." },
             { key: "expiryWarningDays", label: "Warn before certificate expiry (days)", type: "number-list", hint: "Comma-separated, e.g. 60, 30, 7." },
           ]}
-          initialValues={settings.training}
+          initialValues={settings.training as unknown as Record<string, unknown>}
         />
       </div>
     </div>

@@ -23,7 +23,7 @@ export async function saveSettingsSection(
   return runAction("settings.save", async () => {
     const actor = await assertPermission("settings.manage");
     const current = await getSettings();
-    const merged = { ...(current[section] as Record<string, unknown>), ...patch };
+    const merged = { ...(current[section] as unknown as Record<string, unknown>), ...patch };
 
     await updateSettingSection(section, merged, actor.id);
     await recordAudit({

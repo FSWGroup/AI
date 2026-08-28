@@ -18,7 +18,7 @@ export default async function ContentReviewSettingsPage() {
           section="training"
           canManage={actor.permissions.has("settings.manage")}
           fields={[{ key: "defaultReviewCycleDays", label: "Default review cycle (days)", type: "number", hint: "e.g. 90, 180, or 365." }]}
-          initialValues={settings.training}
+          initialValues={settings.training as unknown as Record<string, unknown>}
         />
       </div>
     </div>

@@ -14,7 +14,7 @@ const STATUS_LABEL: Record<string, string> = {
   NO_SHOW: "Marked as no-show",
 };
 
-export function LiveSessionPlayer({ lesson, extra, registerForSession, onProgress }: LessonPlayerProps) {
+export function LiveSessionPlayer({ lesson, extra, registerForSession, onComplete }: LessonPlayerProps) {
   const session = extra?.liveSession;
   const [submitting, setSubmitting] = React.useState(false);
 
@@ -50,7 +50,7 @@ export function LiveSessionPlayer({ lesson, extra, registerForSession, onProgres
         return;
       }
       toast.success("You're registered.");
-      onProgress();
+      onComplete();
     } finally {
       setSubmitting(false);
     }

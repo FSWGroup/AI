@@ -43,7 +43,7 @@ export default async function CourseOverviewPage({ params }: { params: Promise<{
     : firstLessonId
       ? `/courses/${courseId}/lessons/${firstLessonId}`
       : null;
-  const canSelfEnrollHere = !assignment;
+  const canSelfEnrollHere = !assignment && course.selfEnrollAllowed;
 
   return (
     <>

@@ -821,6 +821,7 @@ export interface CourseForLearner {
     status: string;
     requiredVideoPercent: number;
     passingScore: number | null;
+    selfEnrollAllowed: boolean;
     skills: { skillId: string; name: string; levelValue: number | null }[];
     sections: {
       id: string;
@@ -867,6 +868,7 @@ export async function getCourseForLearner(actor: Actor, courseId: string): Promi
       status: true,
       requiredVideoPercent: true,
       passingScore: true,
+      selfEnrollAllowed: true,
       skills: { select: { skillId: true, levelValue: true, skill: { select: { name: true } } } },
       sections: {
         orderBy: { order: "asc" },
@@ -969,6 +971,7 @@ export async function getCourseForLearner(actor: Actor, courseId: string): Promi
       status: course.status,
       requiredVideoPercent: course.requiredVideoPercent,
       passingScore: course.passingScore,
+      selfEnrollAllowed: course.selfEnrollAllowed,
       skills: course.skills.map((s) => ({ skillId: s.skillId, name: s.skill.name, levelValue: s.levelValue })),
       sections,
     },

@@ -24,7 +24,7 @@ export default async function PrivacySettingsPage() {
             { key: "privacyNoticeUrl", label: "Privacy notice URL", type: "url" },
             { key: "privacyNoticeText", label: "Privacy notice text", type: "textarea" },
           ]}
-          initialValues={settings.privacy}
+          initialValues={settings.privacy as unknown as Record<string, unknown>}
         />
       </div>
     </div>
