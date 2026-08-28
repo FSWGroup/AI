@@ -268,7 +268,7 @@ function findMeaningfulCondition(node: CriteriaNode | undefined): CriteriaCondit
 }
 
 function describeAssignmentReason(rule: Pick<AssignmentRule, "name" | "criteria">, context: UserContext): string {
-  const condition = findMeaningfulCondition(rule.criteria as CriteriaNode);
+  const condition = findMeaningfulCondition(rule.criteria as unknown as CriteriaNode);
   if (condition) {
     const phrase = describeCondition(condition.field, condition.value, context);
     if (phrase) return `Assigned because ${phrase}.`;

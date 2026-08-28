@@ -632,14 +632,44 @@ async function runAssessmentAttempts(actor: Actor, params: ReportRunParams): Pro
 // 11. Training Matrix — delegates to matrix.ts, owned by another agent.
 // ---------------------------------------------------------------------------
 
+/**
+ * matrix.ts renders a people×requirement grid with its own internal
+ * pagination (25 people per matrix page). This report flattens that grid to
+ * one row per (person, requirement) pair, which is what a filterable,
+ * exportable table needs — the grid visualization itself lives on the
+ * dedicated matrix screen the compliance/training admin pages own.
+ */
 async function runTrainingMatrix(actor: Actor, params: ReportRunParams): Promise<ReportRunResult> {
+  const rowMode = params.filters.rowMode === "positions" ? "positions" : "people";
+  const matrixPage = Math.max(1, Math.floor(params.page) || 1);
+
   try {
-    const result = (await getTrainingMatrix(actor, params)) as unknown as {
-      rows?: Record<string, unknown>[];
-      total?: number;
-      summary?: Record<string, unknown>;
+    const matrix = await getTrainingMatrix(actor, {
+      rowMode,
+      page: matrixPage,
+      filters: {
+        departmentId: params.filters.departmentId || undefined,
+        workerType: params.filters.workerType || undefined,
+        courseId: params.filters.courseId || undefined,
+      },
+    });
+
+    const flattened: Record<string, unknown>[] = [];
+    for (const row of matrix.rows) {
+      for (const column of matrix.columns) {
+        flattened.push({
+          person: row.label,
+          sublabel: row.sublabel,
+          requirement: column.title,
+          status: row.cells[column.key] ?? "NOT_REQUIRED",
+        });
+      }
+    }
+    return {
+      rows: flattened,
+      total: flattened.length,
+      summary: { matrixTotalRows: matrix.total, matrixPage: matrix.page, matrixPageSize: matrix.pageSize },
     };
-    return { rows: result.rows ?? [], total: result.total ?? result.rows?.length ?? 0, summary: result.summary };
   } catch (error) {
     console.error("[reports] training_matrix failed", error);
     return { rows: [], total: 0, summary: { error: "Training matrix data is temporarily unavailable." } };
@@ -1363,12 +1393,17 @@ export const REPORTS: ReportDefinition[] = [
   {
     key: "training_matrix",
     name: "Training Matrix",
-    description: "People-by-requirement compliance matrix.",
+    description: "People-by-requirement compliance matrix, flattened to one row per person and requirement.",
     category: "Compliance",
     permission: "reports.view",
-    filters: ORG_FILTERS,
+    filters: [
+      { key: "rowMode", label: "Rows", type: "select", options: [{ value: "people", label: "People" }, { value: "positions", label: "Positions" }] },
+      { key: "departmentId", label: "Department", type: "select", options: departmentOptions },
+      { key: "workerType", label: "Worker type", type: "select", options: WORKER_TYPE_OPTIONS },
+    ],
     columns: [
       { key: "person", label: "Person" },
+      { key: "sublabel", label: "Detail" },
       { key: "requirement", label: "Requirement", width: 2 },
       { key: "status", label: "Status", format: "badge" },
     ],

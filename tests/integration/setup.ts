@@ -26,7 +26,8 @@ process.env.FIELD_ENCRYPTION_KEY =
 process.env.AUTH_SECRET = process.env.AUTH_SECRET ?? "test-secret-not-for-production-use-000000";
 process.env.STORAGE_DRIVER = "local";
 process.env.LOCAL_STORAGE_DIR = "./storage/test";
-process.env.NODE_ENV = "test";
+// NODE_ENV is typed readonly by @types/node; Vitest already sets it to "test".
+Object.assign(process.env, { NODE_ENV: "test" });
 
 beforeAll(() => {
   execSync("npx prisma migrate deploy", {

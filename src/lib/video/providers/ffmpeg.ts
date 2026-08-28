@@ -165,15 +165,23 @@ function buildSceneSvg(opts: SceneSvgOptions): string {
   const titleLines = wrapText(scene.title, titleMaxChars, 2);
 
   const bulletMaxChars = Math.max(14, Math.floor((width - marginX * 2) / (bulletFontSize * 0.56)));
-  const maxBullets = Math.max(1, Math.floor((height * 0.24) / (bulletFontSize * 1.7)));
-  const bullets = scene.onScreenText.slice(0, maxBullets);
 
+  // Every header-row measurement is width-based (not height-based) so the
+  // header reads at a consistent visual weight across 16:9, 9:16, and 1:1 —
+  // and so bulletsAreaTop, derived from the same units, never collides with
+  // the logo row regardless of aspect ratio.
   const logoUnit = Math.round(width * 0.012);
   const logoX = marginX;
-  const logoY = Math.round(height * 0.06);
+  const logoY = Math.round(width * 0.033);
+  const headerRowBottom = logoY + logoUnit * 6.5;
+  const bulletsAreaTop = Math.round(headerRowBottom + logoUnit * 4);
+
+  // Bullets must stay clear of the lower-third band, whatever the aspect ratio.
+  const bulletsAreaHeight = Math.max(0, bandY - Math.round(height * 0.03) - bulletsAreaTop);
+  const maxBullets = Math.max(1, Math.floor(bulletsAreaHeight / (bulletFontSize * 1.8)));
+  const bullets = scene.onScreenText.slice(0, maxBullets);
 
   const titleStartY = bandY + Math.round(bandHeight * 0.34);
-  const bulletsAreaTop = Math.round(height * 0.1);
 
   const titleTspans = titleLines
     .map((line, i) => `<tspan x="${marginX}" dy="${i === 0 ? 0 : titleFontSize * 1.15}">${escapeXml(line)}</tspan>`)
@@ -315,17 +323,38 @@ async function concatClips(clipPaths: string[], listPath: string, outPath: strin
   await runFfmpeg(["-y", "-f", "concat", "-safe", "0", "-i", listPath, "-c", "copy", outPath]);
 }
 
-async function burnInCaptions(inputPath: string, vttPath: string, outPath: string): Promise<void> {
-  // libass reads .ass/.srt more reliably across builds than raw .vtt; ffmpeg's
-  // subtitles filter accepts .vtt directly when built with webvtt support,
-  // which this environment's ffmpeg (libass-enabled) supports.
-  const escaped = vttPath.replace(/:/g, "\\:");
+async function burnInCaptions(
+  inputPath: string,
+  vttPath: string,
+  outPath: string,
+  width: number,
+  height: number,
+): Promise<void> {
+  // ffmpeg's subtitles filter converts WebVTT to ASS internally and otherwise
+  // assumes a low default script resolution, which blows font sizes up on a
+  // real HD/portrait frame. `original_size` pins the coordinate space to the
+  // actual frame, and top alignment keeps captions clear of our own lower-
+  // third title band.
+  const escapedVtt = vttPath.replace(/:/g, "\\:").replace(/'/g, "'\\''");
+  const fontSize = Math.max(14, Math.round(width * 0.024));
+  const marginV = Math.round(height * 0.05);
+  const forceStyle = [
+    "FontName=DejaVu Sans",
+    `FontSize=${fontSize}`,
+    "PrimaryColour=&H00FFFFFF",
+    "OutlineColour=&H00102845",
+    "BorderStyle=1",
+    "Outline=2",
+    "Alignment=8",
+    `MarginV=${marginV}`,
+  ].join(",");
+
   await runFfmpeg([
     "-y",
     "-i",
     inputPath,
     "-vf",
-    `subtitles=${escaped}:force_style='FontName=DejaVu Sans,FontSize=18,PrimaryColour=&H00FFFFFF,OutlineColour=&H00102845,BorderStyle=1,Outline=2'`,
+    `subtitles=${escapedVtt}:original_size=${width}x${height}:force_style='${forceStyle}'`,
     "-c:v",
     "libx264",
     "-c:a",
@@ -411,7 +440,7 @@ export class FfmpegVideoProvider implements VideoProvider {
       if (process.env.FFMPEG_BURN_CAPTIONS === "1" && captionsVtt.trim().length > 0) {
         const burnedPath = path.join(workDir, "final.mp4");
         try {
-          await burnInCaptions(concatOutPath, vttPath, burnedPath);
+          await burnInCaptions(concatOutPath, vttPath, burnedPath, dims.width, dims.height);
           finalPath = burnedPath;
         } catch (error) {
           // Caption burn-in is a nice-to-have; never fail the whole render over it.
