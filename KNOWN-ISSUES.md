@@ -5,14 +5,21 @@ about each. Anything fixed is in the git history instead.
 
 ---
 
-## 1. Client-side navigation into `/courses/[id]` commits intermittently
+## 1. `next/link` navigations commit intermittently in production builds
 
-**Severity:** high — it makes course links on the catalog appear dead.
+**Severity:** high — affected links appear dead to the user.
 
 **Symptom.** In a **production build** (`next build && next start`), clicking a
-`next/link` whose target is `/courses/[id]` commits the navigation only about one
-attempt in three. When it fails there is no feedback of any kind: the page simply
-does not change. A user would conclude the link is broken.
+`next/link` sometimes does not navigate. There is no feedback of any kind: the
+page simply does not change, and a user would conclude the link is broken.
+
+It showed up most often on links into `/courses/[id]`, where it reproduced from
+`/catalog` on every attempt across many builds and roughly two attempts in three
+from `/home` and `/my-training`. It is **not** specific to that route: a
+same-route filter link (`/my-training?filter=completed`) failed the same way
+during a full suite run having passed in earlier ones. Which links fail varies
+between runs and even between rounds within one build, which is what rules out
+the application's own module graph as the cause.
 
 **What was established**
 
@@ -59,8 +66,15 @@ routing to hide a fault that may not exist in production.
 
 **Reproduction.** `e2e/learner-journey.spec.ts` contains a `test.fixme` named
 "client-side navigation from the catalog into a course commits". Remove the
-`.fixme` to run it. The neighbouring tests assert the link targets and load the
-destinations directly, so they still verify that the pages and hrefs are correct.
+`.fixme` to run it.
+
+**Effect on the test suite.** Tests that used to click through a link now assert
+its `href` and then load the target with `page.goto`. That still verifies the
+link points somewhere real and that the destination renders, but it does not
+exercise client-side routing — so the suite would not catch a regression in it.
+Two places still click a `next/link` deliberately (the SOP library title link,
+and the mobile drawer's navigation link), because those have been reliable and
+keep some coverage of real navigation.
 
 **Next steps if it reproduces off this container:** capture a React profiler
 trace across the transition to find which boundary suspends without resolving,

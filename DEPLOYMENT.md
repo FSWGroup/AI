@@ -63,6 +63,19 @@ Migrations create these too, but confirming first avoids a failed first deploy.
 Use a **pooled** connection string for the application (Vercel functions open
 many short-lived connections) and a **direct** connection for migrations.
 
+**Size the Prisma pool explicitly.** Prisma defaults `connection_limit` to
+`(CPU cores × 2) + 1` — only 9 on a 4-core host. That is low for this
+application: rendering a page issues several queries in parallel, and the App
+Router prefetches the links on a page, each prefetch server-rendering a whole
+route. A single navigation can therefore need dozens of connections at once, and
+requests beyond the limit queue until `pool_timeout` (10s by default) and then
+fail. Set it deliberately, keeping the total across all instances below the
+database's `max_connections`:
+
+```
+DATABASE_URL="postgresql://…?schema=public&connection_limit=25&pool_timeout=20"
+```
+
 ### 2. Environment variables
 
 Set these in the Vercel project (Production scope). Full documentation in

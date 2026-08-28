@@ -195,6 +195,25 @@ database.**
 Sign in as `jordan.pace@fswelsford.com` to see the learner and onboarding
 experience, then as `training.admin@fswelsford.com` to see authoring.
 
+### What the seed produces
+
+Content and rules alone would leave every learner screen on its empty state, so
+the seed also materialises working state — and it does so by calling the same
+services the running application calls, not by writing rows directly. The
+assignment rule engine and position requirements create the assignments, so each
+card carries the reason the engine actually generated; completing a course's
+required lessons runs the real completion path, which writes the immutable
+completion record, issues a real certificate and awards the course's skills.
+
+A fresh seed leaves roughly 31 assignments across 14 people, spread per person so
+everyone has something overdue, something due within the week and something
+further out, plus four course completions with certificates, one course in
+progress, and three policy acknowledgements. Re-running the seed converges on the
+same state rather than duplicating it.
+
+Because rule-driven assignment depends on start dates and due dates relative to
+today, the exact overdue/due-soon split shifts with the clock.
+
 ---
 
 ## Commands
@@ -333,6 +352,7 @@ npm run start                 # plus at least one `npm run worker`
 | [AI.md](AI.md) | Provider abstraction, RAG design, authorization filtering, prompt-injection defense |
 | [VIDEO.md](VIDEO.md) | Video pipeline, render jobs, providers, SOP-to-video tracking |
 | [CONVENTIONS.md](CONVENTIONS.md) | Coding conventions for contributors |
+| [KNOWN-ISSUES.md](KNOWN-ISSUES.md) | Open defects and environment limitations, with the evidence for each |
 
 ---
 

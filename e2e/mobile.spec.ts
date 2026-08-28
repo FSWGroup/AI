@@ -4,46 +4,60 @@ import { signIn } from "./helpers";
 /**
  * Mobile experience.
  *
- * Runs under the iPhone 13 device profile (see playwright.config.ts). An
- * employee should comfortably read procedures, complete training, and search
- * from a phone — so these check the things that actually break on small
- * screens: horizontal overflow, off-canvas navigation, and tap target size.
+ * Runs under a Chromium phone profile (see playwright.config.ts). An employee
+ * should comfortably read procedures, complete training, and search from a
+ * phone — so these check the things that actually break on small screens:
+ * horizontal overflow, off-canvas navigation, and tap target size.
  */
+
+/**
+ * The drawer slides in over 200ms (`transition-transform duration-200`).
+ * `boundingBox()` takes one instantaneous sample, so reading it straight after a
+ * click catches the panel mid-animation; poll instead of sampling once.
+ */
+async function expectDrawerOffCanvas(page: import("@playwright/test").Page) {
+  await expect
+    .poll(async () => (await page.getByRole("navigation", { name: "Main navigation" }).boundingBox())?.x ?? 0)
+    .toBeLessThan(0);
+}
+
+async function expectDrawerOnScreen(page: import("@playwright/test").Page) {
+  await expect
+    .poll(async () => (await page.getByRole("navigation", { name: "Main navigation" }).boundingBox())?.x ?? -1)
+    .toBeGreaterThanOrEqual(0);
+}
 
 test.describe("Mobile navigation", () => {
   test("the sidebar is off-canvas and opens from the menu button", async ({ page }) => {
     await signIn(page, "learner");
 
-    const nav = page.getByRole("navigation", { name: "Main navigation" });
     const menuButton = page.getByRole("button", { name: /open navigation/i });
 
     // The menu button only exists on small screens.
     await expect(menuButton).toBeVisible();
 
     // Off-canvas: present in the DOM but shifted out of view.
-    const boxBefore = await nav.boundingBox();
-    expect(boxBefore?.x ?? 0).toBeLessThan(0);
+    await expectDrawerOffCanvas(page);
 
     await menuButton.click();
-    const boxAfter = await nav.boundingBox();
-    expect(boxAfter?.x ?? -1).toBeGreaterThanOrEqual(0);
+    await expectDrawerOnScreen(page);
 
-    // Escape closes it, and focus is not trapped afterwards.
+    // Escape closes it again.
     await page.keyboard.press("Escape");
-    const boxClosed = await nav.boundingBox();
-    expect(boxClosed?.x ?? 0).toBeLessThan(0);
+    await expectDrawerOffCanvas(page);
   });
 
   test("the drawer closes after following a link", async ({ page }) => {
     await signIn(page, "learner");
 
     await page.getByRole("button", { name: /open navigation/i }).click();
+    await expectDrawerOnScreen(page);
+
     const nav = page.getByRole("navigation", { name: "Main navigation" });
     await nav.getByRole("link", { name: "My Training", exact: true }).click();
 
     await page.waitForURL(/my-training/);
-    const box = await nav.boundingBox();
-    expect(box?.x ?? 0).toBeLessThan(0);
+    await expectDrawerOffCanvas(page);
   });
 });
 
@@ -109,14 +123,12 @@ test.describe("Mobile reading and search", () => {
     await signIn(page, "learner");
     await page.goto("/sops");
 
-    const firstSop = page.getByRole("link").filter({ hasText: /quote|receiv|acceptable|find an sop/i }).first();
-    if ((await firstSop.count()) === 0) {
-      test.skip(true, "No seeded SOP link found on the library page");
-      return;
-    }
-
+    // Asserted rather than guarded by count(), which does not auto-wait and so
+    // skipped this whenever the library was still rendering.
+    const firstSop = page.getByRole("link", { name: /create a customer quote/i });
+    await expect(firstSop).toBeVisible();
     await firstSop.click();
-    await expect(page.locator("h1")).toBeVisible();
+    await expect(page.getByRole("heading", { level: 1 })).toBeVisible();
 
     const overflow = await page.evaluate(
       () => document.documentElement.scrollWidth - document.documentElement.clientWidth,
@@ -128,12 +140,10 @@ test.describe("Mobile reading and search", () => {
     await signIn(page, "learner");
     await page.goto("/sops");
 
-    const sopLink = page.getByRole("link").filter({ hasText: /quote/i }).first();
-    if ((await sopLink.count()) === 0) {
-      test.skip(true, "No seeded SOP with a table found");
-      return;
-    }
+    const sopLink = page.getByRole("link", { name: /create a customer quote/i });
+    await expect(sopLink).toBeVisible();
     await sopLink.click();
+    await expect(page.getByRole("heading", { level: 1 })).toBeVisible();
 
     // Any table on the page must sit inside a horizontally scrollable wrapper.
     const tables = page.locator("table");

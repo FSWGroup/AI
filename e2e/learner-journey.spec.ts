@@ -20,9 +20,12 @@ test.describe("Learner dashboard", () => {
      * rule engine. Asserting on a named seeded course rather than a loose
      * keyword match matters: a pattern like /assigned/ is also satisfied by the
      * words "No training assigned yet", so an empty dashboard would pass.
+     *
+     * The Customer Quote Process is the one the learner has started and is now
+     * late on, so the dashboard has to surface it.
      */
     await expect(
-      page.getByRole("link", { name: /cybersecurity fundamentals/i }).first(),
+      page.getByRole("link", { name: /customer quote process/i }).first(),
     ).toBeVisible();
   });
 
@@ -40,14 +43,29 @@ test.describe("Learner dashboard", () => {
     // urgency grouping has a section to render.
     await expect(page.getByRole("heading", { name: /overdue/i }).first()).toBeVisible();
 
-    // The filter tabs keep state in the URL so a view is shareable. Scoped to
-    // the filter navigation, because a card can also mention a completion date.
+    /*
+     * The filter tabs keep state in the URL so a view is shareable. Scoped to
+     * the filter navigation, because a card can also mention a completion date.
+     *
+     * The href is asserted and then followed with a document load rather than
+     * clicked: clicking goes through Next's client router, which drops
+     * navigations intermittently in this environment (see KNOWN-ISSUES.md).
+     */
     const filters = page.getByRole("navigation", { name: /filter training/i });
-    await filters.getByRole("link", { name: /completed/i }).click();
+    const completedTab = filters.getByRole("link", { name: /completed/i });
+    await expect(completedTab).toBeVisible();
+    expect(await completedTab.getAttribute("href")).toContain("filter=completed");
+
+    await page.goto("/my-training?filter=completed");
     await expect(page).toHaveURL(/filter=completed/);
 
-    // Switching filters must actually change the view, not just the URL.
-    await expect(page.getByRole("heading", { name: "My Training" })).toBeVisible();
+    /*
+      The filter must actually change the view. Cybersecurity Fundamentals is
+      the completed *assigned* course — only an assignment appears in this list,
+      so the optional course the learner also finished is not expected here.
+    */
+    await expect(page.getByText(/cybersecurity fundamentals/i).first()).toBeVisible();
+    await expect(page.getByRole("heading", { name: /^overdue/i })).toHaveCount(0);
   });
 
   test("the empty state offers a next action rather than a blank screen", async ({ page }) => {
@@ -214,9 +232,9 @@ test.describe("Certificates and transcript", () => {
     await signIn(page, "learner");
     await page.goto("/certificates");
 
-    // The seeded learner completed the welcome course through the real
-    // completion path, so a certificate exists with an FSW serial number.
-    await expect(page.getByText(/welcome to fsw/i).first()).toBeVisible();
+    // The seeded learner completed courses through the real completion path, so
+    // certificates exist with FSW serial numbers.
+    await expect(page.getByText(/cybersecurity fundamentals/i).first()).toBeVisible();
     await expect(page.getByText(/FSW-\d{4}-\d+/).first()).toBeVisible();
 
     // The download must serve an actual PDF, not a dead link.
@@ -238,7 +256,11 @@ test.describe("Certificates and transcript", () => {
     await page.goto("/transcript");
 
     await expect(page.locator("h1")).toBeVisible();
-    // The completion the seed produced must appear as a transcript entry.
+    /*
+      Both completions belong on the transcript: the assigned course and the
+      optional one the learner took without an assignment.
+    */
+    await expect(page.getByText(/cybersecurity fundamentals/i).first()).toBeVisible();
     await expect(page.getByText(/welcome to fsw/i).first()).toBeVisible();
   });
 });

@@ -165,12 +165,23 @@ export async function seedDemonstrationState(
   let partials = 0;
   let acknowledgements = 0;
 
-  // A recent hire part-way through onboarding: one course finished (so the
-  // transcript and a certificate are real), one in progress, one still to do.
+  // A recent hire part-way through onboarding: one required course finished, one
+  // in progress, one still outstanding, plus an optional course taken by choice.
   const welcomeId = courseIds.get("welcome");
   const cyberId = courseIds.get("cyber");
   const quoteId = courseIds.get("quote-process");
 
+  /*
+   * Cybersecurity first, because it is the one the company-wide rule assigns to
+   * everyone. Completing an *assigned* course is what populates the Completed
+   * view, the compliance roll-up and the manager's team status — finishing only
+   * an unassigned course leaves all three empty.
+   */
+  if (learner && cyberId && (await completeCourseAsLearner(prisma, learner, cyberId))) {
+    completions += 1;
+  }
+  // The welcome course is optional and unassigned: a completion with no
+  // assignment behind it, which the transcript still has to render.
   if (learner && welcomeId && (await completeCourseAsLearner(prisma, learner, welcomeId))) {
     completions += 1;
   }
@@ -211,38 +222,62 @@ export async function seedDemonstrationState(
 
   console.log("→ Spreading due dates so urgency grouping is demonstrable");
 
-  // 3. A realistic spread of due dates. Without this every assignment shares
-  //    one due date and the "overdue / due soon / later" grouping, the
-  //    compliance matrix and the reminder job all look identical.
+  /*
+   * 3. A realistic spread of due dates. Without this every assignment shares one
+   *    due date, so the overdue / due-soon / later grouping, the compliance
+   *    matrix and the reminder job all look identical.
+   *
+   *    Bucketed per person, not across the whole table: a global index leaves
+   *    some people with nothing overdue and others with nothing but, so a
+   *    manager's roll-up and any given learner's My Training could each show a
+   *    single flat state. Cycling within each person's own list gives everyone
+   *    at least one overdue and one due-soon item once they have two or more.
+   */
   const outstanding = await prisma.assignment.findMany({
-    where: { status: { in: ["ASSIGNED", "IN_PROGRESS"] } },
-    select: { id: true, userId: true },
-    orderBy: { id: "asc" },
+    // OVERDUE is included so a second seed run re-buckets the same rows instead
+    // of skipping them, which would let overdue counts grow on every run.
+    where: { status: { in: ["ASSIGNED", "IN_PROGRESS", "OVERDUE"] } },
+    select: { id: true, userId: true, status: true },
+    orderBy: [{ userId: "asc" }, { id: "asc" }],
   });
+
+  const byUser = new Map<string, { id: string; status: string }[]>();
+  for (const assignment of outstanding) {
+    const list = byUser.get(assignment.userId) ?? [];
+    list.push({ id: assignment.id, status: assignment.status });
+    byUser.set(assignment.userId, list);
+  }
 
   let overdue = 0;
   let dueSoon = 0;
-  for (const [index, assignment] of outstanding.entries()) {
-    // Deterministic: every third outstanding item is overdue, every third
-    // remaining one is due within the week, the rest sit further out.
-    const bucket = index % 3;
-    if (bucket === 0) {
-      await prisma.assignment.update({
-        where: { id: assignment.id },
-        data: { assignedAt: daysAgo(45), dueAt: daysAgo(9), status: "OVERDUE" },
-      });
-      overdue += 1;
-    } else if (bucket === 1) {
-      await prisma.assignment.update({
-        where: { id: assignment.id },
-        data: { assignedAt: daysAgo(20), dueAt: daysFromNow(4) },
-      });
-      dueSoon += 1;
-    } else {
-      await prisma.assignment.update({
-        where: { id: assignment.id },
-        data: { assignedAt: daysAgo(6), dueAt: daysFromNow(21) },
-      });
+  for (const assignments of byUser.values()) {
+    for (const [index, assignment] of assignments.entries()) {
+      const bucket = index % 3;
+      if (bucket === 0) {
+        await prisma.assignment.update({
+          where: { id: assignment.id },
+          data: {
+            assignedAt: daysAgo(45),
+            dueAt: daysAgo(9),
+            // Only promote an untouched assignment to OVERDUE. Someone who has
+            // started and run late is still IN_PROGRESS — overwriting that
+            // would erase the in-progress example from every screen.
+            ...(assignment.status === "ASSIGNED" ? { status: "OVERDUE" as const } : {}),
+          },
+        });
+        overdue += 1;
+      } else if (bucket === 1) {
+        await prisma.assignment.update({
+          where: { id: assignment.id },
+          data: { assignedAt: daysAgo(20), dueAt: daysFromNow(4) },
+        });
+        dueSoon += 1;
+      } else {
+        await prisma.assignment.update({
+          where: { id: assignment.id },
+          data: { assignedAt: daysAgo(6), dueAt: daysFromNow(21) },
+        });
+      }
     }
   }
 

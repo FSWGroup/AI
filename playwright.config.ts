@@ -55,7 +55,16 @@ export default defineConfig({
     trace: "retain-on-failure",
     screenshot: "only-on-failure",
     video: "off",
-    ...(executablePath ? { launchOptions: { executablePath } } : {}),
+    launchOptions: {
+      ...(executablePath ? { executablePath } : {}),
+      /*
+       * Containers commonly run as root, where Chromium refuses to start its
+       * zygote sandbox ("Running as root without --no-sandbox is not
+       * supported"). The browser here only ever loads this application's own
+       * pages from localhost.
+       */
+      args: ["--no-sandbox"],
+    },
   },
 
   projects: [
@@ -65,8 +74,14 @@ export default defineConfig({
       testIgnore: /mobile\.spec\.ts/,
     },
     {
+      /*
+       * A Chromium-based phone profile, not an iPhone one: the iPhone
+       * descriptors default to WebKit, which this environment does not ship, so
+       * every mobile test failed at browser launch. Pixel 7 exercises the same
+       * narrow viewport and touch/mobile emulation on the Chromium we have.
+       */
       name: "mobile",
-      use: { ...devices["iPhone 13"] },
+      use: { ...devices["Pixel 7"] },
       testMatch: /mobile\.spec\.ts/,
     },
   ],
