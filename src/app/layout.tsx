@@ -7,6 +7,7 @@ const inter = Inter({ subsets: ['latin'], variable: '--font-inter' });
 export const metadata: Metadata = {
   title: { template: '%s · FSW People', default: 'FSW People' },
   description: 'Everything about our people, in one place.',
+  icons: { icon: '/icon.svg' },
 };
 
 export const viewport: Viewport = {
