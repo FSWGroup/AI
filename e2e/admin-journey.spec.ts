@@ -207,8 +207,7 @@ test.describe("People administration", () => {
 
     const personLink = page.getByRole("link", { name: /jordan pace/i }).first();
     await expect(personLink).toBeVisible();
-    const href = await personLink.getAttribute("href");
-    await page.goto(href!);
+    await personLink.click();
     await expect(page.getByRole("heading", { level: 1, name: /jordan pace/i })).toBeVisible();
 
     /*
@@ -272,11 +271,9 @@ test.describe("Compliance and reporting", () => {
       .first();
 
     await expect(reportLink).toBeVisible();
-    const href = await reportLink.getAttribute("href");
-    expect(href, "a report link needs a real target").toBeTruthy();
 
     // The report must actually run and render, not just be listed.
-    await page.goto(href!);
+    await reportLink.click();
     await expect(page.getByRole("heading", { level: 1 })).toBeVisible();
     await expect(page.getByRole("table").or(page.getByText(/no rows|no results/i)).first()).toBeVisible();
   });

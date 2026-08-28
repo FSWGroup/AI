@@ -46,17 +46,11 @@ test.describe("Learner dashboard", () => {
     /*
      * The filter tabs keep state in the URL so a view is shareable. Scoped to
      * the filter navigation, because a card can also mention a completion date.
-     *
-     * The href is asserted and then followed with a document load rather than
-     * clicked: clicking goes through Next's client router, which drops
-     * navigations intermittently in this environment (see KNOWN-ISSUES.md).
      */
     const filters = page.getByRole("navigation", { name: /filter training/i });
     const completedTab = filters.getByRole("link", { name: /completed/i });
     await expect(completedTab).toBeVisible();
-    expect(await completedTab.getAttribute("href")).toContain("filter=completed");
-
-    await page.goto("/my-training?filter=completed");
+    await completedTab.click();
     await expect(page).toHaveURL(/filter=completed/);
 
     /*
@@ -149,7 +143,7 @@ test.describe("Finding knowledge", () => {
 });
 
 test.describe("Working through a course", () => {
-  test("the catalog links each course by title", async ({ page }) => {
+  test("the catalog opens a course from its title link", async ({ page }) => {
     await signIn(page, "learner");
     await page.goto("/catalog");
 
@@ -158,55 +152,40 @@ test.describe("Working through a course", () => {
      * navigable by assistive technology: the footer actions read "View" and
      * "View details" on every card, so without the title link a screen reader's
      * link list could not tell the courses apart.
-     *
-     * This asserts the link's target rather than clicking it. Clicking exercises
-     * Next's client-side router, which is unreliable in this environment — see
-     * the fixme below and KNOWN-ISSUES.md.
      */
     const courseLink = page.getByRole("link", { name: /^cybersecurity fundamentals$/i });
     await expect(courseLink).toBeVisible();
-    const href = await courseLink.getAttribute("href");
-    expect(href).toMatch(/^\/courses\/[a-z0-9]+$/);
+    await courseLink.click();
 
-    // The target really renders that course.
-    await page.goto(href!);
     await expect(
       page.getByRole("heading", { level: 1, name: /cybersecurity fundamentals/i }),
     ).toBeVisible();
   });
 
-  test.fixme(
-    "client-side navigation from the catalog into a course commits",
-    async ({ page }) => {
-      /*
-       * Known defect, tracked in KNOWN-ISSUES.md: in a production build, clicking
-       * a `next/link` into `/courses/[id]` commits only intermittently (~1 attempt
-       * in 3). The click is received and its default prevented, the RSC response
-       * returns 200 with a complete payload in well under a second, then the
-       * transition never commits: no chunk request, no console error, no error
-       * boundary, and the URL is unchanged 45s later. A plain anchor to the same
-       * URL is 100% reliable, and `next dev` is unaffected.
-       *
-       * Ruled out: prefetch on/off, React 19.1.1 and 19.2.8, duplicate React
-       * copies, `scroll-behavior: smooth`, Prisma pool size, server render time
-       * (54-120ms), server action module placement, and parallel/intercepting
-       * routes.
-       */
-      await signIn(page, "learner");
+  /*
+   * Clicking, repeatedly, on purpose. A loading boundary at the app root used to
+   * leave client-side navigations unable to commit in production builds — links
+   * simply did nothing, about two attempts in three. One click can pass by luck,
+   * so this walks in and out several times.
+   */
+  test("client-side navigation into a course commits every time", async ({ page }) => {
+    await signIn(page, "learner");
+
+    for (let attempt = 1; attempt <= 4; attempt += 1) {
       await page.goto("/catalog");
       await page.getByRole("link", { name: /^cybersecurity fundamentals$/i }).click();
-      await expect(page).toHaveURL(/\/courses\//, { timeout: 10_000 });
-    },
-  );
+      await expect(page, `attempt ${attempt} did not navigate`).toHaveURL(/\/courses\//, {
+        timeout: 8000,
+      });
+    }
+  });
 
   test("a course page offers a real way to start, which opens a lesson", async ({ page }) => {
     await signIn(page, "learner");
 
     await page.goto("/catalog");
-    const href = await page
-      .getByRole("link", { name: /^cybersecurity fundamentals$/i })
-      .getAttribute("href");
-    await page.goto(href!);
+    await page.getByRole("link", { name: /^cybersecurity fundamentals$/i }).click();
+    await expect(page).toHaveURL(/\/courses\//);
 
     /*
      * Scoped to the page body: the sidebar's "Help & getting started" link also
@@ -218,11 +197,10 @@ test.describe("Working through a course", () => {
       .getByRole("link", { name: /^(start|continue)$/i })
       .first();
     await expect(start).toBeVisible();
+    await start.click();
 
-    // The action must lead to a real lesson, not sit inert.
-    const lessonHref = await start.getAttribute("href");
-    expect(lessonHref, "the start action needs a real target").toMatch(/lesson/i);
-    await page.goto(lessonHref!);
+    // Landing on a lesson URL proves the action is wired up.
+    await expect(page).toHaveURL(/lesson/i, { timeout: 20_000 });
     await expect(page.locator("h1")).toBeVisible();
   });
 });

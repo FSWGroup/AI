@@ -112,6 +112,20 @@ import { Icon, Glyph } from "@/components/icons";
   (`navy-700`, `steel-100`, `success-600`) are fine; raw hex is not.
 - Status is never conveyed by color alone — always include text.
 
+### No file-based `loading.tsx` boundaries
+
+There are deliberately none in this app. A `loading.tsx` above the segment being
+navigated to made client-side transitions fail to commit intermittently in
+production builds — links did nothing at all, with no error anywhere. A root-level
+one is the worst case (it wraps the whole document, so every transition unmounts
+the shell), but a route-group one still broke same-segment navigation. Server
+renders are 70–120ms and Next keeps the current page visible until the next is
+ready, so nothing is lost.
+
+If a genuinely slow page needs an indicator, use a per-link pending state
+(`useLinkStatus`) or a skeleton the page renders itself — not a route boundary —
+and re-run the navigation probe described in `KNOWN-ISSUES.md` before merging.
+
 ## Accessibility (WCAG 2.2 AA)
 
 - Focus is always visible; never remove outlines.
