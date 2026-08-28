@@ -164,10 +164,21 @@ export default async function CatalogPage({
           </div>
         </form>
 
-        <div className="flex flex-col gap-4">
-          <p className="text-[0.8125rem] text-[var(--text-muted)]">
-            {total} course{total === 1 ? "" : "s"}
-          </p>
+        {/*
+          The results region carries its own h2 so the heading outline runs
+          h1 → h2 (Courses) → h3 (each course title) with no gap. A screen
+          reader user navigating by heading can also jump straight to the
+          results, past the filter form.
+        */}
+        <section aria-labelledby="catalog-results" className="flex flex-col gap-4">
+          <div className="flex items-baseline gap-2">
+            <h2 id="catalog-results" className="text-[1rem] font-semibold text-[var(--text-primary)]">
+              Courses
+            </h2>
+            <p className="text-[0.8125rem] text-[var(--text-muted)]">
+              {total} result{total === 1 ? "" : "s"}
+            </p>
+          </div>
 
           {items.length === 0 ? (
             <EmptyState
@@ -249,7 +260,7 @@ export default async function CatalogPage({
               </Link>
             </div>
           )}
-        </div>
+        </section>
       </PageBody>
     </>
   );

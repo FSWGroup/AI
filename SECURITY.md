@@ -60,6 +60,13 @@ Sessions are JWT-based with a 12-hour default lifetime
 (`SESSION_MAX_AGE_SECONDS`), delivered in `HttpOnly`, `SameSite=Lax`, `Secure`
 cookies. Every sign-in writes an audit event.
 
+**Sign-out** goes through the Auth.js client helper rather than a plain form
+post, because the sign-out endpoint requires a CSRF token. A bare POST is
+rejected — which would close the menu and leave the person signed in while
+believing otherwise, an obvious hazard on a shared workstation. There is an
+end-to-end test asserting that a protected page is unreachable after signing
+out, so this cannot regress silently.
+
 ---
 
 ## Authorization
