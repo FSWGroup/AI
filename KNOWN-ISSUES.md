@@ -33,9 +33,17 @@ content before any real rollout.
 
 Not defects, but where to look first if something is wrong.
 
-- **Deep authoring flows.** The block editor, course builder, question editor and
-  path builder are covered at the load-and-render level, not click-by-click. The
-  learner and security paths are covered thoroughly.
+- **Deep authoring flows.** The main paths are now covered click-by-click:
+  creating, filling, publishing and archiving an SOP, and creating a course with
+  a section and a lesson, publishing it and archiving it
+  (`e2e/authoring-workflow.spec.ts`). Still thinner than the learner surfaces:
+  the question editor's per-type forms, lesson type switching, SCORM upload, and
+  the path builder's reordering are exercised at the load-and-render level only.
+- **E2E runs against the seeded development database.** The authoring suites
+  create real content and archive it, but nothing hard-deletes, so archived test
+  content accumulates and a failed run can leave a draft. Everything is prefixed
+  `E2E`. Pointing the harness at a disposable database would remove the need to
+  tidy up by hand.
 - **Load and concurrency.** Nothing has been run against realistic concurrency or
   a five-thousand-person organization. Size the Prisma connection pool before you
   find out the hard way — see the note in `DEPLOYMENT.md`.
