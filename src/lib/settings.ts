@@ -144,14 +144,26 @@ async function loadSettings(): Promise<AppSettings> {
   };
 }
 
-/**
- * Cached settings read. Settings change rarely and are read on nearly every
- * request, so they are cached and explicitly invalidated on write.
- */
-export const getSettings = unstable_cache(loadSettings, ["app-settings"], {
+const cachedSettings = unstable_cache(loadSettings, ["app-settings"], {
   tags: [SETTINGS_TAG],
   revalidate: 300,
 });
+
+/**
+ * Read application settings.
+ *
+ * Cached per request tag, because settings change rarely and are read on nearly
+ * every page. Outside a Next.js request or render scope — the background worker,
+ * seed scripts, tests — `unstable_cache` has no store to attach to, so the read
+ * falls back to querying directly. Callers get correct settings either way.
+ */
+export async function getSettings(): Promise<AppSettings> {
+  try {
+    return await cachedSettings();
+  } catch {
+    return loadSettings();
+  }
+}
 
 /** Convenience accessor used in page titles and emails. */
 export async function getAppName(): Promise<string> {
@@ -168,5 +180,11 @@ export async function updateSettingSection(
     create: { key, value: value as never, updatedBy },
     update: { value: value as never, updatedBy },
   });
-  revalidateTag(SETTINGS_TAG);
+
+  try {
+    revalidateTag(SETTINGS_TAG);
+  } catch {
+    // Outside a request scope there is no cache to invalidate, and the write
+    // above has already landed. Never fail a settings save over this.
+  }
 }

@@ -17,6 +17,8 @@ import path from "node:path";
  */
 
 const alias = {
+  // Most specific first: Vite matches aliases in order.
+  "@/lib/auth/config": path.resolve(__dirname, "./tests/auth-config-stub.ts"),
   "@": path.resolve(__dirname, "./src"),
   "server-only": path.resolve(__dirname, "./tests/server-only-stub.ts"),
 };
