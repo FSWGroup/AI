@@ -21,7 +21,7 @@ export function DiscussionPlayer({ lesson, progress, viewer, extra, onComplete, 
     if (!postComment || !body.trim()) return;
     setSubmitting(true);
     try {
-      const result = await postComment({ body: body.trim() });
+      const result = await postComment({ lessonId: lesson.id, body: body.trim() });
       if (!result.ok) {
         toast.error(result.error ?? "Couldn't post your comment.");
         return;

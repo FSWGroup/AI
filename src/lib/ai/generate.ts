@@ -65,7 +65,7 @@ export function sanitizeSourceText(text: string, maxChars = 24000): string {
  * the ai.generation_requested audit event — the pattern every exported
  * function in this file follows.
  */
-async function runGeneration<T>(
+export async function runGeneration<T>(
   actor: Actor,
   kind: string,
   input: Record<string, unknown>,

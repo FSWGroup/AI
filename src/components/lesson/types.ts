@@ -81,26 +81,28 @@ export interface LessonPlayerProps {
   /** Called after any non-terminal progress update, so the shell can refresh. */
   onProgress: () => void;
   /**
-   * Bound server action for ACKNOWLEDGEMENT/SIGNATURE lessons. The action
-   * itself reads IP and User-Agent from request headers server-side — the
-   * client only supplies the typed signature, never the evidence fields.
+   * Server actions imported directly from the page's actions.ts and passed
+   * through unwrapped — each takes the lesson id explicitly rather than
+   * relying on a closure, so props stay plain, serializable references.
+   *
+   * The acknowledge action reads IP and User-Agent from request headers
+   * server-side — the client only supplies the typed signature, never the
+   * evidence fields.
    */
-  acknowledge?: (input: { typedSignature?: string }) => Promise<{ ok: boolean; error?: string }>;
-  /** Bound server action for MANAGER_SIGNOFF / PRACTICAL_DEMO lessons — records a manager's rating for one of their reviewable teammates. */
+  acknowledge?: (input: { lessonId: string; typedSignature?: string }) => Promise<{ ok: boolean; error?: string }>;
+  /** Records a manager's rating for one of their reviewable teammates. */
   assessPractical?: (input: {
+    lessonId: string;
     userId: string;
     rating: "NOT_DEMONSTRATED" | "NEEDS_COACHING" | "COMPETENT" | "HIGHLY_COMPETENT";
     comments?: string;
   }) => Promise<{ ok: boolean; error?: string }>;
-  /** Bound server action for ASSIGNMENT_PROJECT lessons. */
-  submitProject?: (input: { mediaId?: string; note?: string }) => Promise<{ ok: boolean; error?: string }>;
-  /** Bound server action for LIVE_SESSION lessons. */
-  registerForSession?: () => Promise<{ ok: boolean; error?: string }>;
-  /** Bound server action for DISCUSSION lessons. */
-  postComment?: (input: { body: string; parentId?: string }) => Promise<{ ok: boolean; error?: string }>;
+  submitProject?: (input: { lessonId: string; mediaId?: string; note?: string }) => Promise<{ ok: boolean; error?: string }>;
+  registerForSession?: (lessonId: string) => Promise<{ ok: boolean; error?: string }>;
+  postComment?: (input: { lessonId: string; body: string; parentId?: string }) => Promise<{ ok: boolean; error?: string }>;
 
   // Quiz engine actions (QUIZ lessons only).
-  startQuizAttempt?: () => Promise<{ ok: boolean; error?: string; data?: QuizAttemptView }>;
+  startQuizAttempt?: (lessonId: string) => Promise<{ ok: boolean; error?: string; data?: QuizAttemptView }>;
   submitQuizAttempt?: (
     attemptId: string,
     answers: Record<string, unknown>,

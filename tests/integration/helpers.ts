@@ -6,7 +6,7 @@ import {
   ROLE_LABELS,
   type RoleKey,
 } from "@/lib/permissions";
-import type { Actor } from "@/lib/auth/guard";
+import type { Actor } from "@/lib/auth/scope";
 import type { Permission } from "@/lib/permissions";
 
 /**
@@ -29,6 +29,13 @@ export async function resetDatabase(): Promise<void> {
   await testPrisma.$executeRawUnsafe(`TRUNCATE TABLE ${list} RESTART IDENTITY CASCADE`);
 }
 
+/**
+ * Seed roles and their default permissions.
+ *
+ * Call once per test after resetDatabase(). Deliberately NOT called from
+ * createUser: rebuilding the permission rows mid-test would momentarily empty
+ * them, and any Actor resolved in that window would appear to hold nothing.
+ */
 export async function seedRoles(): Promise<Map<RoleKey, string>> {
   const ids = new Map<RoleKey, string>();
   for (const key of Object.values(ROLE_KEYS)) {
@@ -36,16 +43,26 @@ export async function seedRoles(): Promise<Map<RoleKey, string>> {
       where: { key },
       create: { key, name: ROLE_LABELS[key], isSystem: true },
       update: {},
-      select: { id: true },
+      select: { id: true, permissions: { select: { permission: true } } },
     });
     ids.set(key, role.id);
-    await testPrisma.rolePermission.deleteMany({ where: { roleId: role.id } });
-    await testPrisma.rolePermission.createMany({
-      data: DEFAULT_ROLE_PERMISSIONS[key].map((permission) => ({ roleId: role.id, permission })),
-      skipDuplicates: true,
-    });
+
+    // Only fill in permissions when they are missing, so repeated calls are
+    // genuinely idempotent rather than delete-and-recreate.
+    if (role.permissions.length === 0) {
+      await testPrisma.rolePermission.createMany({
+        data: DEFAULT_ROLE_PERMISSIONS[key].map((permission) => ({ roleId: role.id, permission })),
+        skipDuplicates: true,
+      });
+    }
   }
   return ids;
+}
+
+/** Reset and seed in one call — the standard test setup. */
+export async function freshDatabase(): Promise<Map<RoleKey, string>> {
+  await resetDatabase();
+  return seedRoles();
 }
 
 export interface CreateUserOptions {
@@ -56,14 +73,19 @@ export interface CreateUserOptions {
   departmentId?: string;
   businessUnitId?: string;
   positionId?: string;
+  teamId?: string;
+  locationId?: string;
   workerType?: "US_EMPLOYEE" | "US_CONTRACTOR" | "PH_EMPLOYEE" | "PH_CONTRACTOR";
   country?: string;
   status?: "ACTIVE" | "INACTIVE" | "INVITED";
   startDate?: Date;
 }
 
+/**
+ * Create a user with real role rows. Assumes seedRoles() has already run —
+ * see the note on seedRoles above.
+ */
 export async function createUser(options: CreateUserOptions): Promise<string> {
-  const roleIds = await seedRoles();
   const passwordHash = await bcrypt.hash("test-password", 4);
 
   const user = await testPrisma.user.create({
@@ -79,18 +101,31 @@ export async function createUser(options: CreateUserOptions): Promise<string> {
       departmentId: options.departmentId ?? null,
       businessUnitId: options.businessUnitId ?? null,
       positionId: options.positionId ?? null,
+      teamId: options.teamId ?? null,
+      locationId: options.locationId ?? null,
       startDate: options.startDate ?? new Date("2025-01-01"),
       trainingStartDate: options.startDate ?? new Date("2025-01-01"),
     },
     select: { id: true },
   });
 
-  for (const key of options.roles ?? [ROLE_KEYS.LEARNER]) {
-    const roleId = roleIds.get(key);
-    if (roleId) {
-      await testPrisma.userRole.create({ data: { userId: user.id, roleId } });
-    }
+  const roleKeys = options.roles ?? [ROLE_KEYS.LEARNER];
+  const roles = await testPrisma.role.findMany({
+    where: { key: { in: roleKeys } },
+    select: { id: true },
+  });
+
+  if (roles.length !== roleKeys.length) {
+    throw new Error(
+      `createUser("${options.email}") requested roles [${roleKeys.join(", ")}] but only ` +
+        `${roles.length} exist. Call seedRoles() (or freshDatabase()) in your setup first.`,
+    );
   }
+
+  await testPrisma.userRole.createMany({
+    data: roles.map((role) => ({ userId: user.id, roleId: role.id })),
+    skipDuplicates: true,
+  });
 
   return user.id;
 }
@@ -130,13 +165,17 @@ export async function actorFor(userId: string): Promise<Actor> {
     for (const { permission } of role.permissions) permissions.add(permission as Permission);
   }
 
-  return { ...user, permissions, roleKeys };
+  const { roles: _roles, ...rest } = user;
+  return { ...rest, permissions, roleKeys };
 }
 
-export async function createOrgFixture() {
+export async function createOrgFixture(suffix = String(Date.now())) {
   const org = await testPrisma.organization.create({ data: { name: "Test Group" } });
   const businessUnit = await testPrisma.businessUnit.create({
-    data: { organizationId: org.id, name: "Test Unit", slug: `unit-${Date.now()}` },
+    data: { organizationId: org.id, name: "Test Unit", slug: `unit-${suffix}` },
+  });
+  const otherUnit = await testPrisma.businessUnit.create({
+    data: { organizationId: org.id, name: "Other Unit", slug: `other-${suffix}` },
   });
   const department = await testPrisma.department.create({
     data: { businessUnitId: businessUnit.id, name: "Sales" },
@@ -144,7 +183,7 @@ export async function createOrgFixture() {
   const position = await testPrisma.position.create({
     data: { departmentId: department.id, title: "Inside Sales Representative" },
   });
-  return { org, businessUnit, department, position };
+  return { org, businessUnit, otherUnit, department, position };
 }
 
 export async function createPublishedCourse(options: {
@@ -152,6 +191,8 @@ export async function createPublishedCourse(options: {
   createdById: string;
   passingScore?: number;
   recertifyMonths?: number;
+  departmentId?: string;
+  businessUnitId?: string;
 }) {
   const course = await testPrisma.course.create({
     data: {
@@ -161,6 +202,8 @@ export async function createPublishedCourse(options: {
       ownerId: options.createdById,
       passingScore: options.passingScore ?? 80,
       recertifyMonths: options.recertifyMonths ?? null,
+      departmentId: options.departmentId ?? null,
+      businessUnitId: options.businessUnitId ?? null,
     },
     select: { id: true },
   });
@@ -187,7 +230,10 @@ export async function createPublishedCourse(options: {
       courseId: course.id,
       versionNumber: "1.0",
       title: options.title,
-      snapshot: { title: options.title, sections: [] },
+      snapshot: {
+        title: options.title,
+        sections: [{ title: "Section 1", lessons: [{ title: "Lesson 1", type: "RICH_TEXT" }] }],
+      },
       authorId: options.createdById,
     },
     select: { id: true },
@@ -206,6 +252,7 @@ export async function createPublishedSop(options: {
   title: string;
   createdById: string;
   businessUnitId?: string;
+  departmentId?: string;
 }) {
   const blocks = [{ id: "b1", type: "paragraph", text: "Procedure body for testing." }];
   const meta = {
@@ -230,6 +277,7 @@ export async function createPublishedSop(options: {
       createdById: options.createdById,
       ownerId: options.createdById,
       businessUnitId: options.businessUnitId ?? null,
+      departmentId: options.departmentId ?? null,
       draftBlocks: blocks,
       draftMeta: meta,
       reviewCycleDays: 365,

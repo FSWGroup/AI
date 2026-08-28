@@ -4,6 +4,7 @@ import {
   createOrgFixture,
   createPublishedSop,
   createUser,
+  freshDatabase,
   resetDatabase,
   seedRoles,
   testPrisma,
@@ -24,14 +25,14 @@ beforeAll(async () => {
   await seedRoles();
 });
 
+
 afterAll(async () => {
   await testPrisma.$disconnect();
 });
 
 describe("effective permissions come from role rows", () => {
   beforeEach(async () => {
-    await resetDatabase();
-    await seedRoles();
+    await freshDatabase();
   });
 
   it("gives a learner the baseline and nothing administrative", async () => {
@@ -110,8 +111,7 @@ describe("manager scope walks the whole reporting tree", () => {
   let unrelated: string;
 
   beforeEach(async () => {
-    await resetDatabase();
-    await seedRoles();
+    await freshDatabase();
 
     director = await createUser({ email: "director@test.local", roles: [ROLE_KEYS.MANAGER] });
     manager = await createUser({
@@ -201,8 +201,7 @@ describe("manager scope walks the whole reporting tree", () => {
 
 describe("deactivated people", () => {
   beforeEach(async () => {
-    await resetDatabase();
-    await seedRoles();
+    await freshDatabase();
   });
 
   it("excludes an inactive person from a manager's visible set", async () => {
@@ -239,8 +238,7 @@ describe("deactivated people", () => {
 
 describe("published content visibility", () => {
   beforeEach(async () => {
-    await resetDatabase();
-    await seedRoles();
+    await freshDatabase();
   });
 
   it("keeps a draft SOP out of the published set a learner can read", async () => {

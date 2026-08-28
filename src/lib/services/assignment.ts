@@ -280,7 +280,7 @@ function describeAssignmentReason(rule: Pick<AssignmentRule, "name" | "criteria"
 // Context assembly (impure — reads the DB and the clock)
 // ---------------------------------------------------------------------------
 
-const USER_CONTEXT_INCLUDE = {
+export const USER_CONTEXT_INCLUDE = {
   department: { select: { id: true, name: true } },
   businessUnit: { select: { id: true, slug: true, name: true } },
   team: { select: { id: true, name: true } },

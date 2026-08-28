@@ -8,7 +8,7 @@ import { Icon } from "@/components/icons";
 import type { LessonPlayerProps } from "@/components/lesson/types";
 
 interface AckContent {
-  statement: string;
+  statement?: string;
   requireTypedSignature?: boolean;
 }
 
@@ -32,7 +32,7 @@ export function AcknowledgementPlayer({ lesson, progress, onComplete, acknowledg
     }
     setSubmitting(true);
     try {
-      const result = await acknowledge({ typedSignature: requireSignature ? signature.trim() : undefined });
+      const result = await acknowledge({ lessonId: lesson.id, typedSignature: requireSignature ? signature.trim() : undefined });
       if (!result.ok) {
         toast.error(result.error ?? "Couldn't record your acknowledgement.");
         return;

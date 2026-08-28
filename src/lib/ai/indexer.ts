@@ -34,8 +34,8 @@ interface CourseSnapshot {
   sections?: CourseSnapshotSection[];
 }
 
-/** Turn arbitrary lesson content into plain text, defensively, by lesson type. */
-function lessonContentToText(type: string, content: unknown): string {
+/** Turn arbitrary lesson content into plain text, defensively, by lesson type. Shared with coach.ts. */
+export function lessonContentToText(type: string, content: unknown): string {
   if (!content || typeof content !== "object") return "";
   const c = content as Record<string, unknown>;
 

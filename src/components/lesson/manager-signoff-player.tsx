@@ -10,7 +10,7 @@ import { Icon } from "@/components/icons";
 import type { LessonPlayerProps } from "@/components/lesson/types";
 
 interface SignoffContent {
-  instruction: string;
+  instruction?: string;
   criteria?: string[];
 }
 
@@ -69,16 +69,18 @@ export function ManagerSignoffPlayer({ lesson, progress, viewer, extra, assessPr
         )}
       </div>
 
-      {viewer.canApprove && <AssessmentForm viewer={viewer} extra={extra} assessPractical={assessPractical} />}
+      {viewer.canApprove && (
+        <AssessmentForm lessonId={lesson.id} viewer={viewer} assessPractical={assessPractical} />
+      )}
     </div>
   );
 }
 
 function AssessmentForm({
+  lessonId,
   viewer,
-  extra,
   assessPractical,
-}: Pick<LessonPlayerProps, "viewer" | "extra" | "assessPractical">) {
+}: Pick<LessonPlayerProps, "viewer" | "assessPractical"> & { lessonId: string }) {
   const [userId, setUserId] = React.useState(viewer.reviewableUsers[0]?.id ?? "");
   const [rating, setRating] = React.useState<"NOT_DEMONSTRATED" | "NEEDS_COACHING" | "COMPETENT" | "HIGHLY_COMPETENT">(
     "COMPETENT",
@@ -100,7 +102,7 @@ function AssessmentForm({
     if (!assessPractical || !userId) return;
     setSubmitting(true);
     try {
-      const result = await assessPractical({ userId, rating, comments: comments.trim() || undefined });
+      const result = await assessPractical({ lessonId, userId, rating, comments: comments.trim() || undefined });
       if (!result.ok) {
         toast.error(result.error ?? "Couldn't save this assessment.");
         return;

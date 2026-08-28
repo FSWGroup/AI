@@ -770,7 +770,10 @@ model Assignment {
   @@index([courseId])
   @@index([pathId])
   @@index([dueAt])
-  @@unique([userId, targetType, courseId, sopId, pathId, parentAssignmentId])
+  // Idempotency is enforced by a COALESCE-based expression index created in
+  // migration 20260828021500_assignment_dedupe. A plain @@unique over these
+  // nullable columns would NOT work: in Postgres NULL is never equal to NULL,
+  // so rows differing only in NULL slots would all be accepted.
 }
 
 model AssignmentRule {

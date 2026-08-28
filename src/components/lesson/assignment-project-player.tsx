@@ -8,7 +8,7 @@ import { Glyph, Icon } from "@/components/icons";
 import type { LessonPlayerProps } from "@/components/lesson/types";
 
 interface ProjectContent {
-  instructions: string;
+  instructions?: string;
 }
 
 export function AssignmentProjectPlayer({ lesson, progress, onComplete, submitProject }: LessonPlayerProps) {
@@ -40,7 +40,7 @@ export function AssignmentProjectPlayer({ lesson, progress, onComplete, submitPr
       if (file) {
         mediaId = await uploadFile(file);
       }
-      const result = await submitProject({ mediaId, note: note.trim() || undefined });
+      const result = await submitProject({ lessonId: lesson.id, mediaId, note: note.trim() || undefined });
       if (!result.ok) {
         toast.error(result.error ?? "Couldn't submit your work.");
         return;
