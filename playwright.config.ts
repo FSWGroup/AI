@@ -72,9 +72,13 @@ export default defineConfig({
   ],
 
   webServer: {
-    command: `npm run start -- --port ${PORT}`,
+    // `next start` reads PORT; passing --port as well would clash with the
+    // script's own flags.
+    command: "npm run start",
     url: BASE_URL,
-    reuseExistingServer: !process.env.CI,
+    // Never reuse: a server left over from an earlier run serves a stale build,
+    // which shows up as every page rendering the error boundary.
+    reuseExistingServer: false,
     timeout: 180_000,
     env: {
       PORT: String(PORT),

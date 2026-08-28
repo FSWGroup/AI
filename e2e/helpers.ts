@@ -31,10 +31,10 @@ export async function signIn(page: Page, account: AccountKey | string): Promise<
   await page.goto("/sign-in");
 
   // The password form is the default when password auth is enabled.
-  const emailField = page.getByLabel("Work email");
+  const emailField = page.getByLabel(/^work email$/i);
   await expect(emailField).toBeVisible();
   await emailField.fill(email);
-  await page.getByLabel("Password", { exact: true }).fill(SEED_PASSWORD);
+  await page.getByLabel(/^password$/i).fill(SEED_PASSWORD);
   await page.getByRole("button", { name: /^sign in$/i }).click();
 
   // Landing on /home means the session was established and the shell rendered.

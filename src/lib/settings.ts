@@ -130,7 +130,23 @@ function mergeSection<T extends object>(defaults: T, stored: unknown): T {
 }
 
 async function loadSettings(): Promise<AppSettings> {
-  const rows = await prisma.appSetting.findMany();
+  let rows: { key: string; value: unknown }[] = [];
+  try {
+    rows = await prisma.appSetting.findMany();
+  } catch (error) {
+    /*
+     * Settings are read by the root layout, so a database hiccup here would
+     * take down every page including sign-in — the one screen someone needs
+     * when the platform is misbehaving. Fall back to defaults and log loudly;
+     * authentication will still fail with its own clear message if the database
+     * is genuinely down.
+     */
+    console.error("[settings] falling back to defaults; database read failed", {
+      error: error instanceof Error ? error.message : String(error),
+    });
+    return DEFAULT_SETTINGS;
+  }
+
   const byKey = new Map(rows.map((row) => [row.key, row.value]));
 
   return {

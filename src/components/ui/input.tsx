@@ -59,6 +59,13 @@ export function Field({
 
   return (
     <div className={cn("flex flex-col gap-1.5", className)}>
+      {/*
+        The asterisk is decorative and the `required` attribute below is what
+        announces the requirement to assistive technology. Adding a visually
+        hidden "(required)" as well would be redundant and would append it to
+        every field's accessible name, making labels harder to target and read
+        aloud.
+      */}
       <label htmlFor={htmlFor} className="text-[0.8125rem] font-medium text-[var(--text-primary)]">
         {label}
         {required && (
@@ -66,7 +73,6 @@ export function Field({
             *
           </span>
         )}
-        {required && <span className="sr-only"> (required)</span>}
       </label>
       {React.isValidElement(children)
         ? React.cloneElement(children as React.ReactElement<Record<string, unknown>>, {

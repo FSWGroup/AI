@@ -316,6 +316,7 @@ npm run start                 # plus at least one `npm run worker`
 |---|---|
 | [ARCHITECTURE.md](ARCHITECTURE.md) | System design, module boundaries, request lifecycle, key decisions |
 | [DATA-MODEL.md](DATA-MODEL.md) | Every entity, relationships, immutability rules, indexing |
+| [ROUTES.md](ROUTES.md) | Every page and endpoint with the permission that gates it |
 | [SECURITY.md](SECURITY.md) | Authentication, authorization, encryption, uploads, AI boundaries, audit |
 | [DEPLOYMENT.md](DEPLOYMENT.md) | Production deployment, backups, recovery, monitoring |
 | [AI.md](AI.md) | Provider abstraction, RAG design, authorization filtering, prompt-injection defense |

@@ -1,7 +1,14 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
-  output: "standalone",
+  /*
+   * Standalone output bundles a self-contained server for container images, but
+   * it is incompatible with `next start` — which is what `npm run start` and the
+   * end-to-end harness use to serve a production build locally. Gate it on the
+   * build target so both paths work: set BUILD_STANDALONE=true in the Docker
+   * build (see DEPLOYMENT.md) and leave it unset everywhere else.
+   */
+  ...(process.env.BUILD_STANDALONE === "true" ? { output: "standalone" as const } : {}),
   poweredByHeader: false,
   eslint: {
     // Lint runs as a dedicated CI step (`npm run lint`); avoid duplicating it in the build.

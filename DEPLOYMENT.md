@@ -152,8 +152,10 @@ import first.
 
 ## Option B — Container deployment
 
-`next.config.ts` sets `output: "standalone"`, so the build emits a
-self-contained server.
+Set `BUILD_STANDALONE=true` at build time and `next.config.ts` emits a
+self-contained server. It is off by default because standalone output is
+incompatible with `next start`, which is how the production build is served
+locally and in the end-to-end harness.
 
 ```dockerfile
 # syntax=docker/dockerfile:1
@@ -172,6 +174,8 @@ RUN apt-get update && apt-get install -y --no-install-recommends openssl \
 COPY --from=deps /app/node_modules ./node_modules
 COPY . .
 ENV NEXT_TELEMETRY_DISABLED=1
+# Standalone output is required for the runner stage below.
+ENV BUILD_STANDALONE=true
 RUN npx prisma generate && npm run build
 
 FROM node:22-slim AS runner

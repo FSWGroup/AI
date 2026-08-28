@@ -17,8 +17,8 @@ test.describe("Authentication", () => {
     page,
   }) => {
     await page.goto("/sign-in");
-    await page.getByLabel("Work email").fill(ACCOUNTS.learner);
-    await page.getByLabel("Password", { exact: true }).fill("definitely-not-the-password");
+    await page.getByLabel(/^work email$/i).fill(ACCOUNTS.learner);
+    await page.getByLabel(/^password$/i).fill("definitely-not-the-password");
     await page.getByRole("button", { name: /^sign in$/i }).click();
 
     const error = page.getByRole("alert");
@@ -26,8 +26,8 @@ test.describe("Authentication", () => {
     await expect(error).toContainText(/didn't match/i);
 
     // A non-existent account produces the same message.
-    await page.getByLabel("Work email").fill("nobody.here@fswelsford.com");
-    await page.getByLabel("Password", { exact: true }).fill("definitely-not-the-password");
+    await page.getByLabel(/^work email$/i).fill("nobody.here@fswelsford.com");
+    await page.getByLabel(/^password$/i).fill("definitely-not-the-password");
     await page.getByRole("button", { name: /^sign in$/i }).click();
     await expect(page.getByRole("alert")).toContainText(/didn't match/i);
   });
@@ -55,7 +55,7 @@ test.describe("Authentication", () => {
   test("the sign-in page offers only configured providers", async ({ page }) => {
     await page.goto("/sign-in");
     // Password auth is enabled in the test environment.
-    await expect(page.getByLabel("Work email")).toBeVisible();
+    await expect(page.getByLabel(/^work email$/i)).toBeVisible();
     // Microsoft SSO is not configured, so no dead button is offered.
     await expect(page.getByRole("button", { name: /continue with microsoft/i })).toHaveCount(0);
   });
@@ -127,8 +127,8 @@ test.describe("Accessibility basics", () => {
   test("the sign-in form associates labels with inputs", async ({ page }) => {
     await page.goto("/sign-in");
     // getByLabel only resolves when the label is correctly associated.
-    await expect(page.getByLabel("Work email")).toBeVisible();
-    await expect(page.getByLabel("Password", { exact: true })).toBeVisible();
+    await expect(page.getByLabel(/^work email$/i)).toBeVisible();
+    await expect(page.getByLabel(/^password$/i)).toBeVisible();
   });
 });
 
@@ -137,8 +137,8 @@ test.describe("Session handling", () => {
     // The seeded set has no deactivated account, so this asserts the shape of
     // the failure for an unknown account, which is the same uniform message.
     await page.goto("/sign-in");
-    await page.getByLabel("Work email").fill("deactivated.person@fswelsford.com");
-    await page.getByLabel("Password", { exact: true }).fill(SEED_PASSWORD);
+    await page.getByLabel(/^work email$/i).fill("deactivated.person@fswelsford.com");
+    await page.getByLabel(/^password$/i).fill(SEED_PASSWORD);
     await page.getByRole("button", { name: /^sign in$/i }).click();
     await expect(page.getByRole("alert")).toBeVisible();
     await expect(page).toHaveURL(/sign-in/);
