@@ -14,7 +14,7 @@ import { Pagination } from "@/components/people/pagination";
 
 export const metadata = { title: "People Directory" };
 
-interface PeopleSearchParams {
+type PeopleSearchParams = {
   q?: string;
   departmentId?: string;
   businessUnitId?: string;
@@ -22,7 +22,7 @@ interface PeopleSearchParams {
   workerType?: string;
   status?: string;
   page?: string;
-}
+};
 
 export default async function PeoplePage({ searchParams }: { searchParams: Promise<PeopleSearchParams> }) {
   const actor = await requirePermission("people.view");

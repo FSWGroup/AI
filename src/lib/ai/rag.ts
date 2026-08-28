@@ -246,10 +246,16 @@ export async function retrieve(
 // Prompt-injection defense
 // ---------------------------------------------------------------------------
 
+// Optional determiners and quantifiers that commonly sit between the verb and
+// the target in an injection attempt. Without covering these, "disregard the
+// above" and "ignore the above instructions" slip past the filter.
+const DET = "(?:all|any|the|these|those|my|your|our)?\\s*";
+
 const INJECTION_PATTERNS: RegExp[] = [
-  /ignore\s+(all\s+|any\s+)?(previous|prior|above|earlier)\s+instructions?/gi,
-  /disregard\s+(all\s+|any\s+)?(previous|prior|above|earlier)\b/gi,
-  /forget\s+(all\s+|any\s+)?(previous|prior|above)\s+instructions?/gi,
+  new RegExp(`ignore\\s+${DET}(?:previous|prior|above|earlier|preceding)(?:\\s+instructions?)?`, "gi"),
+  new RegExp(`disregard\\s+${DET}(?:previous|prior|above|earlier|preceding)`, "gi"),
+  new RegExp(`forget\\s+${DET}(?:previous|prior|above|earlier)(?:\\s+instructions?)?`, "gi"),
+  new RegExp(`override\\s+${DET}(?:previous|prior|above|earlier)`, "gi"),
   /you\s+are\s+now\b/gi,
   /new\s+instructions?\s*:/gi,
   /system\s+prompt/gi,

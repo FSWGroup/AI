@@ -45,7 +45,8 @@ export async function GET(request: Request, context: { params: Promise<{ id: str
     body = injectScormShim(file.data.toString("utf8"), shim);
   }
 
-  return new Response(body instanceof Buffer ? new Uint8Array(body) : body, {
+  const responseBody: BodyInit = typeof body === "string" ? body : new Uint8Array(body);
+  return new Response(responseBody, {
     status: 200,
     headers: {
       "Content-Type": file.mimeType,

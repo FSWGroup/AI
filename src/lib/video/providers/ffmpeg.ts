@@ -315,6 +315,10 @@ async function renderSceneClip(input: {
     "yuv420p",
     "-c:a",
     "aac",
+    "-ar",
+    "44100",
+    "-ac",
+    "2",
     "-b:a",
     "128k",
     "-shortest",
@@ -382,6 +386,12 @@ async function burnInCaptions(
     const end = (timing.startSeconds + timing.durationSeconds).toFixed(2);
     const escapedTextFile = escapeFilterPath(textFilePath);
 
+    // Anchored to the bottom of the frame (the conventional caption position)
+    // rather than a fixed offset, so it clears our own scene title band —
+    // whose height varies with how many lines the title itself wraps to.
+    const boxHeight = lines.length * fontSize * 1.3;
+    const y = Math.max(marginTop, Math.round(height - height * 0.06 - boxHeight));
+
     filters.push(
       [
         "drawtext=",
@@ -392,7 +402,7 @@ async function burnInCaptions(
         "line_spacing=6:",
         "box=1:boxcolor=black@0.55:boxborderw=14:",
         "x=(w-text_w)/2:",
-        `y=${marginTop}:`,
+        `y=${y}:`,
         `enable='between(t\\,${start}\\,${end})'`,
       ].join(""),
     );
