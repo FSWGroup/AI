@@ -107,7 +107,10 @@ function BusinessUnitsTab({ items }: { items: BusinessUnitRow[] }) {
   function toggle(row: BusinessUnitRow) {
     startTransition(async () => {
       const result = await updateBusinessUnitAction(row.id, { isActive: !row.isActive });
-      if (!result.ok) return toast.error(result.error);
+      if (!result.ok) {
+        toast.error(result.error);
+        return;
+      }
       router.refresh();
     });
   }
@@ -167,7 +170,10 @@ function DepartmentsTab({ items, businessUnits }: { items: DepartmentRow[]; busi
   function create() {
     startTransition(async () => {
       const result = await createDepartmentAction({ name, businessUnitId });
-      if (!result.ok) return toast.error(result.error);
+      if (!result.ok) {
+        toast.error(result.error);
+        return;
+      }
       toast.success("Department created.");
       setName("");
       router.refresh();
@@ -176,7 +182,10 @@ function DepartmentsTab({ items, businessUnits }: { items: DepartmentRow[]; busi
   function toggle(row: DepartmentRow) {
     startTransition(async () => {
       const result = await updateDepartmentAction(row.id, { isActive: !row.isActive });
-      if (!result.ok) return toast.error(result.error);
+      if (!result.ok) {
+        toast.error(result.error);
+        return;
+      }
       router.refresh();
     });
   }
@@ -241,7 +250,10 @@ function TeamsTab({ items, departments }: { items: TeamRow[]; departments: { id:
   function create() {
     startTransition(async () => {
       const result = await createTeamAction({ name, departmentId });
-      if (!result.ok) return toast.error(result.error);
+      if (!result.ok) {
+        toast.error(result.error);
+        return;
+      }
       toast.success("Team created.");
       setName("");
       router.refresh();
@@ -250,7 +262,10 @@ function TeamsTab({ items, departments }: { items: TeamRow[]; departments: { id:
   function toggle(row: TeamRow) {
     startTransition(async () => {
       const result = await updateTeamAction(row.id, { isActive: !row.isActive });
-      if (!result.ok) return toast.error(result.error);
+      if (!result.ok) {
+        toast.error(result.error);
+        return;
+      }
       router.refresh();
     });
   }
@@ -314,7 +329,10 @@ function LocationsTab({ items }: { items: LocationRow[] }) {
   function create() {
     startTransition(async () => {
       const result = await createLocationAction({ name, country, state: state || null, city: city || null, timezone });
-      if (!result.ok) return toast.error(result.error);
+      if (!result.ok) {
+        toast.error(result.error);
+        return;
+      }
       toast.success("Location created.");
       setName("");
       router.refresh();
@@ -323,7 +341,10 @@ function LocationsTab({ items }: { items: LocationRow[] }) {
   function toggle(row: LocationRow) {
     startTransition(async () => {
       const result = await updateLocationAction(row.id, { isActive: !row.isActive });
-      if (!result.ok) return toast.error(result.error);
+      if (!result.ok) {
+        toast.error(result.error);
+        return;
+      }
       router.refresh();
     });
   }
@@ -393,7 +414,10 @@ function PositionsTab({ items, departments }: { items: PositionRow[]; department
   function create() {
     startTransition(async () => {
       const result = await createPositionAction({ title, departmentId: departmentId || null });
-      if (!result.ok) return toast.error(result.error);
+      if (!result.ok) {
+        toast.error(result.error);
+        return;
+      }
       toast.success("Position created.");
       setTitle("");
       router.push(`/admin/organization/positions/${result.data.id}`);

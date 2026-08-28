@@ -44,6 +44,33 @@ export async function getSettingsSnapshot(): Promise<AppSettings> {
   return getSettings();
 }
 
+/** `languages` is a plain string array in AppSettings, not a keyed-fields
+ * object like the other sections, so it gets its own save path rather than
+ * going through the generic merge-into-section helper above. */
+export async function saveLanguages(languagesCsv: string): Promise<ActionResult> {
+  return runAction("settings.languages.save", async () => {
+    const actor = await assertPermission("settings.manage");
+    const languages = languagesCsv
+      .split(",")
+      .map((l) => l.trim())
+      .filter(Boolean);
+    if (languages.length === 0) return fail("At least one language is required.");
+
+    await updateSettingSection("languages", languages, actor.id);
+    await recordAudit({
+      actorId: actor.id,
+      actorEmail: actor.email,
+      action: AUDIT_ACTIONS.SETTINGS_CHANGED,
+      entityType: "APP_SETTING",
+      entityId: "languages",
+      metadata: { languages },
+    });
+
+    revalidatePath("/admin/settings/languages");
+    return ok();
+  });
+}
+
 export async function saveOrganizationName(name: string): Promise<ActionResult> {
   return runAction("settings.organization.save", async () => {
     const actor = await assertPermission("settings.manage");
