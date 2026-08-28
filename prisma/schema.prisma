@@ -158,6 +158,9 @@ model AuthToken {
 enum AuthTokenKind {
   ACTIVATION
   PASSWORD_RESET
+  // Single-use sign-in link for workers with no password — the warehouse and
+  // driver population who have no company laptop and rarely sign in.
+  MAGIC_LINK
 }
 
 model Role {
@@ -233,6 +236,12 @@ model Worker {
   // Celebration display is opt-out and shows month/day only — never the year,
   // and never the dateOfBirth value itself. See §51 privacy-by-design.
   showBirthday    Boolean      @default(true)
+  // Kiosk PIN, bcrypt-hashed. Never a stored plaintext number, and never the
+  // same credential as their password — a kiosk PIN opens a clock, nothing else.
+  kioskPinHash    String?
+  kioskPinSetAt   DateTime?
+  kioskFailedCount Int         @default(0)
+  kioskLockedUntil DateTime?
   homeStreet      String? // restricted visibility
   homeCity        String?
   homeState       String?
@@ -301,6 +310,8 @@ model Worker {
   compProposals    CompProposal[]
   referralsMade    Referral[]        @relation("ReferralsMade")
   shiftAssignments ShiftAssignment[]
+  kioskPunches     KioskPunch[]
+  accessEvents     AccessEvent[]
 }
 
 // Effective-dated employment. The "current" record has effectiveTo = null.
@@ -1359,6 +1370,7 @@ model SoftwareApp {
   createdAt    DateTime @default(now())
 
   grants AppAccessGrant[]
+  profileItems AccessProfileItem[]
 }
 
 model AppAccessGrant {
@@ -1689,12 +1701,23 @@ model Integration {
 }
 
 model WebhookEndpoint {
-  id        String   @id @default(cuid())
-  url       String
-  secretEnc String
-  events    Json     @default("[]")
-  active    Boolean  @default(true)
-  createdAt DateTime @default(now())
+  id          String    @id @default(cuid())
+  name        String    @default("Webhook")
+  url         String
+  /** Shared secret for the HMAC signature, encrypted at rest. */
+  secretEnc   String
+  /** Domain events this endpoint wants, e.g. ["WORKER_ADDED"]. */
+  events      Json      @default("[]")
+  active      Boolean   @default(true)
+  createdById String?
+  createdAt   DateTime  @default(now())
+  lastSuccessAt DateTime?
+  lastFailureAt DateTime?
+  consecutiveFailures Int @default(0)
+
+  deliveries WebhookDelivery[]
+
+  @@index([active])
 }
 
 model EmailMessage {
@@ -2040,4 +2063,168 @@ model BreakRule {
   createdAt     DateTime @default(now())
 
   @@index([jurisdiction, active])
+}
+
+// ---------------------------------------------------------------------------
+// Frontline access (§ kiosk and magic link)
+//
+// Half of a distributor's workforce has no desk, no company laptop and often
+// no work email. Everything else in this product assumes a browser session
+// and a password, which makes it invisible to exactly the people with the
+// most timekeeping and time-off friction.
+// ---------------------------------------------------------------------------
+
+/**
+ * A shared tablet mounted in a warehouse or branch.
+ *
+ * The device authenticates, the person does not: a registered kiosk plus a
+ * per-worker PIN is enough to punch a clock, and deliberately not enough to
+ * do anything else. A kiosk never holds a session and can never read a
+ * personnel record.
+ */
+model KioskDevice {
+  id          String    @id @default(cuid())
+  name        String // "Exton warehouse — receiving door"
+  locationId  String?
+  /** SHA-256 of the device token. The token itself is shown once, at setup. */
+  tokenHash   String    @unique
+  active      Boolean   @default(true)
+  lastSeenAt  DateTime?
+  createdById String?
+  createdAt   DateTime  @default(now())
+  revokedAt   DateTime?
+
+  punches KioskPunch[]
+
+  @@index([active])
+}
+
+/**
+ * Every punch a kiosk records, kept as evidence independently of the
+ * timesheet it feeds. Append-only: a disputed hour is settled from here.
+ */
+model KioskPunch {
+  id         String   @id @default(cuid())
+  deviceId   String
+  workerId   String
+  kind       String // IN | OUT
+  at         DateTime @default(now())
+  /** The TimeEntry this punch created or closed, when it produced one. */
+  timeEntryId String?
+  note       String?
+
+  device KioskDevice @relation(fields: [deviceId], references: [id], onDelete: Cascade)
+  worker Worker      @relation(fields: [workerId], references: [id], onDelete: Cascade)
+
+  @@index([workerId, at])
+  @@index([deviceId, at])
+}
+
+// ---------------------------------------------------------------------------
+// Access provisioning loop (§ closed-loop access)
+//
+// Equipment and app access are already tracked, but granted and revoked by
+// hand. That means the record shows intent rather than fact, and the gap only
+// becomes visible when somebody who left three months ago still has a mailbox.
+// An access profile turns "what does a Warehouse Associate get" into data, so
+// onboarding and offboarding can both be driven from it and checked against it.
+// ---------------------------------------------------------------------------
+
+model AccessProfile {
+  id          String   @id @default(cuid())
+  name        String   @unique // "Warehouse Associate", "Inside Sales"
+  description String?
+  // Who this profile applies to: { departmentIds?, jobFamilies?, workerTypes?, titles? }
+  criteria    Json     @default("{}")
+  active      Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  items AccessProfileItem[]
+}
+
+model AccessProfileItem {
+  id          String  @id @default(cuid())
+  profileId   String
+  appId       String
+  accessLevel String  @default("USER") // USER | ADMIN | READONLY
+  // Optional entitlements are offered as a task rather than expected.
+  required    Boolean @default(true)
+  note        String?
+
+  profile AccessProfile @relation(fields: [profileId], references: [id], onDelete: Cascade)
+  app     SoftwareApp   @relation(fields: [appId], references: [id], onDelete: Cascade)
+
+  @@unique([profileId, appId])
+}
+
+/**
+ * Evidence that a grant or revocation actually happened, separate from the
+ * grant record itself. Append-only: this is what an auditor reads when asking
+ * "prove that this person's access was removed when they left".
+ */
+model AccessEvent {
+  id         String   @id @default(cuid())
+  workerId   String
+  appId      String?
+  appName    String // denormalised so the record survives the app being deleted
+  action     String // GRANT_REQUESTED | GRANTED | REVOKE_REQUESTED | REVOKED | EXCEPTION_NOTED
+  source     String   @default("MANUAL") // MANUAL | ONBOARDING | OFFBOARDING | REVIEW
+  actorUserId String?
+  detail     String?
+  at         DateTime @default(now())
+
+  worker Worker @relation(fields: [workerId], references: [id], onDelete: Cascade)
+
+  @@index([workerId, at])
+  @@index([action, at])
+}
+
+// ---------------------------------------------------------------------------
+// Versioned read API and outbound webhooks (§ let other systems consume this)
+//
+// Other FSW systems currently re-key employee data from here, which is how it
+// drifts. A narrow, versioned, scoped read API plus signed webhooks removes
+// the reason to copy anything.
+// ---------------------------------------------------------------------------
+
+model ApiKey {
+  id          String    @id @default(cuid())
+  name        String // "Prophet 21 sync", "Power BI"
+  /** SHA-256 of the key. The key itself is shown once, at creation. */
+  keyHash     String    @unique
+  /** First 8 characters, so a key can be identified in a list without revealing it. */
+  prefix      String
+  /** Read scopes this key may use, e.g. ["workers.read", "org.read"]. */
+  scopes      Json      @default("[]")
+  active      Boolean   @default(true)
+  lastUsedAt  DateTime?
+  requestCount Int      @default(0)
+  expiresAt   DateTime?
+  createdById String?
+  createdAt   DateTime  @default(now())
+  revokedAt   DateTime?
+  revokedById String?
+
+  @@index([active])
+}
+
+
+model WebhookDelivery {
+  id           String    @id @default(cuid())
+  endpointId   String
+  event        String
+  payload      Json
+  status       String    @default("PENDING") // PENDING | DELIVERED | FAILED | ABANDONED
+  attempts     Int       @default(0)
+  responseCode Int?
+  error        String?
+  nextAttemptAt DateTime?
+  deliveredAt  DateTime?
+  createdAt    DateTime  @default(now())
+
+  endpoint WebhookEndpoint @relation(fields: [endpointId], references: [id], onDelete: Cascade)
+
+  @@index([status, nextAttemptAt])
+  @@index([endpointId, createdAt])
 }

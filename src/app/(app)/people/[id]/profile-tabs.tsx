@@ -14,6 +14,7 @@ import {
 import type { Prisma } from '@/generated/prisma/client';
 import { certificationState, SKILL_LEVELS } from '@/lib/skills';
 import { RecordSkillButton, RemoveSkillButton } from '@/app/(app)/skills/skills-ui';
+import { KioskPinForm } from '@/app/(app)/admin/kiosks/kiosk-ui';
 
 type WorkerPayload = Prisma.WorkerGetPayload<{
   include: {
@@ -500,8 +501,8 @@ export async function DocumentsTab({ worker, ctx }: { worker: WorkerPayload; ctx
 // Equipment & app access
 // ---------------------------------------------------------------------------
 
-export async function AssetsTab({ worker, ctx }: { worker: WorkerPayload; ctx: Ctx }) {
-  const [assignments, grants, trainings] = await Promise.all([
+export async function AssetsTab({ worker, ctx, access }: { worker: WorkerPayload; ctx: Ctx; access: WorkerAccess }) {
+  const [assignments, grants, trainings, pinRow] = await Promise.all([
     db.equipmentAssignment.findMany({
       where: { workerId: worker.id },
       include: { asset: true },
@@ -517,6 +518,7 @@ export async function AssetsTab({ worker, ctx }: { worker: WorkerPayload; ctx: C
       include: { course: true },
       orderBy: { assignedAt: 'desc' },
     }),
+    db.worker.findUnique({ where: { id: worker.id }, select: { kioskPinHash: true } }),
   ]);
   return (
     <div className="space-y-4">
@@ -590,6 +592,15 @@ export async function AssetsTab({ worker, ctx }: { worker: WorkerPayload; ctx: C
           </Table>
         )}
       </Card>
+
+      {access.self || can(ctx, 'people.write') ? (
+        <Card>
+          <CardHeader title="Time clock" description="For workers who punch in at a shared warehouse tablet." />
+          <CardBody>
+            <KioskPinForm workerId={worker.id} hasPin={Boolean(pinRow?.kioskPinHash)} />
+          </CardBody>
+        </Card>
+      ) : null}
     </div>
   );
 }

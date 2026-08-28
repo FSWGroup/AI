@@ -786,6 +786,77 @@ export async function seedDemoData(db: PrismaClient, ctx: SeedContext) {
     },
   });
 
+  // --- Break rules and shift templates --------------------------------------
+  // Data, not code: jurisdictional and subject to change, so each rule carries
+  // where it applies and the authority behind it. Verify current requirements
+  // with counsel — these are seeded as a starting point, not as legal advice.
+  await db.breakRule.createMany({
+    data: [
+      {
+        jurisdiction: 'US-PA', name: 'Minors: 30-minute meal after 5 hours',
+        afterMinutes: 300, breakMinutes: 30, kind: 'MEAL', paid: false, appliesToMinors: true,
+        sourceUrl: 'https://www.dli.pa.gov/Individuals/Labor-Management-Relations/llc/Pages/Child-Labor-Act.aspx',
+        note: '[DEMO] Pennsylvania requires meal periods for minors; adult meal breaks are not mandated by state law.',
+      },
+      {
+        jurisdiction: 'US-CA', name: '30-minute unpaid meal after 5 hours',
+        afterMinutes: 300, breakMinutes: 30, kind: 'MEAL', paid: false,
+        sourceUrl: 'https://www.dir.ca.gov/dlse/faq_mealperiods.htm',
+        note: '[DEMO] California meal period requirement.',
+      },
+      {
+        jurisdiction: 'US-CA', name: 'Second 30-minute meal after 10 hours',
+        afterMinutes: 600, breakMinutes: 60, kind: 'MEAL', paid: false,
+        sourceUrl: 'https://www.dir.ca.gov/dlse/faq_mealperiods.htm',
+        note: '[DEMO] A second meal period is required on shifts over ten hours.',
+      },
+      {
+        jurisdiction: 'US-CA', name: '10-minute paid rest per 4 hours',
+        afterMinutes: 240, breakMinutes: 10, kind: 'REST', paid: true,
+        sourceUrl: 'https://www.dir.ca.gov/dlse/faq_restperiods.htm',
+        note: '[DEMO] Paid rest periods are not deducted from scheduled hours.',
+      },
+      {
+        jurisdiction: 'PH', name: '60-minute unpaid meal after 5 hours',
+        afterMinutes: 300, breakMinutes: 60, kind: 'MEAL', paid: false,
+        sourceUrl: 'https://www.dole.gov.ph/',
+        note: '[DEMO] Philippine Labor Code meal period. Confirm with local counsel.',
+      },
+    ],
+  });
+
+  const dayShift = await db.shiftTemplate.create({
+    data: { name: 'Warehouse day (06:00–14:30)', locationId: ctx.locations.exton, startTime: '06:00', endTime: '14:30', breakMinutes: 30 },
+  });
+  await db.shiftTemplate.create({
+    data: { name: 'Warehouse late (14:00–22:30)', locationId: ctx.locations.exton, startTime: '14:00', endTime: '22:30', breakMinutes: 30 },
+  });
+
+  // A published week for the hourly crew, including one shift with a short
+  // break so the compliance check has something to find.
+  const monday = new Date();
+  monday.setUTCHours(0, 0, 0, 0);
+  monday.setUTCDate(monday.getUTCDate() - ((monday.getUTCDay() + 6) % 7));
+  for (let i = 0; i < 5; i++) {
+    const date = new Date(monday.getTime() + i * 86_400_000);
+    const shift = await db.shift.create({
+      data: {
+        templateId: dayShift.id,
+        locationId: ctx.locations.exton,
+        departmentId: ctx.departments.get('Warehouse')!,
+        date,
+        startsAt: new Date(date.getTime() + 6 * 3_600_000),
+        endsAt: new Date(date.getTime() + 14.5 * 3_600_000),
+        breakMinutes: i === 2 ? 15 : 30,
+        role: 'Picker',
+        status: 'PUBLISHED',
+        publishedAt: new Date(),
+        note: i === 2 ? '[DEMO] Short break — appears in the break rule findings.' : null,
+      },
+    });
+    await db.shiftAssignment.create({ data: { shiftId: shift.id, workerId: warehouse.id } });
+  }
+
   // --- Skills and certifications --------------------------------------------
   // Deliberately seeded to show real coverage risk: the forklift certification
   // has one verified holder (single point of failure) and OSHA 30 has one that

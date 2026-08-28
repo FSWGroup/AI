@@ -4,6 +4,7 @@ import { emitEvent } from '@/lib/workflows';
 import { retryFailedEmails } from '@/lib/email';
 import { runAccrualsForAll } from '@/lib/pto';
 import { startOfUTCDay, isoDate, addDays } from '@/lib/format';
+import { drainWebhooks } from '@/lib/webhooks';
 
 /**
  * Scheduled maintenance sweep. Invoked by:
@@ -125,6 +126,33 @@ export async function runMaintenance(): Promise<Record<string, number>> {
 
   // 8. Retry failed emails
   bump('emailRetries', await retryFailedEmails());
+
+  // 9. Certifications approaching expiry — a lapsed forklift ticket stops a
+  //    shift, so it is worth the same warning as an expiring document.
+  const expiringCerts = await db.workerSkill.findMany({
+    where: {
+      expiresAt: { not: null, gte: today, lte: addDays(today, 30) },
+      worker: { status: { in: ['ACTIVE', 'ON_LEAVE'] }, deletedAt: null },
+      skill: { active: true },
+    },
+    select: { id: true, workerId: true, expiresAt: true, skill: { select: { name: true } } },
+  });
+  for (const cert of expiringCerts) {
+    await emitEvent({
+      type: 'DOCUMENT_EXPIRING',
+      workerId: cert.workerId ?? undefined,
+      dedupeKey: `cert:${cert.id}:${todayKey.slice(0, 7)}`,
+      data: { detail: `${cert.skill.name} expires ${isoDate(cert.expiresAt)}` },
+    });
+    bump('certificationsExpiring');
+  }
+
+  // 10. Deliver queued webhooks. Last, so a slow endpoint cannot delay the
+  //     rest of the sweep.
+  const webhooks = await drainWebhooks();
+  bump('webhooksDelivered', webhooks.delivered);
+  bump('webhooksFailed', webhooks.failed);
+  bump('webhooksAbandoned', webhooks.abandoned);
 
   return counters;
 }

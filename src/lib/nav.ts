@@ -24,6 +24,7 @@ export const NAV_GROUPS: NavGroup[] = [
     items: [
       { label: 'Home', href: '/', permission: null },
       { label: 'My Tasks', href: '/tasks', permission: null },
+      { label: 'HR Assistant', href: '/assistant', permission: null },
       { label: 'Approvals', href: '/approvals', permission: null },
     ],
   },
@@ -42,6 +43,8 @@ export const NAV_GROUPS: NavGroup[] = [
       { label: 'Jobs', href: '/recruiting/jobs', permission: 'recruiting.read' },
       { label: 'Candidates', href: '/recruiting/candidates', permission: 'recruiting.read' },
       { label: 'Offers', href: '/recruiting/offers', permission: 'recruiting.write' },
+      { label: 'Referrals', href: '/recruiting/referrals', permission: null },
+      { label: 'Talent Pool', href: '/recruiting/talent-pool', permission: 'recruiting.read' },
     ],
   },
   {
@@ -50,6 +53,7 @@ export const NAV_GROUPS: NavGroup[] = [
       { label: 'Time Off', href: '/time/pto', permission: null },
       { label: 'Calendar', href: '/time/calendar', permission: null },
       { label: 'Timesheets', href: '/time/tracking', permission: null },
+      { label: 'Schedule', href: '/time/schedule', permission: null },
     ],
   },
   {
@@ -84,6 +88,8 @@ export const NAV_GROUPS: NavGroup[] = [
       { label: 'Announcements', href: '/announcements', permission: null },
       { label: 'Equipment', href: '/equipment', permission: 'equipment.admin' },
       { label: 'App Access', href: '/apps', permission: 'apps.admin' },
+      { label: 'Access Profiles', href: '/apps/profiles', permission: 'apps.admin' },
+      { label: 'Access Exceptions', href: '/apps/exceptions', permission: 'apps.admin' },
       { label: 'Surveys', href: '/surveys', permission: null },
     ],
   },
@@ -104,6 +110,8 @@ export const NAV_GROUPS: NavGroup[] = [
       { label: 'Audit Log', href: '/admin/audit', permission: 'audit.read' },
       { label: 'Email Outbox', href: '/admin/email-outbox', permission: 'settings.admin' },
       { label: 'Integrations', href: '/admin/integrations', permission: 'settings.admin' },
+      { label: 'Kiosks', href: '/admin/kiosks', permission: 'settings.admin' },
+      { label: 'API & Webhooks', href: '/admin/api', permission: 'api.admin' },
       { label: 'Settings', href: '/admin/settings', permission: 'org.admin' },
     ],
   },

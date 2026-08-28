@@ -3,11 +3,12 @@ import { notFound } from 'next/navigation';
 import Link from 'next/link';
 import { db } from '@/lib/db';
 import { requireCtx, assertPermission, can } from '@/lib/authz';
-import { fmtDate, fmtDateTime, fmtMoney, humanize } from '@/lib/format';
+import { fmtDate, fmtDateTime, fmtMoney, fullName, humanize } from '@/lib/format';
 import { Badge, Card, CardBody, CardHeader, DescriptionList, PageHeader, StatusBadge } from '@/components/ui';
 import { ScorecardForm } from './scorecard-form';
 import { AiQuestionsPanel, ResumeTextEditor, type StoredQuestion } from './ai-questions';
 import { aiEnabled } from '@/lib/ai/client';
+import { AddToPoolButton, EmailCandidateButton } from '../../funnel-ui';
 
 export const metadata: Metadata = { title: 'Candidate' };
 
@@ -19,6 +20,8 @@ export default async function CandidatePage({ params }: { params: Promise<{ id: 
   const candidate = await db.candidate.findUnique({
     where: { id },
     include: {
+      talentPool: true,
+      referrals: { include: { referrer: { select: { id: true, legalFirstName: true, preferredName: true, lastName: true } } } },
       applications: {
         include: {
           requisition: true,
@@ -78,7 +81,14 @@ export default async function CandidatePage({ params }: { params: Promise<{ id: 
                   </Link>
                 }
                 description={`Stage: ${app.stage.name} · applied ${fmtDate(app.createdAt)}`}
-                actions={<StatusBadge status={app.status} />}
+                actions={
+                  <div className="flex items-center gap-2">
+                    <StatusBadge status={app.status} />
+                    {canWrite ? (
+                      <EmailCandidateButton applicationId={app.id} hasEmail={Boolean(candidate.email)} />
+                    ) : null}
+                  </div>
+                }
               />
               <CardBody className="space-y-4">
                 {app.rejectionReason ? (
@@ -192,6 +202,24 @@ export default async function CandidatePage({ params }: { params: Promise<{ id: 
             />
             {candidate.notes ? (
               <p className="mt-4 border-t border-ink-100 pt-3 text-[13px] whitespace-pre-wrap text-ink-600">{candidate.notes}</p>
+            ) : null}
+            {candidate.referrals.length > 0 ? (
+              <div className="mt-4 border-t border-ink-100 pt-3 text-[13px]">
+                <span className="font-medium text-ink-700">Referred by</span>{' '}
+                {candidate.referrals.map((r) => fullName(r.referrer)).join(', ')}
+              </div>
+            ) : null}
+            {canWrite ? (
+              <div className="mt-4 border-t border-ink-100 pt-3">
+                {candidate.talentPool && candidate.talentPool.status !== 'REMOVED' ? (
+                  <p className="text-[13px] text-ink-600">
+                    In the talent pool
+                    {candidate.talentPool.reviewBy ? ` · review by ${fmtDate(candidate.talentPool.reviewBy)}` : ''}
+                  </p>
+                ) : (
+                  <AddToPoolButton candidateId={candidate.id} jobFamily={null} />
+                )}
+              </div>
             ) : null}
             {canWrite ? <ResumeTextEditor candidateId={candidate.id} resumeText={candidate.resumeText} /> : null}
           </CardBody>

@@ -237,3 +237,42 @@ termination) run inside `db.$transaction` so a partial failure leaves nothing ha
 through `RetentionPolicy` and requires an explicit, audited approval by a `retention.admin`,
 which anonymizes restricted personal data while preserving employment history. The two
 concepts are deliberately kept apart.
+
+## Added in the improvement pass
+
+```
+Skill ── WorkerSkill ── Worker            certification expiry, verification, coverage
+      └─ JobSkillRequirement ── JobRequisition
+
+CompCycle ─┬─ CompCycleBudget (per manager)
+           └─ CompProposal ── Worker      → one effective-dated Compensation row on apply
+
+Referral ── Worker (referrer) ── Candidate    matched by email, exactly
+TalentPoolEntry ── Candidate                  every entry carries a review date
+
+ShiftTemplate ── Shift ── ShiftAssignment ── Worker
+BreakRule                                     jurisdictional, with source URLs
+
+KioskDevice ── KioskPunch ── Worker           append-only; Worker.kioskPinHash
+AuthToken(MAGIC_LINK)                         single-use, 15 minutes
+
+AccessProfile ── AccessProfileItem ── SoftwareApp
+AccessEvent ── Worker                         append-only provisioning evidence
+
+ApiKey                                        hashed, scoped, rate limited
+WebhookEndpoint ── WebhookDelivery            HMAC-signed, retried with backoff
+```
+
+Three of these carry the same append-only database trigger as `AuditEvent`, because each
+is evidence somebody may later dispute: `KioskPunch` (a contested hour), `AccessEvent`
+(whether access was really removed) and `JobBoardDelivery` (whether a candidate was really
+sent to us).
+
+`CompProposal.currentAmount` is a **snapshot** taken when the cycle is populated, so a pay
+change made elsewhere mid-cycle cannot silently shift the budget roll-up. `appliedAt` is
+what makes applying idempotent — a proposal already stamped is skipped even if somebody
+resets its status.
+
+`WorkerSkill.verifiedAt` is what separates a claim from a fact. Critical skills only count
+toward coverage once a named person has verified them, which is why self-recording a skill
+is open to everyone and marking one verified is not.

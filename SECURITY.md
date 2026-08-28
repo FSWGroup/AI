@@ -313,6 +313,146 @@ the admin UI and in `ADMIN_GUIDE.md`.
 
 ---
 
+## Frontline access: kiosks and sign-in links
+
+A wall-mounted tablet is physically accessible to everyone in the building and
+is never in one person's custody, so its security model is deliberately
+different from the rest of the product.
+
+- **The device authenticates, the person does not.** A kiosk holds a long
+  random device token as an httpOnly cookie, exchanged once at setup so the
+  token is never typed or left in browser history as a working credential.
+- **A kiosk holds no session and can reach nothing.** The only action it can
+  take is a punch. There is no page a kiosk can navigate to that shows pay,
+  personal details or anyone's record — verified end to end, not merely
+  intended.
+- **PINs are a separate credential.** Four digits, bcrypt-hashed, throttled and
+  locked out after five failures, and never the account password — a
+  shoulder-surfed PIN opens a clock and signs in nowhere. Four digits is weak
+  by design because it is what a person will use with gloves on; the
+  compensating controls are the narrow blast radius and the lockout, not the
+  entropy. Predictable PINs (runs, repeats, keypad patterns) are refused.
+- **Uniform failure.** A wrong PIN and an employee number that does not exist
+  return the same message and spend comparable time, so the pad cannot be used
+  to enumerate staff.
+- **Punches are append-only.** `KioskPunch` carries the same database trigger
+  as `AuditEvent`: a disputed hour is settled from evidence nobody can edit.
+
+**Magic-link sign-in** exists for workers with a work account they use twice a
+month and no company laptop — a link to their own inbox is a stronger practical
+control than the sticky note a password becomes. The link is single-use
+(stamped spent before the session is created), expires in 15 minutes, and
+issuing a new one spends any outstanding link. It replaces the **password step
+only**: an account with MFA still lands on the challenge. The request endpoint
+is unauthenticated, so it returns the same answer for every address and never
+confirms who works here.
+
+---
+
+## Workforce analytics and protected characteristics
+
+Retention signals name individuals against a risk band, which makes them the
+most easily misused thing in the product. Three controls:
+
+1. **It is not a model.** A model that learns "people like this leave" will
+   learn a protected characteristic as a proxy, and an employer acting on that
+   is discriminating whether or not anyone intended it. `retention.ts` is
+   eleven named, job-related conditions instead — pay that has not moved in two
+   years, below band minimum, no 1:1 in a quarter, a manager carrying too many
+   people. Each is visible to the person it describes, explainable in one
+   sentence, and fixable by the company; each carries the action that clears it.
+2. **Protected characteristics cannot reach it.** `RetentionFacts` is the whole
+   input surface and cannot carry age, date of birth, gender, ethnicity,
+   national origin, citizenship, disability, marital or family status,
+   pregnancy, religion, veteran status or home address. The assembly query
+   never selects them. A test splits the interface's identifiers into words and
+   asserts none of those terms appear — and that scanner is itself tested,
+   because a check that fired on `managerSpan` containing "age" would be deleted
+   and take the guarantee with it.
+3. **Viewing is audited, and the page says what it is for.** Opening the list
+   writes an audit event. The page states plainly that these are a prompt for a
+   conversation or a pay review, never a basis for adverse action, and not a
+   prediction about any individual.
+
+Pay equity reports on **roles, not people** — dispersion within a job family and
+level — and says in the interface that it is a place to start looking, not a
+legal audit.
+
+---
+
+## The HR assistant
+
+`src/lib/ai/copilot-context.ts` is the entire security boundary, and its rule is
+absolute: **the assistant sees exactly what the asking user could already read.**
+
+- Policies are filtered by the same audience rules that decide whether a policy
+  appears on that person's own policy list — country, department, entity,
+  worker type, manager-only. Unpublished drafts never surface to anyone.
+- Personal facts are the asker's own, scoped by a `workerId` that always comes
+  from the session and never from anything the user typed. A question naming a
+  colleague, or containing an instruction to fetch another worker's id, cannot
+  reach another person's data — tested directly.
+- No compensation, no encrypted identifier, no case file, no document contents.
+- The prompt forbids answering from general knowledge: if the supplied
+  policies do not cover it, the assistant says so and offers to hand the
+  question to a person. A confidently wrong answer about leave or pay is worse
+  than no answer.
+- Citations are validated against what was actually supplied, so a
+  hallucinated reference — which looks checkable and therefore does more damage
+  than none — cannot be rendered.
+- Escalation creates a **Task owned by HR, not an HrCase**. HrCase is the
+  disciplinary and investigation record; filing "how does bereavement leave
+  work?" there would put a disciplinary-shaped record against someone for
+  asking a question.
+
+---
+
+## The read API
+
+- **Read-only, and deliberately.** Nothing outside this application changes an
+  HR record without going through the same authorization and audit path a
+  person does.
+- **Keys are hashed** like passwords (SHA-256), shown once at creation and
+  never recoverable — so there is no "show key" control anywhere, because one
+  could not work. Unknown, revoked and expired keys all return the same 401, so
+  the endpoint cannot be used to probe which keys exist.
+- **Scopes are separate on purpose.** A dashboard that needs only totals holds
+  `headcount.read` and can never enumerate the directory.
+- **Responses are an explicit allowlist** (`api-serializers.ts`), with no
+  caller-controlled field selection. Date of birth, home address, personal
+  contact details, compensation, encrypted identifiers, case files and
+  termination reasons are absent by construction, and a test asserts the exact
+  key set.
+- **Rate limited** per key. The limiter is in-process, so a multi-node
+  deployment needs a shared counter — stated in DEPLOYMENT.md rather than left
+  as a surprise.
+
+**Outbound webhooks** are signed with HMAC-SHA256 over the exact bytes sent,
+with the timestamp inside the signed string so a captured delivery cannot be
+replayed indefinitely. Endpoints must be https. Payloads carry ids and the
+event, not personnel data — a receiver needing detail calls the read API with
+its own scoped key, which keeps one authorization path instead of two. Delivery
+is queued and drained by the maintenance sweep, so a slow or dead endpoint can
+never delay or fail an HR action.
+
+---
+
+## Access provisioning evidence
+
+`AccessEvent` is append-only at the database level and answers the question an
+auditor actually asks: *prove that this person's access was removed when they
+left.* The exception report compares live grants against terminations and
+against what access profiles expect, and orders leavers-with-live-access first
+and oldest first. Marking an exception acceptable records a reason in the
+evidence log and **does not clear the exception** — an accepted risk stays
+visible, and the decision to accept it is itself worth recording.
+
+FSW People does not press the button in each vendor console; that needs their
+APIs. A task with a named owner plus an evidence record is the honest
+mechanism, and the exception report is what catches whatever slipped.
+
+---
+
 ## Deployment responsibilities
 
 1. Set all secrets from a secrets manager. Never commit `.env`.
@@ -322,8 +462,12 @@ the admin UI and in `ADMIN_GUIDE.md`.
    `CREATEDB` in production.
 5. Keep the object storage bucket private with public access explicitly blocked.
 6. Enable dependency scanning (`npm audit`, Dependabot) in CI.
-7. Restrict who holds `SUPER_ADMIN`, `pii.reveal` and `retention.admin`, and review the
-   audit log for those actions periodically.
+7. Restrict who holds `SUPER_ADMIN`, `pii.reveal`, `retention.admin` and `api.admin`, and
+   review the audit log for those actions periodically.
+8. Run `npx tsx scripts/sync-roles.ts` on every deploy. A permission added to the catalog
+   reaches no role until this runs, so a new control would silently apply to nobody.
+9. Review Admin → App Access → Exceptions on a schedule. A leaver with live access is the
+   finding an auditor opens with, and nobody discovers it on their own.
 
 ---
 

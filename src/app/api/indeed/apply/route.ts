@@ -4,6 +4,7 @@ import { storage, newFileKey, validateUpload, sha256 } from '@/lib/storage';
 import { auditAnonymous } from '@/lib/audit';
 import { notifyUser, notifyRole } from '@/lib/notify';
 import { emitEvent } from '@/lib/workflows';
+import { linkReferralsForCandidate } from '@/lib/recruiting/funnel';
 import {
   INDEED_BOARD,
   indeedApplyEnabled,
@@ -221,6 +222,11 @@ async function ingest(payload: ApplyPayload, digest: Record<string, unknown>): P
     }
     throw error;
   }
+
+  // A referral submitted before this person applied attaches now.
+  await linkReferralsForCandidate(candidate.id).catch(() => {
+    /* a referral we cannot link is not a reason to drop the application */
+  });
 
   await log({
     status: 'ACCEPTED',

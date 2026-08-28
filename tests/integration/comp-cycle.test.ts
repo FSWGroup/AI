@@ -5,7 +5,7 @@ import { applyCycle, budgetRollUp, populateCycle, increasePct, annualise, payEqu
 
 let fixture: Fixture;
 let hr: Ctx, finance: Ctx, manager: Ctx, otherManager: Ctx, employee: Ctx;
-let managerWorkerId: string, otherManagerWorkerId: string;
+let managerWorkerId: string;
 let reportA: string, reportB: string, outsiderId: string;
 let cycleId: string;
 
@@ -19,7 +19,6 @@ beforeAll(async () => {
   const mgrRow = await makeWorker({ fixture, email: 'mgr@cc.test', roleKeys: ['MANAGER', 'EMPLOYEE'] });
   const mgr2Row = await makeWorker({ fixture, email: 'mgr2@cc.test', roleKeys: ['MANAGER', 'EMPLOYEE'] });
   managerWorkerId = mgrRow.workerId;
-  otherManagerWorkerId = mgr2Row.workerId;
 
   const a = await makeWorker({
     fixture, email: 'a@cc.test', roleKeys: ['EMPLOYEE'], managerId: mgrRow.workerId,

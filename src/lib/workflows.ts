@@ -9,6 +9,7 @@ import { audienceMatches, workerFacts, type Audience } from '@/lib/audience';
 import { addDays, fullName } from '@/lib/format';
 import { decryptField } from '@/lib/crypto';
 import { env } from '@/lib/env';
+import { queueWebhooks } from '@/lib/webhooks';
 
 /**
  * Workflow automation engine ("if this → then that", §36).
@@ -66,6 +67,14 @@ export interface WorkflowAction {
 }
 
 export async function emitEvent(event: DomainEvent): Promise<void> {
+  // Fan out to subscribed external systems as well as internal workflows.
+  // Queued, never delivered inline, so a slow endpoint cannot hold up an HR
+  // action; the maintenance sweep drains the queue.
+  await queueWebhooks(event.type, {
+    workerId: event.workerId ?? null,
+    ...(event.data ?? {}),
+  });
+
   const definitions = await db.workflowDefinition.findMany({
     where: { trigger: event.type, enabled: true, isTemplate: false },
   });

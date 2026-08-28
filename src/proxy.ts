@@ -2,7 +2,9 @@ import { NextResponse, type NextRequest } from 'next/server';
 
 // /careers is the public job board Indeed links applicants to. It renders
 // only jobs a recruiter has explicitly published — see lib/recruiting/postings.
-const PUBLIC_PATHS = ['/login', '/mfa', '/reset', '/activate', '/careers'];
+// /kiosk is a shared wall tablet authenticated by a device cookie, and /magic
+// consumes a single-use sign-in link — neither can have a session yet.
+const PUBLIC_PATHS = ['/login', '/mfa', '/reset', '/activate', '/careers', '/kiosk', '/magic'];
 
 /**
  * Edge-level gate: unauthenticated requests to app pages bounce to /login

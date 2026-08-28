@@ -120,7 +120,7 @@ export default async function WorkerProfilePage({
       {activeTab === 'comp' && access.comp && <CompTab worker={worker} access={access} ctx={ctx} />}
       {activeTab === 'time-off' && canSeeDetail && <TimeOffTab worker={worker} />}
       {activeTab === 'documents' && (access.self || can(ctx, 'docs.read_all')) && <DocumentsTab worker={worker} ctx={ctx} />}
-      {activeTab === 'assets' && canSeeDetail && <AssetsTab worker={worker} ctx={ctx} />}
+      {activeTab === 'assets' && canSeeDetail && <AssetsTab worker={worker} ctx={ctx} access={access} />}
       {activeTab === 'skills' && canSeeDetail && can(ctx, 'skills.read') && (
         <SkillsTab worker={worker} access={access} ctx={ctx} />
       )}

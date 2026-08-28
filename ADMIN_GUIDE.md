@@ -16,6 +16,15 @@ For HR administrators and system administrators running FSW People day to day.
 - [Recruiting](#recruiting)
 - [Posting jobs to Indeed](#posting-jobs-to-indeed)
 - [AI-suggested interview questions](#ai-suggested-interview-questions)
+- [Referrals and the talent pool](#referrals-and-the-talent-pool)
+- [Skills and certifications](#skills-and-certifications)
+- [Shift scheduling and overtime](#shift-scheduling-and-overtime)
+- [Time clock kiosks](#time-clock-kiosks)
+- [Compensation cycles and pay equity](#compensation-cycles-and-pay-equity)
+- [Workforce analytics](#workforce-analytics)
+- [The HR assistant](#the-hr-assistant)
+- [Access profiles and the exception report](#access-profiles-and-the-exception-report)
+- [API keys and webhooks](#api-keys-and-webhooks)
 - [Performance](#performance)
 - [Compensation and benefits](#compensation-and-benefits)
 - [Payroll hub](#payroll-hub)
@@ -338,6 +347,252 @@ still works, but the questions come from the job description alone and say so.
 Set `ANTHROPIC_API_KEY` (and optionally `AI_MODEL`, which defaults to `claude-opus-5`).
 Until then the panel says the feature is not configured rather than offering a button that
 would fail.
+
+---
+
+## Referrals and the talent pool
+
+**Recruiting → Referrals** is open to everyone: any employee can refer someone
+they know. Referrals close faster and stay longer than any other channel, so
+this is the cheapest pipeline available.
+
+An email address is **required**, because a referral is matched to an
+application by email exactly — never by name. Two candidates sharing a name
+would otherwise mean paying a bonus to the wrong person. If the person has
+already applied, the referral attaches immediately; if not, it attaches the
+moment they do, whether they come through Indeed or are added by hand.
+
+When a referred candidate is hired, the bonus opens for approval with an
+eligibility date 90 days after their start. **FSW People records the decision;
+payroll pays it.** Nothing here moves money.
+
+**Recruiting → Talent Pool** holds candidates who interviewed well and lost to
+someone stronger. Add them from their profile. Every entry gets a review date —
+once it passes they stop appearing as matches and show up for a keep-or-remove
+decision, so candidate details are not held indefinitely by default.
+
+Use **Email candidate** on an application to send a status update. A silent
+pipeline costs offers, and it is candidates' most common complaint about
+employers. Every message is recorded, so "did we ever reply to this person?"
+has an answer.
+
+---
+
+## Skills and certifications
+
+**Talent → Skills** tracks what people can actually do, as distinct from what
+courses they have taken.
+
+Mark a skill a **certification** if it expires — forklift, OSHA 30, CDL — and
+give it a validity period so renewal dates are calculated automatically. Mark
+it **critical** if work stops without it. Only critical skills appear as
+coverage risk, deliberately, so that the word keeps meaning something.
+
+Coverage counts a person only if they are at Proficient or above, their
+certification has not lapsed, and — for critical skills — somebody has
+**verified** it. Anyone can record their own skills, which is how the inventory
+gets built; verification needs `skills.admin`, because a self-declared
+"verified" would be meaningless.
+
+The page then answers the question worth asking: *which critical skills are we
+one person deep on?* Certifications lapsing within 60 days appear on the same
+page and also raise a workflow event, so a renewal is chased rather than
+discovered on the day.
+
+---
+
+## Shift scheduling and overtime
+
+**Time → Schedule** builds a week and publishes it.
+
+Shifts start as **drafts**, invisible to the people working them. Publishing is
+one act for the whole week on purpose — a schedule should never be half-changed
+in front of the crew. Everyone assigned is notified on publish.
+
+**Overtime is forecast, not discovered.** The projection adds hours already
+worked to hours still scheduled and compares against the 40-hour FLSA week, so
+unplanned overtime becomes a scheduling decision instead of a payroll surprise.
+Assigning someone into overtime is **warned, not blocked** — sometimes it is
+the right call. Assigning someone to two overlapping shifts on the same day is
+refused outright, because finding that out on the day means a shift goes
+uncovered.
+
+**Break rules** live in the database with their jurisdiction and source, like
+compliance rules, because they vary by state and they change. The findings list
+is a scheduling aid built from rules an administrator recorded — not a legal
+opinion. Confirm current requirements with HR or counsel.
+
+**Estimated labour cost** prices scheduled hours at base rates only. It does
+not model overtime premium, shift differentials or employer taxes; payroll does
+that, and a number that looked complete here would be trusted when it should
+not be.
+
+---
+
+## Time clock kiosks
+
+**Admin → Kiosks** registers a shared tablet for the warehouse or a branch.
+
+You get a **one-time setup link**. Open it once on the tablet itself — it
+exchanges the token for a device cookie, so it never has to be typed again. The
+link is shown once and is not stored.
+
+Workers then clock in with their employee number and a **4-digit PIN**, set on
+their own profile under Equipment & Access (they can set their own; HR can set
+one for somebody who has forgotten theirs). The PIN is not the account password
+and cannot sign anyone in anywhere — it opens the time clock and nothing else.
+A kiosk holds no session and can reach no page that shows pay or personal
+details.
+
+Punch direction is inferred from state: an open entry means the next punch
+closes it. Somebody at 6am should not have to pick the right button. Every
+punch is kept as evidence that cannot be edited or deleted, so a disputed hour
+is settled from the record.
+
+Revoking a device cuts it off immediately.
+
+---
+
+## Compensation cycles and pay equity
+
+**Compensation → Comp Cycles** replaces the merit spreadsheet.
+
+Create a cycle with an effective date and a budget, then **Add eligible
+people** to build the population from the eligibility rules. Each person's
+current pay is snapshotted, so a mid-cycle change elsewhere cannot shift the
+roll-up under you.
+
+Delegate a budget per manager. Managers propose for **their own reports only** —
+that boundary is enforced on the server, not by hiding rows. Drafts count
+against the budget as well as submitted proposals, so a manager sees the effect
+while typing rather than after sending. Going over budget is shown, not
+blocked: the roll-up exists to make the overage visible before it is approved.
+
+A cycle cannot reduce pay or more than double it. Both are real changes that
+belong outside a merit cycle with their own approvals.
+
+Move the cycle to review, decide each proposal, then **approve** it — which
+requires every submitted proposal to have a decision. **Applying** writes one
+effective-dated compensation row per person: the current row is closed the day
+before and a new one opened, so history stays intact. Applying is idempotent; a
+double click or a retried job cannot pay anyone twice.
+
+**Compensation → Pay Equity** shows pay dispersion within each job family and
+level — where a difference nobody can explain would appear. It reports on roles
+rather than people, so it can go to a comp committee without disclosing
+anybody's pay. It is a place to start looking, **not** a legal pay equity
+audit: a defensible audit is run by counsel, controls for legitimate factors,
+and is usually privileged.
+
+---
+
+## Workforce analytics
+
+**Insights → Workforce Analytics** shows leading indicators rather than history:
+early attrition by hire cohort, hiring velocity, pay position against band, and
+retention signals.
+
+**Read the retention signals correctly.** They are named, job-related
+conditions the company can act on — pay that has not moved in two years, a
+missing 1:1, a manager carrying too many people — and each one carries the
+action that would clear it. They are a prompt for a conversation or a pay
+review. They are **never a basis for adverse action** and they are not a
+prediction about any individual.
+
+No characteristic of a person is used. Age, date of birth, gender, ethnicity,
+national origin, citizenship, disability, marital or family status and home
+address are never read by this analysis, by construction. Opening the list is
+audited.
+
+A hire cohort younger than its own 90-day window reports "too early" rather
+than a flattering zero.
+
+---
+
+## The HR assistant
+
+**HR Assistant** in the sidebar answers questions from your handbook and your
+own record.
+
+It reads **only** the policies you personally are entitled to see — the same
+audience rules that decide what appears on your policy list — plus facts about
+you: your leave balance, your manager, your next holiday. It cannot see a
+colleague's information at any permission level, and asking about one gets you
+pointed at the directory.
+
+Every substantive answer **cites the policy and version** it came from, and the
+citation links to it. If your policies do not cover the question, it says so
+and offers to send it to HR rather than guessing — a confident wrong answer
+about leave or pay is worse than no answer. It never states employment law from
+general knowledge.
+
+Sending a question to HR creates a **task**, not a case file. Asking a question
+should never leave a disciplinary-shaped record against somebody.
+
+Set `ANTHROPIC_API_KEY` to enable it; until then the panel says so rather than
+offering a button that would fail.
+
+---
+
+## Access profiles and the exception report
+
+**App Access → Access Profiles** turns "what does a Warehouse Associate get"
+into data instead of tribal knowledge. Give a profile at least one rule — a
+profile with no rules applies to nobody, deliberately, so a half-filled one
+cannot provision the whole company.
+
+Onboarding raises the grant tasks from the matching profiles. Offboarding
+raises revoke tasks from **what was actually granted**, not from what a profile
+says they should have had — those two differ, and the difference is exactly
+what gets left behind. Both are idempotent, so re-running a lifecycle is safe.
+
+FSW People does not press the button in each vendor console; that needs their
+APIs. A task with a named owner plus an evidence record is what someone has to
+do anyway, tracked instead of remembered.
+
+**App Access → Exceptions** is the report that makes the loop worth having:
+
+- **Still has access after leaving** — a terminated worker with a live grant,
+  ordered oldest first. This is the finding an auditor opens with and the one
+  nobody discovers on their own.
+- **Missing an expected entitlement** — a profile says they should have it and
+  they do not.
+- **Access no profile accounts for** — granted individually; confirm it is
+  still needed.
+
+Recording that an exception is acceptable adds a reason to the evidence log and
+**does not clear it**. An accepted risk should stay visible.
+
+---
+
+## API keys and webhooks
+
+**Admin → API & Webhooks** lets other FSW systems read approved HR data instead
+of re-keying it — Prophet 21, Power BI, Pipedrive.
+
+The API is **read-only**. Nothing outside this application changes an HR record
+without going through the same authorization and audit path a person does.
+
+Issue one key per consuming system with only the scopes it needs:
+`workers.read` for the directory, `org.read` for structure, `headcount.read`
+for aggregates. Keeping headcount separate means a dashboard that needs only
+totals can never enumerate the directory.
+
+**A key is shown exactly once.** It is stored as a hash, so there is no way to
+recover it later — only to revoke it and issue a new one. Give keys an expiry;
+a dated key is easier to rotate.
+
+Responses carry a fixed set of fields and nothing else. Date of birth, home
+address, personal contact details, compensation and identifiers are absent, and
+there is no parameter a caller can use to widen the response.
+
+**Webhooks** push events to another system. Endpoints must be https, and each
+delivery is signed with HMAC-SHA256 — verify the signature on your side before
+trusting the payload. Payloads carry ids and the event, not personnel data: a
+receiver that needs detail calls the read API with its own key. Deliveries are
+queued and sent by the maintenance job, retried with backoff, then abandoned
+visibly in the delivery log rather than disappearing. An endpoint that fails 20
+times running is switched off.
 
 ---
 

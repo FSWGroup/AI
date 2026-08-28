@@ -54,8 +54,11 @@ src/
     (auth)/                Login, MFA, activation, password reset
     (app)/                 The authenticated application, one folder per module
     careers/               Public job board — the only unauthenticated content pages
+    kiosk/                 Shared warehouse tablet: device-authenticated time clock
+    magic/                 Single-use sign-in links for workers with no password
     api/                   Document downloads, audited exports, maintenance sweep,
-                           the Indeed job feed and the Indeed Apply webhook
+                           the Indeed job feed and Apply webhook, and v1/ — the
+                           scoped, read-only API other FSW systems consume
   components/
     ui/                    Design system: index.tsx (server-safe), client.tsx (interactive)
     shell/                 SideNav, TopBar
@@ -71,6 +74,14 @@ src/
     imports.ts             CSV validate-then-apply import engine
     crypto.ts              AES-256-GCM field encryption, TOTP, signed URLs
     indeed.ts              Indeed XML feed generation and Apply signature verification
+    skills.ts              Skills, certification expiry, coverage-risk analysis
+    scheduling.ts          Shifts, overtime forecasting, break-rule evaluation
+    comp-cycle.ts          Merit planning, budget roll-up, pay equity grouping
+    access.ts              Access profiles, provisioning loop, exception report
+    kiosk.ts               Shared-tablet device auth and PIN clock-in
+    api-keys.ts            Machine credentials, scopes, rate limit, webhook signing
+    webhooks.ts            Outbound delivery queue with backoff
+    analytics/             retention.ts (job-related rules only), workforce.ts
     ai/                    The only place the app talks to an external model:
                            client.ts (provider), redact.ts (data minimisation),
                            interview-questions.ts (generation + guardrails)
@@ -109,6 +120,20 @@ HMAC-verified against the raw request bytes and deduplicated by a unique
 `Application.sourceRef`, so a webhook retry cannot create a second application. Every
 delivery — including the ones we refuse — is written to an append-only `JobBoardDelivery`
 log that records what happened, not a second copy of the applicant's contact details.
+
+**Retention signals are rules, not a model.** A model that learns "people like
+this leave" will learn a protected characteristic as a proxy, and an employer
+acting on that output is discriminating whether or not anyone intended it. So
+`analytics/retention.ts` is eleven named, job-related conditions instead —
+pay that has not moved, below band minimum, no 1:1 in a quarter — each visible
+to the person it describes and fixable by the company. The input type cannot
+carry age, date of birth, gender, ethnicity, citizenship, marital status or
+home address; the query never selects them; a test proves it.
+
+**The read API is an allowlist, not a projection.** A machine API has no
+screen, so an over-broad field never gets noticed. `api-serializers.ts` names
+every field that may leave, and there is deliberately no caller-controlled
+`fields` or `include` parameter that could widen it.
 
 **AI is advisory, minimal and screened.** `src/lib/ai` is the only path to an external
 model. It runs after the caller's permission check, on data that caller could already read,
@@ -258,6 +283,8 @@ npm run build && npm start &
 npx tsx scripts/verify-mfa-fix.ts        # a password-only session cannot disable MFA
 npx tsx scripts/verify-indeed-flow.ts    # publish → feed → careers page → signed webhook
 npx tsx scripts/verify-ai-questions.ts   # the AI panel reports an outcome, never nothing
+npx tsx scripts/verify-new-modules.ts    # skills, analytics, comp, funnel, schedule,
+                                         # kiosk, assistant, access loop and the read API
 ```
 
 `verify-ai-questions.ts` checks the not-configured path by default. Give it a real
@@ -294,7 +321,7 @@ are shown as "not configured" rather than failing.
 `src/lib/env.ts` validates all of it at startup with Zod and fails fast with a readable
 message naming the specific variable.
 
-Two optional groups are worth calling out:
+Three optional groups are worth calling out:
 
 - **Indeed** — `INDEED_FEED_TOKEN` (protects the job feed Indeed crawls) and
   `INDEED_APPLY_SECRET` (verifies inbound applications). Both should be
@@ -303,6 +330,20 @@ Two optional groups are worth calling out:
   [`ADMIN_GUIDE.md`](ADMIN_GUIDE.md#posting-jobs-to-indeed).
 - **AI** — `ANTHROPIC_API_KEY`, optionally `AI_MODEL` (default `claude-opus-5`). Without a
   key the AI panels say the feature is not configured.
+- **Nothing at all for kiosks, the API or webhooks** — those credentials are issued in the
+  app (Admin → Kiosks, Admin → API & Webhooks) and stored hashed or encrypted, never in the
+  environment.
+
+### After a deploy that adds a permission
+
+```bash
+npx tsx scripts/sync-roles.ts
+```
+
+Adding a permission to `src/lib/authz/catalog.ts` changes code, not the `RolePermission`
+rows an existing database already holds — so without this a new permission is defined and
+granted to nobody. The script is additive and never removes a grant an administrator has
+tailored in Settings.
 
 ---
 

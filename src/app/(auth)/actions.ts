@@ -318,3 +318,106 @@ export async function revokeOtherSessions(): Promise<ActionResult> {
   });
   return { success: 'All other sessions were signed out.' };
 }
+
+// ---------------------------------------------------------------------------
+// Magic-link sign-in (§ frontline access)
+// ---------------------------------------------------------------------------
+
+const MAGIC_LINK_MINUTES = 15;
+
+/**
+ * Email a single-use sign-in link.
+ *
+ * This exists for the warehouse and driver population: people with a work
+ * account they use twice a month, no company laptop, and no chance of
+ * remembering a password. A link to their own inbox is a stronger practical
+ * control than the sticky note the password would otherwise become.
+ *
+ * The response is always the same regardless of whether the address exists —
+ * this endpoint is unauthenticated, so it must not confirm who works here.
+ * MFA is NOT bypassed: a link satisfies the password step only, and an
+ * account with MFA still lands on the challenge.
+ */
+export async function requestMagicLink(_prev: ActionResult, formData: FormData): Promise<ActionResult> {
+  const parsed = z.object({ email: z.string().email() }).safeParse({ email: formData.get('email') });
+  const generic = {
+    success: 'If that address belongs to an active account, a sign-in link is on its way. It expires in 15 minutes.',
+  };
+  if (!parsed.success) return { error: 'Enter your work email address.' };
+  const email = parsed.data.email.toLowerCase().trim();
+
+  const user = await db.user.findUnique({
+    where: { email },
+    include: { worker: { select: { preferredName: true, legalFirstName: true } } },
+  });
+  if (!user || user.status !== 'ACTIVE') {
+    await auditAnonymous('auth.magic_link_unknown', { email });
+    return generic;
+  }
+  if (user.lockedUntil && user.lockedUntil > new Date()) {
+    await auditAnonymous('auth.magic_link_blocked', { email });
+    return generic;
+  }
+
+  // Any outstanding link is spent when a new one is issued, so a forwarded
+  // older email cannot be used behind the person's back.
+  await db.authToken.updateMany({
+    where: { userId: user.id, kind: 'MAGIC_LINK', usedAt: null },
+    data: { usedAt: new Date() },
+  });
+
+  const token = generateToken();
+  await db.authToken.create({
+    data: {
+      userId: user.id,
+      kind: 'MAGIC_LINK',
+      tokenHash: hashToken(token),
+      expiresAt: new Date(Date.now() + MAGIC_LINK_MINUTES * 60_000),
+    },
+  });
+
+  const name = user.worker?.preferredName || user.worker?.legalFirstName || 'there';
+  await sendEmail({
+    to: user.email,
+    subject: 'Your FSW People sign-in link',
+    heading: `Hello ${name}`,
+    bodyHtml: `<p>Use the button below to sign in. The link works once and expires in ${MAGIC_LINK_MINUTES} minutes.</p><p>If you did not ask for this, you can ignore it — nobody can sign in without the link.</p>`,
+    ctaLabel: 'Sign in to FSW People',
+    ctaUrl: `${env.APP_BASE_URL.replace(/\/$/, '')}/magic/${token}`,
+    templateKey: 'auth.magic_link',
+  });
+  await auditAnonymous('auth.magic_link_sent', { email });
+  return generic;
+}
+
+export type MagicLinkOutcome = 'INVALID' | 'MFA_REQUIRED' | 'SIGNED_IN';
+
+/**
+ * Consume a link. Single use, enforced by stamping `usedAt` before the
+ * session is created, so a link forwarded to two devices signs in at most one.
+ */
+export async function consumeMagicLink(token: string): Promise<MagicLinkOutcome> {
+  const record = await db.authToken.findUnique({
+    where: { tokenHash: hashToken(token) },
+    include: { user: true },
+  });
+  if (!record || record.kind !== 'MAGIC_LINK' || record.usedAt || record.expiresAt < new Date()) {
+    await auditAnonymous('auth.magic_link_rejected', {
+      metadata: { reason: !record ? 'unknown' : record.usedAt ? 'already_used' : 'expired' },
+    });
+    return 'INVALID';
+  }
+  if (record.user.status !== 'ACTIVE') return 'INVALID';
+
+  await db.authToken.update({ where: { id: record.id }, data: { usedAt: new Date() } });
+  await db.user.update({
+    where: { id: record.userId },
+    data: { failedLoginCount: 0, lockedUntil: null, lastLoginAt: new Date() },
+  });
+  // A magic link replaces the password, never the second factor.
+  await createSession(record.userId, { mfaPassed: !record.user.mfaEnabled });
+  await db.auditEvent.create({
+    data: { actorUserId: record.userId, actorEmail: record.user.email, action: 'auth.login_magic_link' },
+  });
+  return record.user.mfaEnabled ? 'MFA_REQUIRED' : 'SIGNED_IN';
+}

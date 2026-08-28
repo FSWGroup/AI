@@ -5,6 +5,7 @@ import { recordTimeline } from '@/lib/timeline';
 import { audienceMatches, workerFacts, type Audience } from '@/lib/audience';
 import { addDays } from '@/lib/format';
 import type { LifecycleKind, TaskCategory } from '@/generated/prisma/enums';
+import { provisionForOnboarding, deprovisionForOffboarding } from '@/lib/access';
 
 /**
  * Lifecycle engine: turns onboarding/offboarding templates into concrete,
@@ -84,6 +85,19 @@ export async function startLifecycle(opts: {
       });
       byOrder.set(item.order, task.id);
     }
+  }
+
+  // Access is driven from the access profiles, not from the template, because
+  // what a role gets changes far more often than the onboarding checklist
+  // does. Both helpers are idempotent, so re-running a lifecycle is safe.
+  if (opts.kind === 'ONBOARDING') {
+    await provisionForOnboarding(opts.workerId, opts.createdById).catch(() => {
+      /* provisioning tasks are additive; never block starting onboarding */
+    });
+  } else {
+    await deprovisionForOffboarding(opts.workerId, opts.createdById).catch(() => {
+      /* the exception report catches anything that did not get raised here */
+    });
   }
 
   await recordTimeline({

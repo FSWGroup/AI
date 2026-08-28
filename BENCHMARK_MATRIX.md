@@ -67,7 +67,21 @@ needs an external provider or credential · ✗ not built
 | Applications delivered into the pipeline | ✅ | ◐ | ✅ | ✗ | ✗ | Indeed Apply webhook, HMAC-verified, idempotent |
 | Disposition sync back to the board | ✗ | ◐ | ◐ | ✗ | ✗ | Needs Indeed's partner API — documented, not faked |
 | AI interview question preparation | ✅ | ◐ | ✗ | ✗ | ✗ | Five per application, screened for protected characteristics, advisory only |
+| Employee referral programme | ✅ | ✅ | ✅ | ◐ | ◐ | Email-exact matching; bonus recorded here, paid by payroll |
+| Talent pool / silver medallists | ✅ | ◐ | ◐ | ✗ | ✗ | Every entry carries a review date |
+| Candidate status emails | ✅ | ✅ | ✅ | ◐ | ✅ | Explicit send, never automatic |
 | Resume parsing | ◐ | ◐ | ✅ | ✗ | ✗ | Structured résumé text from Indeed Apply or pasted; PDF text extraction needs a provider |
+
+### Hourly workforce
+
+| Capability | FSW People | Rippling-style | BambooHR-style | Gusto-style | Deel-style | Notes |
+|---|---|---|---|---|---|---|
+| Shift scheduling and publishing | ✅ | ◐ | ✗ | ✗ | ✗ | Draft → publish as one act per week |
+| Overtime forecasting before it is incurred | ✅ | ◐ | ✗ | ✗ | ✗ | Worked + scheduled against the FLSA week |
+| Break-rule compliance checking | ✅ | ◐ | ✗ | ✗ | ✗ | Data-driven per jurisdiction, with sources |
+| Labour cost by location | ✅ | ◐ | ✗ | ◐ | ✗ | Base rates only, and says so |
+| Kiosk / shared-tablet clock-in | ✅ | ✅ | ◐ | ◐ | ✗ | Device-authenticated, punch-only |
+| Passwordless sign-in for frontline staff | ✅ | ◐ | ✗ | ✗ | ✗ | Single-use link; does not bypass MFA |
 
 ## Talent
 
@@ -97,6 +111,14 @@ needs an external provider or credential · ✗ not built
 | **Running payroll / filing taxes** | ✗ | ✅ | ◐ | ✅ | ✅ | **Deliberately out of scope** — see limitations |
 | Contractor payments | ◐ | ✅ | ✗ | ✅ | ✅ | Records and reconciles; does not move money |
 
+### Skills and capability
+
+| Capability | FSW People | Rippling-style | BambooHR-style | Gusto-style | Deel-style | Notes |
+|---|---|---|---|---|---|---|
+| Skills inventory mapped to roles | ✅ | ◐ | ◐ | ✗ | ✗ | Distinct from training completion |
+| Certification expiry tracking | ✅ | ◐ | ◐ | ✗ | ✗ | Renewal dates calculated; raises a workflow event |
+| Coverage-risk / single-point-of-failure | ✅ | ✗ | ✗ | ✗ | ✗ | Critical skills only, verification required |
+
 ## Global / international
 
 | Capability | FSW People | Rippling-style | BambooHR-style | Gusto-style | Deel-style | Notes |
@@ -109,6 +131,33 @@ needs an external provider or credential · ✗ not built
 | Data privacy notice and consent tracking | ✅ | ◐ | ◐ | ✗ | ✅ | PH Data Privacy Act principles |
 | EOR / entity-of-record services | ✗ | ◐ | ✗ | ✗ | ✅ | A service, not software — `EOR` engagement type is supported as a classification |
 | Multi-currency FX roll-up | ◐ | ✅ | ✗ | ✗ | ✅ | Cost roll-ups are USD-only; no FX rate source |
+
+### Analytics
+
+| Capability | FSW People | Rippling-style | BambooHR-style | Gusto-style | Deel-style | Notes |
+|---|---|---|---|---|---|---|
+| Descriptive reporting | ✅ | ✅ | ✅ | ◐ | ◐ | |
+| Early-attrition cohorts | ✅ | ◐ | ◐ | ✗ | ✗ | Only possible because history is effective-dated |
+| Retention signals | ✅ | ◐ | ✗ | ✗ | ✗ | Named job-related rules, never a model, never protected characteristics |
+| Time-to-fill by department | ✅ | ◐ | ◐ | ✗ | ✗ | Median, not mean |
+| Compa-ratio and pay position | ✅ | ✅ | ◐ | ✗ | ✗ | Hourly annualised to compare like for like |
+
+### Access governance
+
+| Capability | FSW People | Rippling-style | BambooHR-style | Gusto-style | Deel-style | Notes |
+|---|---|---|---|---|---|---|
+| Role-based access profiles | ✅ | ✅ | ✗ | ✗ | ✗ | Drives onboarding grants and offboarding revokes |
+| Provisioning evidence log | ✅ | ◐ | ✗ | ✗ | ✗ | Append-only; answers an auditor directly |
+| "Still has access after leaving" report | ✅ | ◐ | ✗ | ✗ | ✗ | Oldest first |
+| Automated vendor provisioning | ✗ | ✅ | ✗ | ✗ | ✗ | Needs each vendor's API — tasks + evidence instead, honestly labelled |
+
+### Integration surface
+
+| Capability | FSW People | Rippling-style | BambooHR-style | Gusto-style | Deel-style | Notes |
+|---|---|---|---|---|---|---|
+| Versioned read API | ✅ | ✅ | ✅ | ◐ | ✅ | Scoped, rate-limited, explicit field allowlist |
+| Outbound signed webhooks | ✅ | ✅ | ◐ | ◐ | ✅ | HMAC over exact bytes, queued with backoff |
+| Write API | ✗ | ✅ | ◐ | ◐ | ◐ | Deliberate: no external path around authorization and audit |
 
 ## Automation, compliance, governance
 
@@ -157,18 +206,26 @@ These are consequences of building for one company rather than for a market:
 
 In rough priority order for FSW Group:
 
-1. **Entra ID SSO** — the highest-value integration; the architecture is ready.
-1b. **PDF résumé text extraction** — Indeed Apply supplies structured résumé text, but a
-    PDF arriving any other way still has to be pasted in by hand.
-2. **S3 driver implementation** — required before multi-node production deployment.
-3. **Peer/360 review UI** — the data model already supports it.
-4. **Compensation cycle planning** — bulk merit planning with budget roll-up.
-5. **Open enrollment windows** — a guided period rather than ad-hoc elections.
-6. **Scheduled report delivery** — the schema field exists; needs a delivery job.
-7. **9-box and succession planning** — for executive talent review.
-8. **Multi-currency roll-up** — needs an FX rate source and a policy on rate dates.
-9. **Native mobile app** — the responsive web app covers phone use today.
-10. **Versioned public API** — for other FSW systems to consume approved HR data.
+1. **Entra ID SSO** — still the highest-value integration. The access provisioning loop is
+   built and driven by profiles; SSO is what would let it press the button rather than
+   raise a task.
+2. **Philippines statutory depth** — 13th month pay, SSS/PhilHealth/Pag-IBIG contribution
+   schedules, night differential and holiday premium. Real legal exposure, and the one item
+   here that needs PH counsel to validate the rules rather than a developer to write them.
+3. **Vendor provisioning adapters** — Prophet 21, RingCentral, Google Workspace. The loop,
+   the profiles and the evidence log all exist; each adapter turns a task into an action.
+4. **S3 driver implementation** — required before multi-node production deployment. The
+   API rate limiter is also in-process and needs a shared counter at that point.
+5. **PDF résumé text extraction** — Indeed Apply supplies structured résumé text, but a PDF
+   arriving any other way still has to be pasted in by hand.
+6. **SMS for frontline staff** — kiosk and magic-link close most of the gap; PTO requests
+   and shift confirmations by text would close the rest. Needs a provider.
+7. **Peer/360 review UI** — the data model already supports it.
+8. **Open enrollment windows** — a guided period rather than ad-hoc elections.
+9. **Scheduled report delivery** — the schema field exists; needs a delivery job.
+10. **9-box and succession planning** — the skills inventory now feeds it usefully.
+11. **Multi-currency roll-up** — needs an FX rate source and a policy on rate dates.
+12. **Native mobile app** — the responsive web app plus kiosk covers frontline use today.
 
 ---
 

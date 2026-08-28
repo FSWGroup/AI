@@ -8,6 +8,8 @@ import { audit } from '@/lib/audit';
 import { createApprovalRequest } from '@/lib/approvals';
 import { createWorker } from '@/lib/people';
 import { sendEmail } from '@/lib/email';
+import { notifyRole } from '@/lib/notify';
+import { sendCandidateEmail, linkReferralsForCandidate, markReferralHired, type CandidateEmailKind } from '@/lib/recruiting/funnel';
 import { emitEvent } from '@/lib/workflows';
 import { INDEED_BOARD, indeedFeedEnabled } from '@/lib/indeed';
 import { aiEnabled, describeAiError, AiUnavailableError } from '@/lib/ai/client';
@@ -129,6 +131,8 @@ export async function createCandidateAction(_prev: ActionResult, formData: FormD
         });
       }
     }
+    // A referral submitted before they applied attaches here.
+    await linkReferralsForCandidate(candidate.id);
     await audit(ctx, 'recruiting.candidate_created', { targetType: 'Candidate', targetId: candidate.id });
     revalidatePath('/recruiting/candidates');
     if (requisitionId) revalidatePath(`/recruiting/jobs/${requisitionId}`);
@@ -385,8 +389,11 @@ export async function recordOfferResponseAction(_prev: ActionResult, formData: F
       targetId: offerId,
       metadata: { workerId: worker.id },
     });
+    // If somebody referred this candidate, the bonus clock starts now.
+    await markReferralHired(candidate.id, offer.startDate ?? new Date());
     await emitEvent({ type: 'OFFER_ACCEPTED', workerId: worker.id });
     revalidatePath('/recruiting/offers');
+    revalidatePath('/recruiting/referrals');
     return { success: `Offer accepted — ${candidate.firstName} is now a worker with onboarding started. Set their work email on the profile to send the account invite.` };
   } catch (error) {
     if (error instanceof AuthzError) return { error: error.message };
@@ -577,5 +584,199 @@ export async function saveCandidateResumeAction(_prev: ActionResult, formData: F
   } catch (error) {
     if (error instanceof AuthzError) return { error: error.message };
     return { error: 'Could not save the résumé text.' };
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Referrals — § own the funnel
+// ---------------------------------------------------------------------------
+
+/**
+ * Refer someone. Any employee may do this for themselves; recording a
+ * referral on somebody else's behalf needs recruiting.write, because the
+ * referrer is who a bonus would eventually be paid to.
+ */
+export async function createReferralAction(_prev: ActionResult, formData: FormData): Promise<ActionResult> {
+  try {
+    const ctx = await requireCtxAction();
+    const requestedReferrer = String(formData.get('referrerWorkerId') ?? '');
+    const referrerWorkerId = requestedReferrer && can(ctx, 'recruiting.write') ? requestedReferrer : ctx.workerId;
+    if (!referrerWorkerId) return { error: 'Only a worker record can make a referral.' };
+
+    const candidateName = String(formData.get('candidateName') ?? '').trim();
+    if (!candidateName) return { error: 'Who are you referring?' };
+    const candidateEmail = String(formData.get('candidateEmail') ?? '').trim() || null;
+
+    // A referral without an email can never be matched to an application, and
+    // therefore can never earn a bonus. Say so rather than silently failing.
+    if (!candidateEmail) {
+      return { error: 'An email address is required so the referral can be matched to their application.' };
+    }
+
+    const referral = await db.referral.create({
+      data: {
+        referrerWorkerId,
+        candidateName,
+        candidateEmail,
+        candidatePhone: String(formData.get('candidatePhone') ?? '') || null,
+        requisitionId: String(formData.get('requisitionId') ?? '') || null,
+        relationship: String(formData.get('relationship') ?? '') || null,
+        note: String(formData.get('note') ?? '') || null,
+      },
+    });
+
+    // If they have already applied, attach it now rather than waiting.
+    const existing = await db.candidate.findFirst({
+      where: { email: { equals: candidateEmail, mode: 'insensitive' } },
+      select: { id: true },
+    });
+    if (existing) {
+      await db.referral.update({
+        where: { id: referral.id },
+        data: { candidateId: existing.id, status: 'LINKED' },
+      });
+    }
+
+    await audit(ctx, 'recruiting.referral_created', {
+      targetType: 'Referral',
+      targetId: referral.id,
+      metadata: { requisitionId: referral.requisitionId, linked: Boolean(existing) },
+    });
+    await notifyRole('RECRUITER', {
+      title: 'New employee referral',
+      body: `${candidateName} was referred${referral.requisitionId ? ' for an open role' : ''}.`,
+      href: '/recruiting/referrals',
+    });
+    revalidatePath('/recruiting/referrals');
+    return {
+      success: existing
+        ? 'Referral recorded and matched to their existing application.'
+        : 'Referral recorded. It will attach automatically when they apply.',
+    };
+  } catch (error) {
+    if (error instanceof AuthzError) return { error: error.message };
+    return { error: 'Could not record the referral.' };
+  }
+}
+
+/** Approve a referral bonus for payment. Recording only — payroll pays it. */
+export async function decideReferralBonusAction(_prev: ActionResult, formData: FormData): Promise<ActionResult> {
+  try {
+    const ctx = await requirePermission('recruiting.write');
+    const referralId = String(formData.get('referralId') ?? '');
+    const decision = String(formData.get('bonusStatus') ?? '');
+    if (!['APPROVED', 'FORFEITED', 'PAID'].includes(decision)) return { error: 'Invalid decision.' };
+    const referral = await db.referral.findUniqueOrThrow({ where: { id: referralId } });
+    if (referral.status !== 'HIRED') return { error: 'A bonus only applies once the referred candidate is hired.' };
+    if (decision === 'APPROVED' && referral.bonusEligibleAt && referral.bonusEligibleAt > new Date()) {
+      return { error: `Not eligible until ${referral.bonusEligibleAt.toISOString().slice(0, 10)}.` };
+    }
+    const amountRaw = String(formData.get('bonusAmount') ?? '').trim();
+    const bonusAmount = amountRaw ? Number(amountRaw) : null;
+    if (amountRaw && (!Number.isFinite(bonusAmount) || bonusAmount! < 0)) return { error: 'Enter a valid amount.' };
+
+    await db.referral.update({
+      where: { id: referralId },
+      data: {
+        bonusStatus: decision,
+        ...(bonusAmount !== null ? { bonusAmount } : {}),
+        bonusApprovedById: ctx.userId,
+      },
+    });
+    await audit(ctx, 'recruiting.referral_bonus', {
+      targetType: 'Referral',
+      targetId: referralId,
+      metadata: { decision, bonusAmount },
+    });
+    revalidatePath('/recruiting/referrals');
+    return { success: `Bonus marked ${decision.toLowerCase()}. Payroll pays it — FSW People only records the decision.` };
+  } catch (error) {
+    if (error instanceof AuthzError) return { error: error.message };
+    return { error: 'Could not update the bonus.' };
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Talent pool
+// ---------------------------------------------------------------------------
+
+export async function addToTalentPoolAction(_prev: ActionResult, formData: FormData): Promise<ActionResult> {
+  try {
+    const ctx = await requirePermission('recruiting.write');
+    const candidateId = String(formData.get('candidateId') ?? '');
+    const months = Number(formData.get('reviewMonths')) || 12;
+    const reviewBy = new Date(Date.now() + months * 30.44 * 86_400_000);
+    await db.talentPoolEntry.upsert({
+      where: { candidateId },
+      create: {
+        candidateId,
+        addedById: ctx.userId,
+        reason: String(formData.get('reason') ?? '') || null,
+        jobFamily: String(formData.get('jobFamily') ?? '') || null,
+        strengthNote: String(formData.get('strengthNote') ?? '') || null,
+        reviewBy,
+      },
+      update: {
+        status: 'ACTIVE',
+        reason: String(formData.get('reason') ?? '') || null,
+        jobFamily: String(formData.get('jobFamily') ?? '') || null,
+        strengthNote: String(formData.get('strengthNote') ?? '') || null,
+        reviewBy,
+      },
+    });
+    await audit(ctx, 'recruiting.talent_pool_added', { targetType: 'Candidate', targetId: candidateId });
+    revalidatePath('/recruiting/talent-pool');
+    revalidatePath(`/recruiting/candidates/${candidateId}`);
+    return { success: `Added to the talent pool, for review in ${months} months.` };
+  } catch (error) {
+    if (error instanceof AuthzError) return { error: error.message };
+    return { error: 'Could not add to the talent pool.' };
+  }
+}
+
+export async function removeFromTalentPoolAction(formData: FormData): Promise<void> {
+  const ctx = await requirePermission('recruiting.write');
+  const entryId = String(formData.get('entryId') ?? '');
+  const entry = await db.talentPoolEntry.findUnique({ where: { id: entryId } });
+  if (!entry) return;
+  await db.talentPoolEntry.update({ where: { id: entryId }, data: { status: 'REMOVED' } });
+  await audit(ctx, 'recruiting.talent_pool_removed', { targetType: 'Candidate', targetId: entry.candidateId });
+  revalidatePath('/recruiting/talent-pool');
+}
+
+// ---------------------------------------------------------------------------
+// Candidate communication
+// ---------------------------------------------------------------------------
+
+/** Send a candidate a status update. Always an explicit human act. */
+export async function emailCandidateAction(_prev: ActionResult, formData: FormData): Promise<ActionResult> {
+  try {
+    const ctx = await requirePermission('recruiting.write');
+    const applicationId = String(formData.get('applicationId') ?? '');
+    const kind = String(formData.get('kind') ?? '') as CandidateEmailKind;
+    if (!['RECEIVED', 'ADVANCED', 'REJECTED', 'POOL_INVITE'].includes(kind)) return { error: 'Unknown message type.' };
+
+    const application = await db.application.findUniqueOrThrow({
+      where: { id: applicationId },
+      include: { requisition: { select: { title: true } }, candidate: { select: { id: true, email: true } } },
+    });
+    const sent = await sendCandidateEmail({
+      candidateId: application.candidateId,
+      kind,
+      jobTitle: application.requisition.title,
+      note: String(formData.get('note') ?? '') || null,
+    });
+    if (!sent) return { error: 'This candidate has no email address on file.' };
+
+    await audit(ctx, 'recruiting.candidate_emailed', {
+      targetType: 'Candidate',
+      targetId: application.candidateId,
+      metadata: { kind, applicationId },
+    });
+    revalidatePath(`/recruiting/candidates/${application.candidateId}`);
+    return { success: 'Message queued. It appears in Admin → Email Outbox until a mail provider is configured.' };
+  } catch (error) {
+    if (error instanceof AuthzError) return { error: error.message };
+    return { error: 'Could not send the message.' };
   }
 }
