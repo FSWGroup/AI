@@ -128,10 +128,12 @@ test.describe("Search honours permissions", () => {
 
 test.describe("Insecure direct object reference", () => {
   test("a learner cannot read another person's profile by URL", async ({ page }) => {
-    // Sign in as a manager first to discover a real user ID from the directory.
+    // Sign in as a manager first to discover a real user ID and name.
     await signIn(page, "manager");
     const searchResponse = await page.request.get("/api/search?q=Kim&limit=5");
-    const body = (await searchResponse.json()) as { results: { entityType: string; id: string }[] };
+    const body = (await searchResponse.json()) as {
+      results: { entityType: string; id: string; title: string }[];
+    };
     const otherPerson = body.results.find((r) => r.entityType === "PERSON");
 
     if (!otherPerson) {
@@ -144,11 +146,20 @@ test.describe("Insecure direct object reference", () => {
     await signIn(page, "learner");
     await page.goto(`/people/${otherPerson.id}`);
 
-    // Must not render the other person's profile. Either forbidden or not-found
-    // is acceptable; rendering their details is not.
-    const url = page.url();
-    const refused = /forbidden/.test(url) || (await page.getByText(/not found/i).count()) > 0;
-    expect(refused, "a learner must not see another person's profile").toBeTruthy();
+    /*
+     * The security property is that the colleague's record is not rendered. The
+     * application answers with "Page not found" rather than an explicit
+     * refusal, which is deliberate: a 403 would confirm that the person exists.
+     */
+    await expect(
+      page.getByRole("heading", { level: 1, name: new RegExp(otherPerson.title, "i") }),
+    ).toHaveCount(0);
+
+    const heading = await page.getByRole("heading", { level: 1 }).first().textContent();
+    expect(
+      /not found|not permitted|went wrong/i.test(heading ?? ""),
+      `a learner must not see another person's profile; saw heading "${heading}"`,
+    ).toBeTruthy();
   });
 
   test("a learner cannot download another person's certificate", async ({ page }) => {

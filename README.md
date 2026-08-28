@@ -275,6 +275,17 @@ npm run test:integration  # integration — real database
 npm run test:e2e          # end-to-end — real browser
 ```
 
+| Layer | Count | Covers |
+|---|---|---|
+| Unit | 156 | Permission catalog invariants, assignment criteria evaluation, quiz grading for all ten question types, timezone-aware due dates, content transforms, field encryption |
+| Integration | 128 | Authorization boundaries, evidence immutability, AI retrieval filtering, video progress anti-scrub, certificate PDFs, the job queue, SOP lifecycle, assignment idempotency |
+| End-to-end | 5 specs | Authentication and permission-filtered navigation, security boundaries, the learner journey, the administrator journey, mobile, accessibility |
+
+Notable: `npm run test:e2e` frees the port first, because the harness
+deliberately refuses to reuse an existing server — a leftover process serves a
+stale build, which shows up as every page rendering the error boundary rather
+than as an obvious port conflict.
+
 Integration tests require the test database and refuse to run against any
 database whose name does not contain `test`.
 
