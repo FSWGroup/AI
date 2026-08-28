@@ -452,7 +452,7 @@ async function attemptDelivery(deliveryId: string): Promise<{ ok: boolean; respo
 
 /** Delivers one webhook attempt immediately and returns the outcome, for the admin "Test delivery" button. */
 export async function testWebhookDelivery(webhookId: string): Promise<{ ok: boolean; responseCode: number | null }> {
-  const webhook = await prisma.webhook.findUniqueOrThrow({ where: { id: webhookId } });
+  await prisma.webhook.findUniqueOrThrow({ where: { id: webhookId } }); // throws if the webhook doesn't exist
   const delivery = await prisma.webhookDelivery.create({
     data: {
       webhookId,

@@ -420,6 +420,7 @@ async function runOverdueTraining(actor: Actor, params: ReportRunParams): Promis
   const userWhere = await scopedUserWhere(actor, {
     ...(params.filters.businessUnitId ? { businessUnitId: params.filters.businessUnitId } : {}),
     ...(params.filters.departmentId ? { departmentId: params.filters.departmentId } : {}),
+    ...(params.filters.locationId ? { locationId: params.filters.locationId } : {}),
   });
 
   const where: Prisma.AssignmentWhereInput = {
@@ -1309,7 +1310,7 @@ export const REPORTS: ReportDefinition[] = [
     description: "Assignments past their due date and not completed.",
     category: "Compliance",
     permission: "reports.view",
-    filters: ORG_FILTERS,
+    filters: [...ORG_FILTERS, { key: "locationId", label: "Location", type: "select", options: locationOptions }],
     columns: [
       { key: "person", label: "Person" },
       { key: "manager", label: "Manager" },
