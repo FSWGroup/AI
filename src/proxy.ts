@@ -1,6 +1,8 @@
 import { NextResponse, type NextRequest } from 'next/server';
 
-const PUBLIC_PATHS = ['/login', '/mfa', '/reset', '/activate'];
+// /careers is the public job board Indeed links applicants to. It renders
+// only jobs a recruiter has explicitly published — see lib/recruiting/postings.
+const PUBLIC_PATHS = ['/login', '/mfa', '/reset', '/activate', '/careers'];
 
 /**
  * Edge-level gate: unauthenticated requests to app pages bounce to /login

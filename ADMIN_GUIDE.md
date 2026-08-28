@@ -14,6 +14,8 @@ For HR administrators and system administrators running FSW People day to day.
 - [Time off](#time-off)
 - [Time tracking](#time-tracking)
 - [Recruiting](#recruiting)
+- [Posting jobs to Indeed](#posting-jobs-to-indeed)
+- [AI-suggested interview questions](#ai-suggested-interview-questions)
 - [Performance](#performance)
 - [Compensation and benefits](#compensation-and-benefits)
 - [Payroll hub](#payroll-hub)
@@ -207,6 +209,135 @@ across, and onboarding starts — no re-entry.
 tools are enabled they may summarize resumes, extract experience, compare against explicit
 job requirements and draft questions — they may never autonomously reject anyone, and never
 score protected characteristics.
+
+---
+
+## Posting jobs to Indeed
+
+### How it works
+
+Indeed does not have a "create job" API you can call. It sources jobs by crawling an XML
+feed you host. FSW People hosts that feed at `/api/indeed/feed`, protected by a long random
+token that only Indeed is given.
+
+So "Publish to Indeed" means **the job is now in the feed**. Indeed decides when it crawls,
+indexes and ranks the listing — usually within a few hours. The job page shows when Indeed
+last fetched the feed, which is the only honest evidence available that the listing is live.
+Nothing in FSW People claims a job is on Indeed the instant you click.
+
+### One-time setup (administrator)
+
+1. Generate two secrets and put them in the environment:
+   ```
+   INDEED_FEED_TOKEN=$(openssl rand -hex 32)
+   INDEED_APPLY_SECRET=$(openssl rand -hex 32)
+   ```
+2. Restart the app.
+3. Go to **Admin → Integrations → Indeed**, click **Reveal feed URL** (the reveal is
+   audited) and give that URL to Indeed as your XML feed source.
+4. If Indeed has enabled Indeed Apply on your account, give them the webhook URL shown on
+   the same page and set `INDEED_APPLY_API_TOKEN` to the publisher token they issue. Only
+   when both that token and `INDEED_APPLY_SECRET` are set does the feed advertise
+   apply-inside-Indeed — a half-configured Apply button would fail for applicants.
+
+The feed URL contains the token. Anyone holding it can read every published job, so treat
+it like a password and rotate it by changing the environment variable.
+
+### Publishing a role
+
+On a job's pipeline page, **Job boards → Publish to Indeed**. The job must be **Open** and
+must have a description; the control tells you which is missing. You choose:
+
+- **Public job title** and **public location** — what applicants see, if different from the
+  internal requisition.
+- **Work arrangement** — on-site, hybrid or fully remote.
+- **Show the salary range** — off by default. Several states require a pay range in the
+  posting; check with HR before leaving it off.
+
+Everything else on the requisition stays internal. Hiring manager, recruiter, headcount,
+replacement flag and approval history are never in the feed.
+
+**Removing a role** takes it out of the feed immediately; Indeed clears the public listing
+on its next crawl, so it can stay visible on Indeed for a short while afterwards. Closing
+or filling the requisition removes it from the feed automatically — you do not have to
+remember to unpublish.
+
+### Where candidates arrive
+
+Indeed Apply posts each application to `/api/indeed/apply`. FSW People verifies the
+signature, creates or matches the candidate on email, files the application in the first
+pipeline stage, stores the résumé, and notifies the recruiter and hiring manager. The
+candidate shows a source of "Indeed".
+
+Redeliveries are safe: each Indeed application id is stored once, enforced by a database
+constraint, so a retry never creates a duplicate.
+
+**Admin → Integrations → Indeed** shows a delivery log of every exchange — accepted,
+duplicate and rejected alike. It records what happened, not a second copy of the
+applicant's contact details.
+
+### What FSW People does not do
+
+It does not push hire/reject dispositions back to Indeed. That needs Indeed's partner
+Disposition API and credentials FSW Group does not hold. Rejecting a candidate here records
+the decision here; nothing is sent to Indeed on your behalf.
+
+### The public careers pages
+
+`/careers` lists every published role and is deliberately public — it is where Indeed sends
+applicants who click through. It shows only published postings and only the public fields.
+No session, no employee data, no internal pages are reachable from it.
+
+---
+
+## AI-suggested interview questions
+
+On a candidate's page, under an application, **Suggest 5 questions** produces five questions
+drawn from that person's experience and that job's description.
+
+### What it is
+
+Preparation help for a human interviewer. Each question comes with why it is worth asking
+and what a strong answer contains. That is all it produces.
+
+### What it is not
+
+It carries **no score, no ranking and no hire recommendation**. It cannot advance, reject or
+rate anyone. Rejection remains what it has always been: a person, with a written reason.
+
+### What gets sent
+
+Only the candidate's **first name**, their **résumé text with contact details, identifiers,
+addresses and links stripped out**, and the **job description and requirements**. No
+personnel record, no pipeline history, no interview notes, no scorecards. The redaction is
+listed under each generated set so you can see what was removed.
+
+### Guardrails
+
+The model is instructed not to ask about or infer age, race, ethnicity, national origin,
+citizenship, disability, health, religion, political belief, union membership, sexual
+orientation, gender identity, pregnancy, children, marital or family status, criminal
+history, or salary history. Every returned question is then screened for those subjects in
+code before it is stored — an instruction is a request, the screen is the enforcement. If
+screening leaves fewer than five usable questions, **nothing is saved** and you are asked to
+try again.
+
+### Audit trail
+
+Each set records who generated it, which model produced it, and what the model was shown,
+and writes an audit event. The panel labels the questions AI-assisted wherever they appear.
+
+### Getting résumé text in
+
+Indeed Apply supplies it automatically. For candidates who arrived as a PDF, use **Résumé
+text → Add** on the candidate's Details card and paste it. Without résumé text the generator
+still works, but the questions come from the job description alone and say so.
+
+### Setup
+
+Set `ANTHROPIC_API_KEY` (and optionally `AI_MODEL`, which defaults to `claude-opus-5`).
+Until then the panel says the feature is not configured rather than offering a button that
+would fail.
 
 ---
 

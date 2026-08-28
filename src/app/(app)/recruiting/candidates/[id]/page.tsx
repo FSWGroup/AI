@@ -2,10 +2,12 @@ import type { Metadata } from 'next';
 import { notFound } from 'next/navigation';
 import Link from 'next/link';
 import { db } from '@/lib/db';
-import { requireCtx, assertPermission } from '@/lib/authz';
+import { requireCtx, assertPermission, can } from '@/lib/authz';
 import { fmtDate, fmtDateTime, fmtMoney, humanize } from '@/lib/format';
 import { Badge, Card, CardBody, CardHeader, DescriptionList, PageHeader, StatusBadge } from '@/components/ui';
 import { ScorecardForm } from './scorecard-form';
+import { AiQuestionsPanel, ResumeTextEditor, type StoredQuestion } from './ai-questions';
+import { aiEnabled } from '@/lib/ai/client';
 
 export const metadata: Metadata = { title: 'Candidate' };
 
@@ -23,6 +25,7 @@ export default async function CandidatePage({ params }: { params: Promise<{ id: 
           stage: true,
           interviews: { include: { scorecards: true }, orderBy: { scheduledAt: 'asc' } },
           offers: { orderBy: { createdAt: 'desc' } },
+          questionSets: { orderBy: { createdAt: 'desc' }, take: 1 },
         },
       },
     },
@@ -41,6 +44,21 @@ export default async function CandidatePage({ params }: { params: Promise<{ id: 
     const u = scorecardUsers.find((x) => x.id === uid);
     return u?.worker ? `${u.worker.preferredName || u.worker.legalFirstName} ${u.worker.lastName}` : (u?.email ?? 'Interviewer');
   };
+
+  // Who generated each question set — an AI-assisted recommendation has to
+  // say whose account produced it (§16 audit trail).
+  const generatorIds = [...new Set(candidate.applications.flatMap((a) => a.questionSets.map((q) => q.generatedById)))];
+  const generators = generatorIds.length
+    ? await db.user.findMany({
+        where: { id: { in: generatorIds } },
+        select: { id: true, email: true, worker: { select: { legalFirstName: true, preferredName: true, lastName: true } } },
+      })
+    : [];
+  const generatorName = (uid: string) => {
+    const u = generators.find((x) => x.id === uid);
+    return u?.worker ? `${u.worker.preferredName || u.worker.legalFirstName} ${u.worker.lastName}` : (u?.email ?? 'a recruiter');
+  };
+  const canWrite = can(ctx, 'recruiting.write');
 
   return (
     <div>
@@ -106,6 +124,31 @@ export default async function CandidatePage({ params }: { params: Promise<{ id: 
                   </div>
                 ) : null}
 
+                {canWrite ? (
+                  <div>
+                    <h3 className="mb-2 text-[13px] font-semibold text-ink-700">Suggested interview questions</h3>
+                    <AiQuestionsPanel
+                      applicationId={app.id}
+                      jobTitle={app.requisition.title}
+                      aiConfigured={aiEnabled()}
+                      hasResume={Boolean(candidate.resumeText?.trim())}
+                      latest={
+                        app.questionSets[0]
+                          ? {
+                              id: app.questionSets[0].id,
+                              createdAt: fmtDateTime(app.questionSets[0].createdAt),
+                              model: app.questionSets[0].model,
+                              generatedBy: generatorName(app.questionSets[0].generatedById),
+                              redacted: readRedacted(app.questionSets[0].basis),
+                              usedResume: readUsedResume(app.questionSets[0].basis),
+                              questions: (app.questionSets[0].questions as unknown as StoredQuestion[]) ?? [],
+                            }
+                          : null
+                      }
+                    />
+                  </div>
+                ) : null}
+
                 {app.offers.length > 0 ? (
                   <div>
                     <h3 className="mb-2 text-[13px] font-semibold text-ink-700">Offers</h3>
@@ -150,9 +193,20 @@ export default async function CandidatePage({ params }: { params: Promise<{ id: 
             {candidate.notes ? (
               <p className="mt-4 border-t border-ink-100 pt-3 text-[13px] whitespace-pre-wrap text-ink-600">{candidate.notes}</p>
             ) : null}
+            {canWrite ? <ResumeTextEditor candidateId={candidate.id} resumeText={candidate.resumeText} /> : null}
           </CardBody>
         </Card>
       </div>
     </div>
   );
+}
+
+/** The stored basis records what the model was actually shown. */
+function readRedacted(basis: unknown): string[] {
+  const value = basis && typeof basis === 'object' ? (basis as Record<string, unknown>).redacted : null;
+  return Array.isArray(value) ? value.map(String) : [];
+}
+
+function readUsedResume(basis: unknown): boolean {
+  return Boolean(basis && typeof basis === 'object' && (basis as Record<string, unknown>).usedResume);
 }

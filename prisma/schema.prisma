@@ -511,6 +511,7 @@ model JobRequisition {
 
   applications Application[]
   offers       Offer[]
+  boardPostings JobBoardPosting[]
 }
 
 model Candidate {
@@ -523,6 +524,10 @@ model Candidate {
   referredBy   String?
   linkedinUrl  String?
   resumeDocId  String?
+  // Plain-text resume/experience. Populated from an Indeed Apply structured
+  // resume, or pasted by a recruiter when the CV is a PDF we cannot parse.
+  // This is what the AI interview-question generator reads.
+  resumeText   String?
   notes        String?
   isDemo       Boolean  @default(false)
   createdAt    DateTime @default(now())
@@ -548,9 +553,14 @@ model Application {
   status         String   @default("ACTIVE") // ACTIVE | REJECTED | WITHDRAWN | HIRED
   rejectionReason String?
   aiSummary      String? // AI-assisted summary — advisory only, never auto-rejects
+  // Set when the application arrived from a job board (e.g. Indeed Apply).
+  // Unique so a webhook redelivery can never create a duplicate application.
+  sourceBoard    String? // INDEED | ...
+  sourceRef      String? @unique
   createdAt      DateTime @default(now())
   updatedAt      DateTime @updatedAt
 
+  questionSets InterviewQuestionSet[]
   candidate   Candidate      @relation(fields: [candidateId], references: [id], onDelete: Cascade)
   requisition JobRequisition @relation(fields: [requisitionId], references: [id], onDelete: Cascade)
   stage       PipelineStage  @relation(fields: [stageId], references: [id])
@@ -614,6 +624,89 @@ model Offer {
 
   application Application    @relation(fields: [applicationId], references: [id], onDelete: Cascade)
   requisition JobRequisition @relation(fields: [requisitionId], references: [id])
+}
+
+// ---------------------------------------------------------------------------
+// Job boards (Indeed)
+// ---------------------------------------------------------------------------
+
+/**
+ * A requisition published to an external job board. FSW People publishes to
+ * Indeed by hosting an XML feed that Indeed crawls on its own schedule, so
+ * "published" here means "included in the feed", not "confirmed live" —
+ * Indeed decides when it indexes and whether it accepts a posting.
+ */
+model JobBoardPosting {
+  id            String    @id @default(cuid())
+  requisitionId String
+  board         String    @default("INDEED")
+  status        String    @default("PUBLISHED") // PUBLISHED | REMOVED
+  // Indeed reads these from the feed; they can differ from the internal record
+  // (e.g. a public location string, or salary hidden from the ad).
+  publicTitle   String?
+  publicLocation String?
+  showSalary    Boolean   @default(false)
+  remoteType    String? // ONSITE | HYBRID | REMOTE
+  publishedById String?
+  publishedAt   DateTime  @default(now())
+  removedAt     DateTime?
+  // Set when the feed is next generated, so admins can see Indeed has crawled.
+  lastFeedAt    DateTime?
+
+  requisition JobRequisition @relation(fields: [requisitionId], references: [id], onDelete: Cascade)
+
+  @@unique([requisitionId, board])
+  @@index([board, status])
+}
+
+/**
+ * Append-only log of every inbound job-board delivery, including rejected
+ * ones. Kept separate from Application so a malformed or unauthenticated
+ * payload is still visible to whoever debugs the integration.
+ */
+model JobBoardDelivery {
+  id            String   @id @default(cuid())
+  board         String   @default("INDEED")
+  externalId    String?
+  status        String // ACCEPTED | DUPLICATE | REJECTED | ERROR
+  detail        String?
+  requisitionId String?
+  applicationId String?
+  // Raw payload with contact details removed — enough to debug a mapping
+  // problem without keeping a second copy of candidate PII.
+  payloadDigest Json?
+  receivedAt    DateTime @default(now())
+
+  @@index([board, receivedAt])
+  @@index([externalId])
+}
+
+// ---------------------------------------------------------------------------
+// AI-assisted recruiting (§16 — advisory only, never autonomous)
+// ---------------------------------------------------------------------------
+
+/**
+ * A generated set of interview questions for one application.
+ *
+ * Advisory output: an interviewer chooses what to ask. Nothing here feeds a
+ * score, a stage change or a rejection, and every generation is audited with
+ * the model and the inputs used.
+ */
+model InterviewQuestionSet {
+  id            String   @id @default(cuid())
+  applicationId String
+  // [{ question, rationale, listenFor, basis }]
+  questions     Json     @default("[]")
+  model         String
+  // Which inputs the model actually saw, so a reader knows how grounded the
+  // questions are (e.g. whether a resume was available at all).
+  basis         Json     @default("{}")
+  generatedById String
+  createdAt     DateTime @default(now())
+
+  application Application @relation(fields: [applicationId], references: [id], onDelete: Cascade)
+
+  @@index([applicationId, createdAt])
 }
 
 // ---------------------------------------------------------------------------

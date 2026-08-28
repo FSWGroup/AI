@@ -95,9 +95,16 @@ export async function uploadDocumentAction(_prev: ActionResult, formData: FormDa
 /** Access rule shared by detail page + download endpoint. */
 export async function canAccessDocument(
   ctx: Awaited<ReturnType<typeof requireCtxAction>>,
-  doc: { workerId: string | null; classification: string },
+  doc: { id?: string; workerId: string | null; classification: string },
 ): Promise<boolean> {
   if (can(ctx, 'docs.read_all')) return true;
+  // Candidate résumés sit outside the worker hierarchy — an applicant is not
+  // an employee, so no workerId rule can reach them. Recruiters need them,
+  // and nobody else does.
+  if (doc.id && !doc.workerId && can(ctx, 'recruiting.read')) {
+    const isCandidateResume = await db.candidate.count({ where: { resumeDocId: doc.id } });
+    if (isCandidateResume > 0) return true;
+  }
   if (doc.workerId) {
     const access = await workerAccess(ctx, doc.workerId);
     if (access.self) return true;

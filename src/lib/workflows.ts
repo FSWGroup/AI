@@ -38,6 +38,7 @@ export const WORKFLOW_TRIGGERS = [
   'REVIEW_CYCLE_STARTED',
   'TERMINATION_SCHEDULED',
   'EQUIPMENT_UNRETURNED',
+  'CANDIDATE_APPLIED',
 ] as const;
 
 export type WorkflowTrigger = (typeof WORKFLOW_TRIGGERS)[number];

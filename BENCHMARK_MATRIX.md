@@ -62,8 +62,12 @@ needs an external provider or credential · ✗ not built
 | Interview scheduling and scorecards | ✅ | ✅ | ✅ | ✗ | ◐ | Calendar sync needs the Microsoft integration |
 | Offers with approval and send | ✅ | ✅ | ✅ | ◐ | ✅ | |
 | Candidate → employee with no re-entry | ✅ | ✅ | ✅ | ◐ | ✅ | Carries comp and start date, starts onboarding |
-| Careers site / job board posting | ✗ | ◐ | ✅ | ✗ | ✗ | Not built |
-| Resume parsing | ✗ | ◐ | ✅ | ✗ | ✗ | Field exists; parsing needs a provider |
+| Careers site / job board posting | ✅ | ◐ | ✅ | ✗ | ✗ | Public `/careers` pages + Indeed XML feed |
+| Indeed posting | ✅ | ◐ | ✅ | ✗ | ✗ | Token-protected feed Indeed crawls; publish per job |
+| Applications delivered into the pipeline | ✅ | ◐ | ✅ | ✗ | ✗ | Indeed Apply webhook, HMAC-verified, idempotent |
+| Disposition sync back to the board | ✗ | ◐ | ◐ | ✗ | ✗ | Needs Indeed's partner API — documented, not faked |
+| AI interview question preparation | ✅ | ◐ | ✗ | ✗ | ✗ | Five per application, screened for protected characteristics, advisory only |
+| Resume parsing | ◐ | ◐ | ✅ | ✗ | ✗ | Structured résumé text from Indeed Apply or pasted; PDF text extraction needs a provider |
 
 ## Talent
 
@@ -154,6 +158,8 @@ These are consequences of building for one company rather than for a market:
 In rough priority order for FSW Group:
 
 1. **Entra ID SSO** — the highest-value integration; the architecture is ready.
+1b. **PDF résumé text extraction** — Indeed Apply supplies structured résumé text, but a
+    PDF arriving any other way still has to be pasted in by hand.
 2. **S3 driver implementation** — required before multi-node production deployment.
 3. **Peer/360 review UI** — the data model already supports it.
 4. **Compensation cycle planning** — bulk merit planning with budget roll-up.

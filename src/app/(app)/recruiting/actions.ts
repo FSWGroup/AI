@@ -9,6 +9,9 @@ import { createApprovalRequest } from '@/lib/approvals';
 import { createWorker } from '@/lib/people';
 import { sendEmail } from '@/lib/email';
 import { emitEvent } from '@/lib/workflows';
+import { INDEED_BOARD, indeedFeedEnabled } from '@/lib/indeed';
+import { aiEnabled, describeAiError, AiUnavailableError } from '@/lib/ai/client';
+import { generateInterviewQuestions, AiGuardrailError } from '@/lib/ai/interview-questions';
 import type { ActionResult } from '@/app/(auth)/actions';
 
 // ---------------------------------------------------------------------------
@@ -389,5 +392,190 @@ export async function recordOfferResponseAction(_prev: ActionResult, formData: F
     if (error instanceof AuthzError) return { error: error.message };
     console.error(error);
     return { error: 'Could not record the response.' };
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Job boards (Indeed) — §16
+// ---------------------------------------------------------------------------
+
+/**
+ * Add a job to the Indeed feed. Publishing does not put the job on Indeed
+ * instantly — Indeed crawls the feed on its own schedule — so the UI reports
+ * when the feed was last fetched rather than claiming the job is live.
+ */
+export async function publishToBoardAction(_prev: ActionResult, formData: FormData): Promise<ActionResult> {
+  try {
+    const ctx = await requirePermission('recruiting.write');
+    if (!indeedFeedEnabled()) {
+      return { error: 'Indeed is not configured. An administrator sets INDEED_FEED_TOKEN — see Admin › Integrations.' };
+    }
+    const requisitionId = String(formData.get('requisitionId') ?? '');
+    const job = await db.jobRequisition.findUniqueOrThrow({ where: { id: requisitionId } });
+    if (job.status !== 'OPEN') {
+      return { error: 'Only an open requisition can be published. Open the job first.' };
+    }
+    if (!job.description?.trim()) {
+      return { error: 'Add a job description before publishing — Indeed rejects postings without one.' };
+    }
+
+    const publicTitle = String(formData.get('publicTitle') ?? '').trim() || null;
+    const publicLocation = String(formData.get('publicLocation') ?? '').trim() || null;
+    const remoteTypeRaw = String(formData.get('remoteType') ?? '');
+    const remoteType = ['ONSITE', 'HYBRID', 'REMOTE'].includes(remoteTypeRaw) ? remoteTypeRaw : null;
+    const showSalary = formData.get('showSalary') === 'on';
+
+    const posting = await db.jobBoardPosting.upsert({
+      where: { requisitionId_board: { requisitionId, board: INDEED_BOARD } },
+      create: {
+        requisitionId,
+        board: INDEED_BOARD,
+        publicTitle,
+        publicLocation,
+        remoteType,
+        showSalary,
+        publishedById: ctx.userId,
+      },
+      update: {
+        status: 'PUBLISHED',
+        publicTitle,
+        publicLocation,
+        remoteType,
+        showSalary,
+        publishedById: ctx.userId,
+        publishedAt: new Date(),
+        removedAt: null,
+      },
+    });
+    await audit(ctx, 'recruiting.board_published', {
+      targetType: 'JobBoardPosting',
+      targetId: posting.id,
+      metadata: { board: INDEED_BOARD, requisitionId, showSalary },
+    });
+    revalidatePath(`/recruiting/jobs/${requisitionId}`);
+    return { success: 'Added to the Indeed feed. Indeed picks it up on its next crawl.' };
+  } catch (error) {
+    if (error instanceof AuthzError) return { error: error.message };
+    console.error(error);
+    return { error: 'Could not publish the job.' };
+  }
+}
+
+/** Remove a job from the feed. Indeed drops it on the next crawl. */
+export async function unpublishFromBoardAction(_prev: ActionResult, formData: FormData): Promise<ActionResult> {
+  try {
+    const ctx = await requirePermission('recruiting.write');
+    const requisitionId = String(formData.get('requisitionId') ?? '');
+    const posting = await db.jobBoardPosting.findUnique({
+      where: { requisitionId_board: { requisitionId, board: INDEED_BOARD } },
+    });
+    if (!posting) return { error: 'This job is not on Indeed.' };
+    await db.jobBoardPosting.update({
+      where: { id: posting.id },
+      data: { status: 'REMOVED', removedAt: new Date() },
+    });
+    await audit(ctx, 'recruiting.board_unpublished', {
+      targetType: 'JobBoardPosting',
+      targetId: posting.id,
+      metadata: { board: INDEED_BOARD, requisitionId },
+    });
+    revalidatePath(`/recruiting/jobs/${requisitionId}`);
+    return { success: 'Removed from the feed. Indeed clears the listing on its next crawl.' };
+  } catch (error) {
+    if (error instanceof AuthzError) return { error: error.message };
+    return { error: 'Could not remove the job from Indeed.' };
+  }
+}
+
+// ---------------------------------------------------------------------------
+// AI interview questions — §16, §35. Advisory only.
+// ---------------------------------------------------------------------------
+
+/**
+ * Generate five interview questions for one application.
+ *
+ * The authorization check happens before anything is sent anywhere, and the
+ * only data that leaves is the candidate's first name, their redacted résumé
+ * text, and the job's own description — all of which this user could already
+ * read on this page. Every generation is audited with the model used and
+ * what it was shown.
+ */
+export async function generateInterviewQuestionsAction(
+  _prev: ActionResult,
+  formData: FormData,
+): Promise<ActionResult> {
+  try {
+    const ctx = await requirePermission('recruiting.write');
+    if (!aiEnabled()) {
+      return { error: 'AI features are not configured. An administrator sets ANTHROPIC_API_KEY — see Admin › Integrations.' };
+    }
+    const applicationId = String(formData.get('applicationId') ?? '');
+    const application = await db.application.findUnique({
+      where: { id: applicationId },
+      include: {
+        candidate: { select: { firstName: true, resumeText: true } },
+        requisition: { select: { title: true, description: true, requirements: true } },
+      },
+    });
+    if (!application) return { error: 'Application not found.' };
+
+    const result = await generateInterviewQuestions({
+      candidateFirstName: application.candidate.firstName,
+      resumeText: application.candidate.resumeText,
+      jobTitle: application.requisition.title,
+      jobDescription: application.requisition.description,
+      jobRequirements: application.requisition.requirements,
+    });
+
+    const set = await db.interviewQuestionSet.create({
+      data: {
+        applicationId,
+        questions: result.questions,
+        model: result.model,
+        basis: result.basis,
+        generatedById: ctx.userId,
+      },
+    });
+    await audit(ctx, 'recruiting.ai_questions_generated', {
+      targetType: 'InterviewQuestionSet',
+      targetId: set.id,
+      metadata: { applicationId, model: result.model, ...result.basis },
+    });
+
+    revalidatePath('/recruiting');
+    return { success: 'Five suggested questions ready. Review them before the interview — they are suggestions, not a script.' };
+  } catch (error) {
+    if (error instanceof AuthzError) return { error: error.message };
+    if (error instanceof AiUnavailableError || error instanceof AiGuardrailError) return { error: error.message };
+    console.error(error);
+    return { error: describeAiError(error) };
+  }
+}
+
+/**
+ * Paste or correct a candidate's résumé text. Indeed Apply supplies this
+ * automatically; for candidates who arrived as a PDF, a recruiter pastes it
+ * here so the AI has something to work from.
+ */
+export async function saveCandidateResumeAction(_prev: ActionResult, formData: FormData): Promise<ActionResult> {
+  try {
+    const ctx = await requirePermission('recruiting.write');
+    const candidateId = String(formData.get('candidateId') ?? '');
+    const resumeText = String(formData.get('resumeText') ?? '').trim();
+    if (resumeText.length > 60_000) return { error: 'That résumé is too long — keep it under 60,000 characters.' };
+    await db.candidate.update({
+      where: { id: candidateId },
+      data: { resumeText: resumeText || null },
+    });
+    await audit(ctx, 'recruiting.candidate_resume_updated', {
+      targetType: 'Candidate',
+      targetId: candidateId,
+      metadata: { characters: resumeText.length },
+    });
+    revalidatePath(`/recruiting/candidates/${candidateId}`);
+    return { success: resumeText ? 'Résumé text saved.' : 'Résumé text cleared.' };
+  } catch (error) {
+    if (error instanceof AuthzError) return { error: error.message };
+    return { error: 'Could not save the résumé text.' };
   }
 }

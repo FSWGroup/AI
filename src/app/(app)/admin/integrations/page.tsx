@@ -1,4 +1,5 @@
 import type { Metadata } from 'next';
+import Link from 'next/link';
 import { db } from '@/lib/db';
 import { requireCtx, assertPermission } from '@/lib/authz';
 import { env } from '@/lib/env';
@@ -21,6 +22,8 @@ const CATALOG = [
   { kind: 'BENEFITS', name: 'Benefits carrier feed', group: 'HR vendors', envVars: [], purpose: 'Enrollment feeds to carriers or a benefits administrator.' },
   { kind: 'BACKGROUND_CHECK', name: 'Background checks', group: 'HR vendors', envVars: ['BACKGROUND_CHECK_PROVIDER', 'BACKGROUND_CHECK_API_KEY'], purpose: 'Order and track pre-employment screening.' },
   { kind: 'ESIGN', name: 'DocuSign / Adobe Sign', group: 'HR vendors', envVars: ['ESIGN_PROVIDER', 'ESIGN_API_KEY'], purpose: 'For documents with statutory e-signature requirements beyond internal acknowledgment.' },
+  { kind: 'INDEED', name: 'Indeed', group: 'Recruiting', envVars: ['INDEED_FEED_TOKEN'], purpose: 'Publish open roles to a job feed Indeed crawls, and receive Indeed Apply candidates straight into the pipeline.' },
+  { kind: 'ANTHROPIC', name: 'AI assistance (Anthropic)', group: 'Recruiting', envVars: ['ANTHROPIC_API_KEY'], purpose: 'Suggested interview questions and other advisory AI help. Never makes hiring decisions.' },
   { kind: 'PROPHET21', name: 'Prophet 21', group: 'FSW systems', envVars: [], purpose: 'ERP employee and cost-center synchronization.' },
   { kind: 'PIPEDRIVE', name: 'Pipedrive', group: 'FSW systems', envVars: [], purpose: 'Sales rep alignment and territory ownership.' },
   { kind: 'RINGCENTRAL', name: 'RingCentral', group: 'FSW systems', envVars: [], purpose: 'Extension provisioning at onboarding.' },
@@ -75,6 +78,11 @@ export default async function IntegrationsPage() {
                           )}
                         </div>
                         <p className="mt-0.5 text-[12.5px] text-ink-500">{item.purpose}</p>
+                        {item.kind === 'INDEED' ? (
+                          <Link href="/admin/integrations/indeed" className="mt-1 inline-block text-[12px] text-brand-600 hover:underline">
+                            Feed URL, webhook and delivery log →
+                          </Link>
+                        ) : null}
                         {item.envVars.length > 0 ? (
                           <p className="mt-1 text-[11.5px] text-ink-400">
                             Requires: {item.envVars.map((v) => (

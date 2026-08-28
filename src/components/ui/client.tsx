@@ -288,18 +288,31 @@ export function ActionForm({
   children,
   className,
   resetOnSuccess,
+  onSuccess,
   id,
 }: {
   action: (prev: { error?: string; success?: string } | void, formData: FormData) => Promise<{ error?: string; success?: string } | void>;
   children: ReactNode;
   className?: string;
   resetOnSuccess?: boolean;
+  /** Called once after the action reports success — e.g. to close a drawer. */
+  onSuccess?: () => void;
   id?: string;
 }) {
   const [state, formAction] = useActionState(action, undefined);
   const formRef = useRef<HTMLFormElement>(null);
+  // Kept in a ref so an inline arrow callback does not re-run the effect on
+  // every render. Assigned inside an effect — refs are not written during
+  // render.
+  const onSuccessRef = useRef(onSuccess);
   useEffect(() => {
-    if (resetOnSuccess && state && 'success' in state && state.success) formRef.current?.reset();
+    onSuccessRef.current = onSuccess;
+  }, [onSuccess]);
+  useEffect(() => {
+    if (state && 'success' in state && state.success) {
+      if (resetOnSuccess) formRef.current?.reset();
+      onSuccessRef.current?.();
+    }
   }, [state, resetOnSuccess]);
   return (
     <form ref={formRef} id={id} action={formAction} className={className}>

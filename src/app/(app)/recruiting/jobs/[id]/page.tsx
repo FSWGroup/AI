@@ -3,10 +3,12 @@ import { notFound } from 'next/navigation';
 import Link from 'next/link';
 import { db } from '@/lib/db';
 import { requireCtx, assertPermission, can } from '@/lib/authz';
-import { fmtDate, fmtMoney, fullName, humanize } from '@/lib/format';
+import { fmtDate, fmtDateTime, fmtMoney, fullName, humanize } from '@/lib/format';
 import { Badge, Card, CardBody, CardHeader, PageHeader, StatusBadge } from '@/components/ui';
 import { JobStatusForm } from '../job-forms';
 import { AddCandidateButton, ApplicationCardActions } from './pipeline-ui';
+import { IndeedPanel } from './indeed-ui';
+import { INDEED_BOARD, indeedFeedEnabled } from '@/lib/indeed';
 
 export const metadata: Metadata = { title: 'Job pipeline' };
 
@@ -31,6 +33,9 @@ export default async function JobDetailPage({ params }: { params: Promise<{ id: 
   if (!job) notFound();
 
   const stages = await db.pipelineStage.findMany({ orderBy: { order: 'asc' } });
+  const posting = await db.jobBoardPosting.findUnique({
+    where: { requisitionId_board: { requisitionId: job.id, board: INDEED_BOARD } },
+  });
   const [hiringManager, recruiter] = await Promise.all([
     job.hiringManagerId ? db.worker.findUnique({ where: { id: job.hiringManagerId } }) : null,
     job.recruiterId ? db.worker.findUnique({ where: { id: job.recruiterId } }) : null,
@@ -65,6 +70,35 @@ export default async function JobDetailPage({ params }: { params: Promise<{ id: 
         <div className="mb-4">
           <JobStatusForm jobId={job.id} status={job.status} />
         </div>
+      ) : null}
+
+      {canWrite ? (
+        <Card className="mb-4">
+          <CardHeader title="Job boards" description="Where this role is advertised outside FSW People." />
+          <CardBody>
+            <IndeedPanel
+              requisitionId={job.id}
+              configured={indeedFeedEnabled()}
+              jobOpen={job.status === 'OPEN'}
+              hasDescription={Boolean(job.description?.trim())}
+              defaultTitle={job.title}
+              defaultLocation={job.locationText ?? 'Exton, PA'}
+              posting={
+                posting
+                  ? {
+                      status: posting.status,
+                      publicTitle: posting.publicTitle,
+                      publicLocation: posting.publicLocation,
+                      remoteType: posting.remoteType,
+                      showSalary: posting.showSalary,
+                      publishedAt: fmtDate(posting.publishedAt),
+                      lastFeedAt: posting.lastFeedAt ? fmtDateTime(posting.lastFeedAt) : null,
+                    }
+                  : null
+              }
+            />
+          </CardBody>
+        </Card>
       ) : null}
 
       <div className="fsw-scroll -mx-1 flex gap-3 overflow-x-auto pb-4">

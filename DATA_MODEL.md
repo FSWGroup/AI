@@ -83,15 +83,39 @@ but only to people entitled to see them.
 ### Recruiting
 
 ```
-JobRequisition ─── Application ─┬─ Interview ── InterviewScorecard
-                  │             └─ Offer
-Candidate ────────┘
+JobRequisition ─┬─ Application ─┬─ Interview ── InterviewScorecard
+                │   │           ├─ Offer
+                │   │           └─ InterviewQuestionSet   (AI-suggested, advisory)
+                │  Candidate ───┘
+                └─ JobBoardPosting                        (per board: INDEED)
+JobBoardDelivery  (append-only log of every exchange with a board)
 PipelineStage (ordered, customizable)
 ```
 
 An accepted `Offer` calls the same `createWorker()` used by HR's "Add worker", so a hire
 carries its compensation and start date across without re-entry, and immediately gets the
 onboarding checklist matching its population.
+
+`JobBoardPosting` is the publish record for one requisition on one board — unique on
+`(requisitionId, board)`. It holds only what differs from the internal requisition for a
+public audience: the public title and location, the work arrangement, and whether the salary
+range may be shown (off by default). A posting is only in the feed while its requisition is
+`OPEN`, so closing a job unpublishes it without anyone remembering to.
+
+`Application.sourceRef` is the board's own application id, stored **unique**. That
+constraint — not application logic — is what makes an Indeed webhook retry incapable of
+creating a duplicate application. `Candidate.resumeText` holds the plain-text résumé, from
+Indeed Apply or pasted by a recruiter; it is what the AI question generator reads.
+
+`JobBoardDelivery` is evidence, not data: every inbound delivery and every outbound feed
+fetch, including deliveries we refuse. It carries the same append-only trigger as
+`AuditEvent` and stores a digest (which job, which fields were present) rather than a second
+copy of the applicant's contact details.
+
+`InterviewQuestionSet` stores the five generated questions with the model that produced them
+and a `basis` recording what that model was actually shown — including which categories of
+personal data were redacted first. Advisory only: nothing in this table can advance, rate or
+reject a candidate.
 
 ### Lifecycle and tasks
 

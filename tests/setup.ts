@@ -13,3 +13,10 @@ process.env.DOCUMENT_URL_SIGNING_KEY ??= 'b'.repeat(40);
 process.env.EMAIL_DRIVER = 'outbox';
 process.env.STORAGE_DRIVER = 'local';
 process.env.STORAGE_LOCAL_DIR = './.storage-test';
+
+// Indeed + AI: fixed test credentials so the feed, webhook signature and
+// integration status behave deterministically. No real key is ever used.
+process.env.INDEED_FEED_TOKEN ??= 'test-feed-token-'.padEnd(40, '0');
+process.env.INDEED_APPLY_SECRET ??= 'test-apply-secret-'.padEnd(40, '0');
+process.env.INDEED_COMPANY_NAME ??= 'FSW Group';
+process.env.APP_BASE_URL ??= 'http://localhost:3000';

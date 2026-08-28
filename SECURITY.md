@@ -222,6 +222,95 @@ explicit job requirements. AI may **not** autonomously reject a candidate, termi
 worker, change pay, or make a legal determination — every such action requires a human
 decision recorded in the audit trail.
 
+`src/lib/ai/client.ts` is the only place the application talks to an external model. It
+holds no credentials of its own beyond the configured API key and is never reachable
+without a prior permission check by the caller.
+
+### AI interview questions
+
+The one AI feature shipped today generates five suggested interview questions for an
+application. Its boundaries, in order of how they are enforced:
+
+1. **Authorization first.** `generateInterviewQuestionsAction` calls
+   `requirePermission('recruiting.write')` before reading anything. A user who cannot open
+   the pipeline cannot invoke the generator by any route.
+2. **Minimal input.** Only the candidate's *first* name, their résumé text, and the job's
+   description and requirements are sent — all of which the caller can already read on the
+   page they invoked it from. No personnel record, no pipeline history, no notes, no
+   scorecards, no surname, no email, no phone number.
+3. **Redaction before egress.** `src/lib/ai/redact.ts` strips email addresses, phone
+   numbers, US SSNs, Philippine government identifiers (SSS, TIN, PhilHealth, Pag-IBIG),
+   bank and card numbers, street addresses, stated dates of birth, and URLs from the résumé
+   before it leaves the process. What was removed is recorded on the stored set and shown
+   in the UI. This is data minimisation, not a security boundary — the résumé body is still
+   candidate data, sent because a recruiter asked for it.
+4. **Protected characteristics are refused twice.** The system prompt forbids asking about
+   or inferring age, race, ethnicity, national origin, citizenship, disability, health,
+   religion, political belief, union membership, sexual orientation, gender identity,
+   pregnancy, children, marital or family status, criminal history, and salary history.
+   Every returned question, rationale and listen-for note is then screened in code against
+   the same list. **A model instruction is a request; the screen is the enforcement.** If
+   screening leaves fewer than five usable questions the whole set is discarded and nothing
+   is stored.
+5. **Output is inert.** A question set carries no score, no ranking and no recommendation,
+   and the action has no code path that touches application status. Rejection remains
+   `rejectApplicationAction`: `recruiting.write`, a mandatory written reason, and an audit
+   event.
+6. **Audit trail.** Each set stores who generated it, the model that produced it, and what
+   the model was shown, and writes a `recruiting.ai_questions_generated` audit event. The
+   UI labels the output AI-assisted wherever it appears.
+
+Unverified: a successful live generation has not been exercised against the Anthropic API,
+because no API key was available in this environment. The permission check, redaction,
+guardrail screen, error handling and UI wiring were verified end to end — a click with an
+invalid key surfaces "The AI service rejected our credentials" rather than failing silently
+(`scripts/verify-ai-questions.ts`).
+
+---
+
+## Job board integration (Indeed)
+
+Two endpoints face the outside world. Neither trusts anything it is given.
+
+**The job feed** (`/api/indeed/feed`) is a credential-protected URL, because Indeed's
+crawler cannot present a session. `INDEED_FEED_TOKEN` is compared with a constant-time
+comparison; a request with a missing or wrong token gets **404, not 403**, so an
+unauthenticated caller learns nothing about whether a feed exists. Denied attempts are
+audited. The feed carries only fields a jobseeker would see: never the hiring manager,
+recruiter, headcount, replacement flag or approval history, and never the salary range
+unless a recruiter explicitly published it. Descriptions are wrapped in CDATA with `]]>`
+split across sections, so no requisition text can break out of the document.
+
+The feed URL embeds the token and is therefore a credential. It is never rendered by
+default — an admin must click **Reveal feed URL**, which requires `settings.admin` and
+writes an `integration.secret_revealed` audit event.
+
+**The Indeed Apply webhook** (`/api/indeed/apply`) verifies an HMAC-SHA256 signature over
+the **raw request bytes**, never a re-serialized object, so an attacker cannot vary
+whitespace or key ordering to reuse a signature. An unverified body is not parsed beyond
+its shape and nothing derived from it is stored. Bodies are size-capped before parsing;
+résumé files are capped at 8 MB and pass the same extension/MIME/magic-byte validation as
+any upload.
+
+Applications are only accepted for a requisition that is *currently published and open* —
+knowing an old job id is not enough. Idempotency is a database guarantee:
+`Application.sourceRef` is unique, so a webhook retry cannot create a second application
+even if two deliveries race.
+
+`JobBoardDelivery` records every exchange, accepted or refused, and carries the same
+append-only database trigger as `AuditEvent` — rows cannot be updated or deleted. It stores
+a digest (which job, which fields were present) rather than a second copy of the applicant's
+email, phone, résumé or cover letter.
+
+**The public careers pages** (`/careers`) are the only unauthenticated content in the
+application. They render published postings only, share nothing with the authenticated app,
+and reaching any other path without a session still bounces to `/login`.
+
+**Not implemented, deliberately:** pushing hire/reject dispositions back to Indeed. That
+requires Indeed's partner Disposition API and credentials FSW Group does not hold. Rather
+than ship a control that appears to notify Indeed and does not, the limitation is stated in
+the admin UI and in `ADMIN_GUIDE.md`.
+
 ---
 
 ## Deployment responsibilities
@@ -268,7 +357,7 @@ PII in logs, mass assignment, and authentication weaknesses.
 
 | # | Severity | Issue | Fix |
 |---|---|---|---|
-| 1 | **Critical** | MFA bypass. `getSession()` does not check `mfaPassed` (correctly — the `/mfa` page needs it), but the account-security page and all four MFA-management actions used it, so a session holding only a stolen password could open that page and turn MFA off, or enroll an attacker-controlled secret. | Added `getFullSession()`, which rejects a session that has not cleared MFA, and switched every MFA-management action and both account pages to it. Disabling MFA now also requires re-entering the password. Verified live with `scripts/verify-mfa-fix.mjs`. |
+| 1 | **Critical** | MFA bypass. `getSession()` does not check `mfaPassed` (correctly — the `/mfa` page needs it), but the account-security page and all four MFA-management actions used it, so a session holding only a stolen password could open that page and turn MFA off, or enroll an attacker-controlled secret. | Added `getFullSession()`, which rejects a session that has not cleared MFA, and switched every MFA-management action and both account pages to it. Disabling MFA now also requires re-entering the password. Verified live with `scripts/verify-mfa-fix.ts`. |
 | 2 | High | Goal hijack. `saveGoalAction` authorized the *submitted* fields, not the stored goal, so any employee could pass a company goal's id with their own worker id and take it over. Company goal ids were rendered into every user's alignment dropdown. | Editing now loads the stored goal and authorizes against it (owner, their manager, or `talent.admin`). |
 | 3 | High | Task read IDOR. The task detail drawer fetched by id with no ownership check and serialized the task and its full comment thread — including offboarding and disciplinary detail — to any signed-in user who knew an id. | The read path now uses the same `loadOwnedTask()` guard as the mutations. |
 | 4 | Medium | Emergency contact IDOR. The update was keyed on `contactId` alone while authorization was on the submitted `workerId`, so any user could overwrite another worker's emergency contact, with the audit entry misattributed. | The update is scoped by `workerId` as well as `id`, and a zero-row result raises. |

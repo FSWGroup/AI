@@ -53,7 +53,9 @@ src/
   app/
     (auth)/                Login, MFA, activation, password reset
     (app)/                 The authenticated application, one folder per module
-    api/                   Document downloads, audited exports, maintenance sweep
+    careers/               Public job board — the only unauthenticated content pages
+    api/                   Document downloads, audited exports, maintenance sweep,
+                           the Indeed job feed and the Indeed Apply webhook
   components/
     ui/                    Design system: index.tsx (server-safe), client.tsx (interactive)
     shell/                 SideNav, TopBar
@@ -68,6 +70,10 @@ src/
     reports.ts             Report registry powering both the UI and CSV export
     imports.ts             CSV validate-then-apply import engine
     crypto.ts              AES-256-GCM field encryption, TOTP, signed URLs
+    indeed.ts              Indeed XML feed generation and Apply signature verification
+    ai/                    The only place the app talks to an external model:
+                           client.ts (provider), redact.ts (data minimisation),
+                           interview-questions.ts (generation + guardrails)
 tests/
   unit/                    Pure logic (crypto, formatting, CSV safety)
   integration/             Real database: permission boundaries and HR journeys
@@ -95,6 +101,22 @@ table. Laws change; the application does not need a deploy when they do.
 `startLifecycle()` directly so a new hire can never silently end up without a checklist if
 an admin disables the automation. `startLifecycle()` is idempotent, so a workflow that also
 runs `START_ONBOARDING` will not create a second instance.
+
+**Job boards are a feed, not an API call.** Indeed sources jobs by crawling XML you host,
+so "published" means "in the feed" and the UI says exactly that, showing when Indeed last
+fetched rather than claiming a listing is live. Inbound Indeed Apply deliveries are
+HMAC-verified against the raw request bytes and deduplicated by a unique
+`Application.sourceRef`, so a webhook retry cannot create a second application. Every
+delivery — including the ones we refuse — is written to an append-only `JobBoardDelivery`
+log that records what happened, not a second copy of the applicant's contact details.
+
+**AI is advisory, minimal and screened.** `src/lib/ai` is the only path to an external
+model. It runs after the caller's permission check, on data that caller could already read,
+and sends the least it can: a first name, a résumé with contact details and identifiers
+redacted, and the job text. Generated interview questions are screened in code for
+protected characteristics before they are stored — the model's instructions are a request,
+the screen is the enforcement. Nothing the AI returns can advance, rate or reject a
+candidate.
 
 ---
 
@@ -221,6 +243,27 @@ formula-injection escaping, PTO accrual and ledger math, every role's permission
 manager hierarchy resolution, and end-to-end HR journeys (hire → onboarding → job change →
 PTO → approval → offboarding → termination), plus the append-only audit guarantee.
 
+For the job-board and AI features it also covers Indeed feed token comparison and XML
+escaping, Apply signature verification against the raw bytes, webhook idempotency and
+rejection logging, résumé redaction, and the protected-characteristic screen on generated
+interview questions.
+
+### Verification scripts
+
+These run against a **running** server with the demo seed, and check behaviour the unit and
+integration tests cannot: that the real UI is wired to the real server action.
+
+```bash
+npm run build && npm start &
+npx tsx scripts/verify-mfa-fix.ts        # a password-only session cannot disable MFA
+npx tsx scripts/verify-indeed-flow.ts    # publish → feed → careers page → signed webhook
+npx tsx scripts/verify-ai-questions.ts   # the AI panel reports an outcome, never nothing
+```
+
+`verify-ai-questions.ts` checks the not-configured path by default. Give it a real
+`ANTHROPIC_API_KEY` to exercise a full generation, including that exactly five questions are
+stored with their model and basis.
+
 ---
 
 ## Scheduled jobs
@@ -250,6 +293,16 @@ are shown as "not configured" rather than failing.
 
 `src/lib/env.ts` validates all of it at startup with Zod and fails fast with a readable
 message naming the specific variable.
+
+Two optional groups are worth calling out:
+
+- **Indeed** — `INDEED_FEED_TOKEN` (protects the job feed Indeed crawls) and
+  `INDEED_APPLY_SECRET` (verifies inbound applications). Both should be
+  `openssl rand -hex 32`. With neither set, both endpoints return 404 and the publish
+  controls stay disabled rather than failing when clicked. See
+  [`ADMIN_GUIDE.md`](ADMIN_GUIDE.md#posting-jobs-to-indeed).
+- **AI** — `ANTHROPIC_API_KEY`, optionally `AI_MODEL` (default `claude-opus-5`). Without a
+  key the AI panels say the feature is not configured.
 
 ---
 

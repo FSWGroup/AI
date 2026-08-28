@@ -31,6 +31,21 @@ const envSchema = z.object({
 
   AI_PROVIDER: z.string().optional(),
   ANTHROPIC_API_KEY: z.string().optional(),
+  // Model used for AI-assisted recruiting help. Advisory output only.
+  AI_MODEL: z.string().default('claude-opus-5'),
+
+  // Indeed. The job feed is a token-protected URL Indeed crawls; the token is
+  // the only thing standing between the public internet and our open roles,
+  // so it must be long. INDEED_APPLY_SECRET verifies the HMAC signature on
+  // inbound Indeed Apply deliveries. Both optional: with neither set the
+  // integration is simply off.
+  INDEED_FEED_TOKEN: z.string().min(24, 'INDEED_FEED_TOKEN must be at least 24 chars').optional(),
+  INDEED_APPLY_SECRET: z.string().min(24, 'INDEED_APPLY_SECRET must be at least 24 chars').optional(),
+  // Publisher API token Indeed issues when Indeed Apply is enabled on the
+  // account. Without it the feed still posts jobs; applicants just apply on
+  // our own careers page instead of inside Indeed.
+  INDEED_APPLY_API_TOKEN: z.string().optional(),
+  INDEED_COMPANY_NAME: z.string().default('FSW Group'),
 
   NODE_ENV: z.enum(['development', 'test', 'production']).default('development'),
 });
