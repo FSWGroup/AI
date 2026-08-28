@@ -155,6 +155,25 @@ export async function listPeople(actor: Actor, filters: PeopleFilters, page = 1)
   };
 }
 
+/**
+ * A manager's full reporting subtree (direct and indirect reports), excluding
+ * the manager themselves. Used by the /team/* dashboards, which are always
+ * scoped to "my team" specifically rather than the broader visibility rules
+ * in getVisibleUserIds (which also cover org-wide reporting access).
+ */
+export async function getTeamMemberIds(managerId: string): Promise<string[]> {
+  const rows = await prisma.$queryRaw<{ id: string }[]>`
+    WITH RECURSIVE subtree AS (
+      SELECT "id" FROM "User" WHERE "managerId" = ${managerId}
+      UNION
+      SELECT u."id" FROM "User" u
+      INNER JOIN subtree s ON u."managerId" = s."id"
+    )
+    SELECT "id" FROM subtree
+  `;
+  return rows.map((r) => r.id);
+}
+
 // ---------------------------------------------------------------------------
 // Profile
 // ---------------------------------------------------------------------------

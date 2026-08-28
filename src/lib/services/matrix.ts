@@ -344,7 +344,11 @@ export interface TrainingMatrixParams {
 }
 
 export async function getTrainingMatrix(actor: Actor, params: TrainingMatrixParams): Promise<TrainingMatrix> {
-  requirePermission(actor, "reports.view");
+  // reports.view covers the org-wide admin matrix; team.view covers a manager's
+  // own subtree — getVisibleUserIds still scopes rows correctly either way.
+  if (!actor.permissions.has("reports.view") && !actor.permissions.has("team.view")) {
+    throw new AuthorizationError("reports.view");
+  }
   const filters = params.filters ?? {};
   const page = Math.max(1, Math.floor(params.page ?? 1));
   return params.rowMode === "positions"

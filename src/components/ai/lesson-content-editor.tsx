@@ -196,7 +196,7 @@ export function LessonContentEditor({
   }
 }
 
-function QuestionConfigFields({
+export function QuestionConfigFields({
   question,
   onChange,
 }: {

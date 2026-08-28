@@ -141,13 +141,30 @@ export interface SaveIntegrationResult {
   detail: string;
 }
 
+/**
+ * Saves integration config. `patch` is merged over whatever is already
+ * stored (never replaced outright) so the admin UI can send only the fields
+ * someone actually typed — leaving a field blank keeps its existing value,
+ * which matters most for secrets that are never sent back to the client.
+ */
 export async function saveIntegrationConfig(
   actor: Actor,
   key: string,
-  config: Record<string, unknown>,
+  patch: Record<string, unknown>,
 ): Promise<SaveIntegrationResult> {
   const descriptor = CONFIGURABLE_INTEGRATIONS.find((c) => c.key === key);
   if (!descriptor) return { ok: false, status: "NOT_CONNECTED", detail: "Unknown integration." };
+
+  const existingRow = await prisma.integration.findUnique({ where: { key } });
+  let existingConfig: Record<string, unknown> = {};
+  if (existingRow?.configCiphertext) {
+    try {
+      existingConfig = decryptJson<Record<string, unknown>>(existingRow.configCiphertext);
+    } catch {
+      existingConfig = {};
+    }
+  }
+  const config = { ...existingConfig, ...patch };
 
   const test = await testConfigurableIntegration(key, config);
   const status: IntegrationView["status"] = test.ok ? "CONNECTED" : "NEEDS_ATTENTION";
@@ -164,7 +181,7 @@ export async function saveIntegrationConfig(
     action: AUDIT_ACTIONS.INTEGRATION_CHANGED,
     entityType: "INTEGRATION",
     entityId: key,
-    metadata: { fields: Object.keys(config), status },
+    metadata: { changedFields: Object.keys(patch), status },
   });
 
   return { ok: test.ok, status, detail: test.detail };
