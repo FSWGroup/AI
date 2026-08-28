@@ -315,6 +315,11 @@ async function renderSceneClip(input: {
     "yuv420p",
     "-c:a",
     "aac",
+    // Force a uniform sample rate/channel layout on every scene's audio
+    // track, narrated or silent. Without this, a narration file at a
+    // different native sample rate than the silent anullsrc track (44100)
+    // makes the concat demuxer misread timestamps across the join and can
+    // roughly double the reported/actual duration of the concatenated file.
     "-ar",
     "44100",
     "-ac",

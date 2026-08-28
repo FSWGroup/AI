@@ -171,27 +171,45 @@ export function AdminPeopleTable({
           dueAt: dueAt || null,
           reason: reason || null,
         });
-        if (!result.ok) return toast.error(result.error);
+        if (!result.ok) {
+          toast.error(result.error);
+          return;
+        }
         toast.success(`Assigned to ${result.data.assigned.length} people (${result.data.alreadyAssigned.length} already had it).`);
       } else if (action === "path") {
         const result = await bulkAssignTrainingAction({ userIds: selectedIds, targetType: "LEARNING_PATH", pathId: pathTarget });
-        if (!result.ok) return toast.error(result.error);
+        if (!result.ok) {
+          toast.error(result.error);
+          return;
+        }
         toast.success(`Applied to ${result.data.assigned.length} people.`);
       } else if (action === "remind") {
         const result = await bulkRemindAction(selectedIds);
-        if (!result.ok) return toast.error(result.error);
+        if (!result.ok) {
+          toast.error(result.error);
+          return;
+        }
         toast.success(`Reminded ${result.data.notified} people.`);
       } else if (action === "department") {
         const result = await bulkMoveDepartmentAction({ userIds: selectedIds, departmentId: departmentTarget });
-        if (!result.ok) return toast.error(result.error);
+        if (!result.ok) {
+          toast.error(result.error);
+          return;
+        }
         toast.success(`Moved ${result.data.updated} people.`);
       } else if (action === "manager") {
         const result = await bulkChangeManagerAction({ userIds: selectedIds, managerId: managerTarget });
-        if (!result.ok) return toast.error(result.error);
+        if (!result.ok) {
+          toast.error(result.error);
+          return;
+        }
         toast.success(`Updated manager for ${result.data.updated} people.`);
       } else if (action === "deactivate") {
         const result = await bulkDeactivateAction(selectedIds);
-        if (!result.ok) return toast.error(result.error);
+        if (!result.ok) {
+          toast.error(result.error);
+          return;
+        }
         toast.success(`Deactivated ${result.data.updated} people.`);
       }
       setConfirmOpen(false);
@@ -204,7 +222,10 @@ export function AdminPeopleTable({
   function runExport() {
     startTransition(async () => {
       const result = await bulkExportAction(selectedIds);
-      if (!result.ok) return toast.error(result.error);
+      if (!result.ok) {
+        toast.error(result.error);
+        return;
+      }
       downloadJson(`people-export-${new Date().toISOString().slice(0, 10)}.json`, result.data);
       toast.success(`Exported ${result.data.length} people.`);
     });
