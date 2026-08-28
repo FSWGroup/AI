@@ -193,6 +193,9 @@ Netlify Blobs; PDFs via the report's Print button there).
 
 ## Documentation
 
+- `docs/AI-FEATURES.md` — the résumé/interview brief and job-description
+  benchmark proposals: setup, guardrails, and why they are shaped that way.
+- `docs/DEPLOY-NETLIFY.md` — click-by-click hosted deployment runbook.
 - `docs/ASSESSMENT-METHODOLOGY.md` — constructs, item types, scoring,
   validity indicators, bands vs stanines, composites, selection rules.
 - `docs/RECORDING-PRIVACY.md` — recording architecture and protections.

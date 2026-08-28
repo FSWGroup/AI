@@ -11,6 +11,10 @@ import { useRouter } from "next/navigation";
 import { api, ApiError } from "@/lib/client/api";
 import { dimensionMeta } from "@/content/narratives/dimension-meta";
 import { Button, Card, Input } from "@/components/ui";
+import {
+  JobDescriptionPanel,
+  type ProposedDimension,
+} from "@/components/admin/JobDescriptionPanel";
 
 interface BenchmarkRow {
   construct: string;
@@ -38,11 +42,17 @@ export function BenchmarkEditor({
   readOnly,
   initialBenchmarks,
   initialConcernRules,
+  jobDescription,
+  aiConfigured,
+  tailoredFormName,
 }: {
   jobProfileId: string;
   readOnly: boolean;
   initialBenchmarks: BenchmarkRow[];
   initialConcernRules: ConcernRow[];
+  jobDescription: string;
+  aiConfigured: boolean;
+  tailoredFormName: string | null;
 }) {
   const router = useRouter();
   const [rows, setRows] = useState<BenchmarkRow[]>(() =>
@@ -106,8 +116,40 @@ export function BenchmarkEditor({
     }
   }
 
+  /** Load an AI proposal into the editor. Nothing is saved until the admin
+   *  reviews the ranges and presses Save benchmark. */
+  function applyProposal(proposed: ProposedDimension[]): void {
+    setRows((prev) =>
+      prev.map((r) => {
+        const p = proposed.find((d) => d.construct === r.construct);
+        if (!p) return r;
+        return {
+          ...r,
+          enabled: p.enabled,
+          required: p.enabled && p.required,
+          minScore: Math.min(p.minScore, p.maxScore),
+          maxScore: Math.max(p.minScore, p.maxScore),
+          weight: p.weight,
+          note: p.rationale.slice(0, 500),
+        };
+      }),
+    );
+    if (typeof window !== "undefined") {
+      window.scrollTo({ top: window.scrollY + 200, behavior: "smooth" });
+    }
+  }
+
   return (
     <div className="mt-6 space-y-6">
+      <JobDescriptionPanel
+        jobProfileId={jobProfileId}
+        initialJobDescription={jobDescription}
+        aiConfigured={aiConfigured}
+        readOnly={readOnly}
+        tailoredFormName={tailoredFormName}
+        onApplyProposal={applyProposal}
+      />
+
       {message && (
         <p role="status" className="rounded-lg bg-fsw-50 p-3 text-sm text-fsw-900">
           {message}

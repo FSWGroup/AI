@@ -7,6 +7,7 @@ import { scopedJobProfileIds } from "@/lib/auth/scope";
 import { Badge, Card, SectionHeading } from "@/components/ui";
 import { StatusBadge } from "@/components/admin/StatusBadge";
 import { AdminActions } from "@/components/admin/AdminActions";
+import { AiAnalysisPanel } from "@/components/admin/AiAnalysisPanel";
 import { RecordingViewer } from "@/components/admin/RecordingViewer";
 import { ScoreTable } from "@/components/admin/ScoreTable";
 import { summarizeIntegrity, INTEGRITY_LABELS } from "@/lib/scoring/integrity";
@@ -17,6 +18,7 @@ const TABS = [
   { key: "overview", label: "Overview" },
   { key: "results", label: "Results" },
   { key: "report", label: "Narrative Report" },
+  { key: "ai", label: "Résumé & AI Brief" },
   { key: "integrity", label: "Integrity" },
   { key: "recording", label: "Recording" },
   { key: "admin", label: "Administration" },
@@ -284,6 +286,8 @@ export default async function CandidateDetailPage({
             </Card>
           </>
         )}
+
+        {tab === "ai" && <AiAnalysisPanel attemptId={attempt.id} />}
 
         {tab === "recording" && recordingAllowed && (
           <RecordingViewer attemptId={attempt.id} />

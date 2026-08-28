@@ -296,6 +296,7 @@ model AssessmentVersion {
   invitations   Invitation[]
   attempts      Attempt[]
   normTables    NormTable[]
+  jobProfiles   JobProfile[] @relation("ProfileAssessmentVersion")
 
   @@unique([name, versionNumber])
 }
@@ -345,9 +346,17 @@ model JobProfile {
   id          String  @id @default(cuid())
   name        String
   description String?
+  /// Full job description text. Drives AI-proposed benchmarks and the
+  /// role-tailored assessment form; retained for audit of how a benchmark
+  /// was arrived at.
+  jobDescription String?
   isSalesRole Boolean @default(false)
   leadershipModuleEnabled Boolean @default(false)
   active      Boolean @default(true)
+  /// Optional role-tailored assessment form. When set, invitations for this
+  /// profile's openings use it instead of the default active version.
+  assessmentVersionId String?
+  assessmentVersion   AssessmentVersion? @relation("ProfileAssessmentVersion", fields: [assessmentVersionId], references: [id], onDelete: SetNull)
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 
@@ -355,6 +364,7 @@ model JobProfile {
   openings    JobOpening[]
   assignments JobProfileAssignment[]
   concernRules AreaOfConcernRule[]
+  aiAnalyses  AiAnalysis[]
 }
 
 model JobDimensionBenchmark {
@@ -443,6 +453,7 @@ model Candidate {
   invitations Invitation[]
   attempts    Attempt[]
   notes       CandidateNote[]
+  documents   CandidateDocument[]
 
   @@index([email])
 }
@@ -537,6 +548,8 @@ model Attempt {
   recordings      Recording[]
   reports         Report[]
   accommodations  AccommodationOverride[]
+  documents       CandidateDocument[]
+  aiAnalyses      AiAnalysis[]
 
   @@index([candidateId])
   @@index([jobOpeningId])
@@ -832,6 +845,85 @@ model AccommodationOverride {
   approvedById String?
   approvedBy   User?             @relation("AccommodationApprovedBy", fields: [approvedById], references: [id], onDelete: SetNull)
   createdAt    DateTime          @default(now())
+}
+
+// ---------------------------------------------------------------------------
+// Candidate documents (résumés) and AI decision-support analyses
+// ---------------------------------------------------------------------------
+
+enum DocumentKind {
+  RESUME
+  COVER_LETTER
+  OTHER
+}
+
+/// A document supplied for a candidate. Files live in private object
+/// storage; only extracted text and metadata live here.
+model CandidateDocument {
+  id           String       @id @default(cuid())
+  candidateId  String
+  candidate    Candidate    @relation(fields: [candidateId], references: [id], onDelete: Cascade)
+  attemptId    String?
+  attempt      Attempt?     @relation(fields: [attemptId], references: [id], onDelete: SetNull)
+  kind         DocumentKind @default(RESUME)
+  fileName     String
+  mimeType     String
+  sizeBytes    Int
+  objectKey    String?
+  /// Text extracted for analysis. Never shown to candidates.
+  extractedText String?
+  /// Set when automatic extraction failed and text was pasted instead.
+  textSource   String       @default("extracted")
+  uploadedById String?
+  createdAt    DateTime     @default(now())
+
+  analyses AiAnalysis[]
+
+  @@index([candidateId])
+  @@index([attemptId])
+}
+
+enum AiAnalysisKind {
+  CANDIDATE_FIT
+  JOB_DESCRIPTION
+}
+
+enum AiAnalysisStatus {
+  PENDING
+  READY
+  FAILED
+}
+
+/// An AI-generated, human-reviewed decision-support artifact.
+///
+/// These are advisory only: they never change assessment scores, never
+/// produce a hire/reject recommendation, and are always attributed to the
+/// admin who requested them. Inputs, model, and prompt version are stored so
+/// any output can be traced back to what produced it.
+model AiAnalysis {
+  id           String           @id @default(cuid())
+  kind         AiAnalysisKind
+  status       AiAnalysisStatus @default(PENDING)
+  attemptId    String?
+  attempt      Attempt?         @relation(fields: [attemptId], references: [id], onDelete: Cascade)
+  jobProfileId String?
+  jobProfile   JobProfile?      @relation(fields: [jobProfileId], references: [id], onDelete: Cascade)
+  documentId   String?
+  document     CandidateDocument? @relation(fields: [documentId], references: [id], onDelete: SetNull)
+  model        String
+  promptVersion String
+  /// Structured result. Shape depends on `kind`.
+  output       Json?
+  error        String?
+  /// Token usage for cost visibility.
+  inputTokens  Int?
+  outputTokens Int?
+  requestedById String?
+  createdAt    DateTime         @default(now())
+  completedAt  DateTime?
+
+  @@index([attemptId])
+  @@index([jobProfileId])
 }
 
 // ---------------------------------------------------------------------------

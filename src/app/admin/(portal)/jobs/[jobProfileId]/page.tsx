@@ -4,6 +4,7 @@ import { getCurrentUser } from "@/lib/auth/session";
 import { can } from "@/lib/auth/rbac";
 import { SectionHeading } from "@/components/ui";
 import { BenchmarkEditor } from "@/components/admin/BenchmarkEditor";
+import { isAiConfigured } from "@/lib/ai/client";
 
 export const dynamic = "force-dynamic";
 
@@ -22,6 +23,7 @@ export default async function JobProfilePage({
       benchmarks: true,
       concernRules: true,
       openings: true,
+      assessmentVersion: true,
     },
   });
   if (!profile) notFound();
@@ -39,6 +41,13 @@ export default async function JobProfilePage({
       <BenchmarkEditor
         jobProfileId={profile.id}
         readOnly={!can(user.role, "MANAGE_BENCHMARKS")}
+        jobDescription={profile.jobDescription ?? ""}
+        aiConfigured={isAiConfigured()}
+        tailoredFormName={
+          profile.assessmentVersion
+            ? `${profile.assessmentVersion.name} v${profile.assessmentVersion.versionNumber}`
+            : null
+        }
         initialBenchmarks={profile.benchmarks.map((b) => ({
           construct: b.construct,
           minScore: b.minScore,

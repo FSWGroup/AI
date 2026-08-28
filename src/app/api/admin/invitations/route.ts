@@ -27,10 +27,16 @@ export const POST = withErrorHandling(async (req) => {
   if (!opening || opening.status !== "OPEN") {
     return apiError("That job opening is not open for invitations.", 422);
   }
-  const version = await prisma.assessmentVersion.findFirst({
-    where: { status: "ACTIVE" },
-    orderBy: { versionNumber: "desc" },
-  });
+  // A profile with a role-tailored form uses it; otherwise the default
+  // active version. Either way the attempt freezes the exact version served.
+  const version = opening.jobProfile.assessmentVersionId
+    ? await prisma.assessmentVersion.findFirst({
+        where: { id: opening.jobProfile.assessmentVersionId, status: "ACTIVE" },
+      })
+    : await prisma.assessmentVersion.findFirst({
+        where: { status: "ACTIVE", jobProfiles: { none: {} } },
+        orderBy: { versionNumber: "desc" },
+      });
   if (!version) {
     return apiError("No active assessment version is configured.", 422);
   }

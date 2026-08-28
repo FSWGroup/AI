@@ -10,7 +10,6 @@ import { requireAnyUser, requestMeta } from "@/lib/auth/session";
 import { canAccessRecordings } from "@/lib/auth/rbac";
 import { assertAttemptAccess } from "@/lib/auth/scope";
 import { audit, AUDIT_ACTIONS } from "@/lib/audit";
-import { getStorage } from "@/lib/storage";
 
 export const GET = withErrorHandling(async (_req, ctx) => {
   const user = await requireAnyUser();
@@ -39,28 +38,42 @@ export const GET = withErrorHandling(async (_req, ctx) => {
     ip: meta.ip,
   });
 
-  const storage = getStorage();
-  const sessions = [];
-  for (const rec of recordings) {
-    const chunks = [];
-    for (const chunk of rec.chunks.filter((c) => c.status === "UPLOADED")) {
-      chunks.push({
-        sequence: chunk.sequence,
-        url: await storage.getDownloadUrl(chunk.objectKey, 300),
-        sizeBytes: chunk.sizeBytes,
-        startedAt: chunk.startedAt,
-        endedAt: chunk.endedAt,
-      });
-    }
-    sessions.push({
+  // Sessions are played back as one continuous stream (see the /stream
+  // route); this payload describes the timeline so a reviewer can jump to a
+  // point in time. Per-chunk URLs are deliberately not returned — an
+  // individual chunk is not independently playable.
+  const sessions = recordings.map((rec) => {
+    const uploaded = rec.chunks
+      .filter((c) => c.status === "UPLOADED" && c.sizeBytes && c.sizeBytes > 0)
+      .sort((a, b) => a.sequence - b.sequence);
+    const sessionStart = (
+      uploaded[0]?.startedAt ?? rec.startedAt
+    ).getTime();
+    const lastEnd = uploaded[uploaded.length - 1]?.endedAt ?? rec.endedAt;
+
+    return {
       sessionId: rec.sessionId,
       status: rec.status,
       mimeType: rec.mimeType,
-      startedAt: rec.startedAt,
-      endedAt: rec.endedAt,
-      chunks,
-    });
-  }
+      startedAt: rec.startedAt.toISOString(),
+      endedAt: rec.endedAt?.toISOString() ?? null,
+      expectedChunks: rec.expectedChunks,
+      uploadedChunks: uploaded.length,
+      totalBytes: uploaded.reduce((n, c) => n + (c.sizeBytes ?? 0), 0),
+      /** Best-effort wall-clock length of the captured video, in seconds. */
+      durationSeconds: lastEnd
+        ? Math.max(0, Math.round((lastEnd.getTime() - sessionStart) / 1000))
+        : null,
+      segments: uploaded.map((c) => ({
+        sequence: c.sequence,
+        offsetSeconds: c.startedAt
+          ? Math.max(0, Math.round((c.startedAt.getTime() - sessionStart) / 1000))
+          : null,
+        startedAt: c.startedAt?.toISOString() ?? null,
+        sizeBytes: c.sizeBytes,
+      })),
+    };
+  });
 
   return apiOk({
     reminder:
@@ -96,8 +109,10 @@ export const DELETE = withErrorHandling(async (_req, ctx) => {
     return apiError("A legal hold prevents deleting this recording.", 409);
   }
 
-  const storage = getStorage();
-  const deleted = await storage.deletePrefix(`assessment-recordings/${attemptId}/`);
+  const { getStorage } = await import("@/lib/storage");
+  const deleted = await getStorage().deletePrefix(
+    `assessment-recordings/${attemptId}/`,
+  );
   await prisma.recording.updateMany({
     where: { attemptId },
     data: { status: "DELETED", deletedAt: new Date() },

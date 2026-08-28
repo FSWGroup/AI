@@ -40,8 +40,12 @@ Site configuration → Environment variables:
 | `BOOTSTRAP_ADMIN_EMAIL` | your admin email, e.g. `jwelsford@fswelsford.com` |
 | `BOOTSTRAP_ADMIN_PASSWORD` | a strong password, 12+ characters |
 
-Optional: `APP_BASE_URL` — only needed if you use a custom domain; otherwise
-the app uses Netlify's site URL automatically.
+Optional:
+- `APP_BASE_URL` — only needed with a custom domain; otherwise the app uses
+  Netlify's site URL automatically.
+- `ANTHROPIC_API_KEY` — enables the AI interview brief and job-description
+  benchmark proposals (`docs/AI-FEATURES.md`). Without it those two features
+  show a "not configured" notice and everything else works normally.
 
 ## 4. Deploy (~5 min build)
 

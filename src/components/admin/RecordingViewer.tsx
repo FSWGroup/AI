@@ -1,8 +1,25 @@
 "use client";
 
+/**
+ * Recording review.
+ *
+ * Plays each recording session as ONE continuous video covering the whole
+ * assessment (the server reassembles the stored chunks — an individual chunk
+ * is not independently playable). A timeline lets the reviewer jump to a
+ * point in time; jumping reloads the stream starting at that segment, so
+ * long recordings never have to download from the beginning.
+ */
+
 import { useEffect, useRef, useState } from "react";
 import { api, ApiError } from "@/lib/client/api";
-import { Button, Card } from "@/components/ui";
+import { Badge, Button, Card } from "@/components/ui";
+
+interface Segment {
+  sequence: number;
+  offsetSeconds: number | null;
+  startedAt: string | null;
+  sizeBytes: number | null;
+}
 
 interface RecordingSession {
   sessionId: string;
@@ -10,7 +27,22 @@ interface RecordingSession {
   mimeType: string;
   startedAt: string;
   endedAt: string | null;
-  chunks: { sequence: number; url: string; sizeBytes: number | null }[];
+  expectedChunks: number | null;
+  uploadedChunks: number;
+  totalBytes: number;
+  durationSeconds: number | null;
+  segments: Segment[];
+}
+
+function formatClock(seconds: number): string {
+  const m = Math.floor(seconds / 60);
+  const s = seconds % 60;
+  return `${m}:${String(s).padStart(2, "0")}`;
+}
+
+function formatBytes(bytes: number): string {
+  if (bytes < 1024 * 1024) return `${Math.round(bytes / 1024)} KB`;
+  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
 }
 
 export function RecordingViewer({ attemptId }: { attemptId: string }) {
@@ -22,6 +54,7 @@ export function RecordingViewer({ attemptId }: { attemptId: string }) {
   const [loaded, setLoaded] = useState(false);
 
   async function load(): Promise<void> {
+    setError(null);
     try {
       const res = await api<{ reminder: string; sessions: RecordingSession[] }>(
         `/api/admin/attempts/${attemptId}/recording`,
@@ -63,74 +96,177 @@ export function RecordingViewer({ attemptId }: { attemptId: string }) {
         </Card>
       )}
       {data?.sessions.map((s, i) => (
-        <SessionPlayer key={s.sessionId} session={s} index={i} />
+        <SessionPlayer
+          key={s.sessionId}
+          attemptId={attemptId}
+          session={s}
+          index={i}
+          total={data.sessions.length}
+        />
       ))}
     </div>
   );
 }
 
 function SessionPlayer({
+  attemptId,
   session,
   index,
+  total,
 }: {
+  attemptId: string;
   session: RecordingSession;
   index: number;
+  total: number;
 }) {
   const videoRef = useRef<HTMLVideoElement | null>(null);
-  const [chunkIdx, setChunkIdx] = useState(0);
-  const chunks = session.chunks;
+  const [fromSequence, setFromSequence] = useState<number>(
+    session.segments[0]?.sequence ?? 0,
+  );
+  const [elapsed, setElapsed] = useState(0);
+
+  const base = `/api/admin/attempts/${attemptId}/recording/stream?session=${encodeURIComponent(
+    session.sessionId,
+  )}`;
+  const src = `${base}&from=${fromSequence}`;
+
+  // Offset of the segment playback starts from, so the displayed time
+  // reflects position in the assessment rather than in the loaded stream.
+  const startOffset =
+    session.segments.find((seg) => seg.sequence === fromSequence)?.offsetSeconds ?? 0;
 
   useEffect(() => {
     const v = videoRef.current;
-    if (!v || chunks.length === 0) return;
-    v.src = chunks[chunkIdx].url;
-    void v.play().catch(() => undefined);
-  }, [chunkIdx, chunks]);
+    if (!v) return;
+    v.load();
+    setElapsed(0);
+  }, [src]);
+
+  const incomplete =
+    session.status === "INCOMPLETE" ||
+    (session.expectedChunks !== null &&
+      session.uploadedChunks < session.expectedChunks);
 
   return (
     <Card className="p-6">
       <div className="flex flex-wrap items-center justify-between gap-2">
         <h3 className="text-sm font-bold text-navy-900">
-          Session {index + 1} — {session.status}
+          {total > 1 ? `Session ${index + 1} of ${total}` : "Recording"}
         </h3>
-        <p className="text-xs text-navy-400">
-          {new Date(session.startedAt).toLocaleString()} · {chunks.length} chunks
-        </p>
+        <div className="flex items-center gap-2">
+          <Badge tone={incomplete ? "amber" : "green"}>
+            {incomplete ? "Incomplete upload" : "Complete"}
+          </Badge>
+          <span className="text-xs text-navy-400">
+            {new Date(session.startedAt).toLocaleString()}
+            {session.durationSeconds !== null &&
+              ` · ${formatClock(session.durationSeconds)} captured`}
+            {` · ${formatBytes(session.totalBytes)}`}
+          </span>
+        </div>
       </div>
-      {chunks.length > 0 ? (
+
+      {session.segments.length === 0 ? (
+        <p className="mt-3 text-sm text-navy-400">
+          No uploaded video for this session.
+        </p>
+      ) : (
         <>
           <video
             ref={videoRef}
             controls
             playsInline
-            className="mt-4 aspect-video w-full max-w-xl rounded-xl bg-navy-950"
-            onEnded={() => {
-              if (chunkIdx < chunks.length - 1) setChunkIdx(chunkIdx + 1);
-            }}
-          />
-          <div className="mt-3 flex flex-wrap gap-1">
-            {chunks.map((c, i) => (
-              <button
-                key={c.sequence}
-                onClick={() => setChunkIdx(i)}
-                className={`h-7 w-9 rounded text-xs font-semibold ${
-                  i === chunkIdx
-                    ? "bg-navy-900 text-white"
-                    : "bg-navy-100 text-navy-600 hover:bg-navy-200"
-                }`}
-                aria-label={`Play segment ${i + 1}`}
-              >
-                {i + 1}
-              </button>
-            ))}
-          </div>
-          <p className="mt-2 text-xs text-navy-400">
-            Segments play in sequence automatically. Playback URLs expire after
-            a few minutes; reload the tab to re-issue them.
+            preload="metadata"
+            className="mt-4 aspect-video w-full max-w-2xl rounded-xl bg-navy-950"
+            onTimeUpdate={(e) => setElapsed(e.currentTarget.currentTime)}
+          >
+            <source src={src} type={session.mimeType || "video/webm"} />
+            Your browser cannot play this recording format.
+          </video>
+
+          <p className="mt-2 text-sm font-medium text-navy-700">
+            Position in assessment:{" "}
+            <span className="font-mono">
+              {formatClock(Math.round(startOffset + elapsed))}
+            </span>
+            {session.durationSeconds !== null && (
+              <span className="text-navy-400">
+                {" "}
+                / {formatClock(session.durationSeconds)}
+              </span>
+            )}
           </p>
+
+          <div className="mt-4">
+            <p className="text-xs font-semibold uppercase tracking-wide text-navy-400">
+              Jump to a point in the assessment
+            </p>
+            <div className="mt-2 flex flex-wrap gap-1.5">
+              {session.segments.map((seg) => {
+                const active = seg.sequence === fromSequence;
+                return (
+                  <button
+                    key={seg.sequence}
+                    onClick={() => setFromSequence(seg.sequence)}
+                    className={`rounded px-2.5 py-1 font-mono text-xs font-semibold transition-colors ${
+                      active
+                        ? "bg-navy-900 text-white"
+                        : "bg-navy-100 text-navy-600 hover:bg-navy-200"
+                    }`}
+                    aria-pressed={active}
+                    aria-label={`Play from ${
+                      seg.offsetSeconds !== null
+                        ? formatClock(seg.offsetSeconds)
+                        : `segment ${seg.sequence + 1}`
+                    }`}
+                  >
+                    {seg.offsetSeconds !== null
+                      ? formatClock(seg.offsetSeconds)
+                      : `#${seg.sequence + 1}`}
+                  </button>
+                );
+              })}
+            </div>
+            <p className="mt-2 text-xs text-navy-400">
+              The player streams the recording continuously from the selected
+              point to the end. Because browser-recorded video carries no
+              duration header, the scrub bar may not show a total length —
+              use these markers to move through the session, or download the
+              full file to review it in a desktop player.
+            </p>
+          </div>
+
+          <div className="mt-3 flex gap-2">
+            <a
+              href={`${base}&from=${session.segments[0].sequence}`}
+              download={`recording-${session.sessionId}.webm`}
+              className="rounded-lg border border-navy-200 bg-white px-3 py-1.5 text-xs font-semibold text-navy-700 hover:bg-navy-50"
+            >
+              Download full recording
+            </a>
+            {fromSequence !== session.segments[0].sequence && (
+              <Button
+                variant="secondary"
+                className="px-3 py-1.5 text-xs"
+                onClick={() => setFromSequence(session.segments[0].sequence)}
+              >
+                Back to start
+              </Button>
+            )}
+          </div>
+
+          {incomplete && (
+            <p className="mt-3 rounded-lg bg-amber-50 p-3 text-xs text-amber-900">
+              This session&apos;s upload did not finish
+              {session.expectedChunks !== null
+                ? ` (${session.uploadedChunks} of ${session.expectedChunks} segments received)`
+                : ""}
+              . The candidate may have closed the window or lost connection at
+              the end. Any other sessions above/below cover the rest of the
+              attempt.
+            </p>
+          )}
         </>
-      ) : (
-        <p className="mt-3 text-sm text-navy-400">No uploaded chunks.</p>
       )}
     </Card>
   );
