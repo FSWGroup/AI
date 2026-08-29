@@ -165,11 +165,35 @@ normalization; commercial accounts; ship-tos; organization relationships with cy
 prevention; person affiliations with history; the candidate-value model; the
 configurable survivorship engine; the field-ownership register; divergence reporting.
 
-**Migrations.** `0019`–`0022`.
+**Migrations.** `0015` (party core) and `0016` (survivorship).
 
 **Events.** `fsw.party.OrganizationCreated`, `OrganizationFieldValueChanged`,
-`SiteCreated`, `PersonAffiliationStarted`, `PersonAffiliationEnded`,
-`CommercialAccountLinked`.
+`OrganizationRoleGranted`, `OrganizationRelationshipChanged`, `SiteCreated`,
+`CommercialAccountLinked`, `PersonAffiliationStarted`, `PersonAffiliationEnded`.
+
+**Status: the survivorship core is delivered** — the candidate model, the configurable
+engine with four strategies, the field-ownership register, the divergence view,
+organizations with roles and cycle-checked relationships, locations with raw
+preservation and conservative normalization, and optimistic concurrency on the write
+path. Sites, commercial accounts, ship-tos and person affiliations have their schema
+and their events, and the services over them follow with entity resolution in Phase 8,
+which is where they acquire their first real caller.
+
+Two design notes worth recording, because both looked like they could go the other way:
+
+- **One candidate table, not four.** `party.field_candidate` carries `entity_type` and
+  `entity_id` rather than there being an `organization_field_candidate`, a
+  `person_field_candidate` and so on. Referential integrity is not given up to get it:
+  stored generated columns (`CASE WHEN entity_type = 'ORGANIZATION' THEN entity_id END`)
+  carry a real foreign key per entity type, enforced only for rows of that type. The
+  alternative was four near-identical tables and either four code paths or dynamic
+  table names in the engine.
+- **The mastered-field registry is a table, not a TypeScript constant.** Unlike a
+  product attribute, adding a mastered field means adding a column, so it is a
+  migration either way and the "no code change" argument does not apply. The registry
+  earns its place by being the single declaration the engine, the audit classifier and
+  the admin UI all read, and the migration verifies every row against the catalogue so
+  a typo fails at migration time.
 
 **Exit criteria.** AC10 — two sources disagree on one field; both values, the
 winner, the reason and the origin are all visible; changing the rule re-evaluates safely.

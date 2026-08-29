@@ -71,7 +71,7 @@ Rows fill in as phases land.
 | 7   | Class 150 is not 150 PSI; NPS 1 is not 25.4 mm                                  | `pim/engineering-semantics.test.ts`, `pim/catalog.test.ts`           | ✅                                                        |
 | 8   | Two sources, explainable match, approve, both records preserved                 | `party/entity-resolution.test.ts`                                    | ⬜                                                        |
 | 9   | Undo the merge, restore relationships, lose nothing                             | `party/unmerge.test.ts`                                              | ⬜                                                        |
-| 10  | Two sources disagree: both values, winner, reason, origin                       | `pim/catalog.test.ts` (PIM); `party/survivorship.test.ts` (accounts) | ◐                                                         |
+| 10  | Two sources disagree: both values, winner, reason, origin                       | `pim/catalog.test.ts` (PIM); `party/survivorship.test.ts` (accounts) | ✅                                                        |
 | 11  | Interrupted Pipedrive backfill restarts without duplicates                      | `ingest/pipedrive-backfill.test.ts`                                  | ⬜                                                        |
 | 12  | The same webhook twice is harmless                                              | `ingest/pipedrive-webhook.test.ts`                                   | ⬜                                                        |
 | 13  | A missed webhook is found by reconciliation                                     | `ingest/pipedrive-reconcile.test.ts`                                 | ⬜                                                        |
@@ -82,7 +82,7 @@ Rows fill in as phases land.
 | 21  | Exact equivalent vs. functional alternate are distinguished                     | `pim/relationships.test.ts`                                          | ✅                                                        |
 | 22  | Missing required Cv excludes a variant from the publishable view                | `pim/catalog.test.ts`                                                | ✅                                                        |
 | 23  | Model-number parsing with version, confidence, warnings                         | deferred — assumption A-031                                          | ⬜                                                        |
-| 25  | A stale write is rejected, not silently applied                                 | `pim/catalog.test.ts` (domain); `api/concurrency.test.ts` (HTTP)     | ◐                                                         |
+| 25  | A stale write is rejected, not silently applied                                 | `pim/catalog.test.ts`, `party/organizations.test.ts`                 | ◐ domain proven; the HTTP layer is Phase 11               |
 | 26  | Canonical services depend on the abstract ingestion contract                    | `ingest/adapter-independence.test.ts`                                | ✅                                                        |
 | 27  | Clean environment restored from backup and verified                             | `docs/runbooks/restore.md` drill                                     | ⬜                                                        |
 
@@ -153,6 +153,18 @@ Worth recording, because they are the reason the tests are shaped this way.
   correctly and left nothing to act on. Fixed by committing the observation in its own
   transaction before the halt; pinned by `ingest/p21-drift.test.ts › records the
 observed structure so a reviewer has something to approve`.
+- **A test that rewrote a survivorship rule changed the meaning of every test after
+  it.** `party.survivorship_rule` is configuration, so it survived the row truncation
+  the other tests relied on, and later assertions were quietly running under a rule
+  nobody had chosen. The symptom appeared two tests further down, in an unrelated
+  assertion. Fixed by snapshotting the seeded rules before any test runs and restoring
+  them in `beforeEach`: configuration tables need resetting as deliberately as data
+  ones.
+- **`party.field_divergence` returned its `sources` column as a raw string.**
+  `array_agg` over a column of a DOMAIN type produces an array with its own type OID,
+  which client drivers do not recognise, so every consumer would have received
+  `'{P21,PIPEDRIVE}'` rather than a list. Caught by asserting on the parsed value
+  instead of on the column's presence; fixed by casting to `text[]` in the view.
 
 ## What the benchmark actually measures
 
