@@ -9,5 +9,6 @@
  */
 import { pimEvents } from './modules/pim/index.js';
 import { ingestEvents } from './modules/ingest/index.js';
+import { partyEvents } from './modules/party/index.js';
 
-export const ALL_EVENTS = [...pimEvents, ...ingestEvents];
+export const ALL_EVENTS = [...pimEvents, ...ingestEvents, ...partyEvents];
