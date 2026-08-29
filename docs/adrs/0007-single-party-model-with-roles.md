@@ -29,11 +29,11 @@ Role types (v1): `CUSTOMER`, `PROSPECT`, `MANUFACTURER`, `BRAND_OWNER`, `SUPPLIE
 Four concepts are kept rigorously distinct, because collapsing them is the single most
 common and most expensive MDM mistake:
 
-| Concept | Table | Definition |
-|---|---|---|
-| **Organization** | `party.organization` | A company or legal/business entity. Exists whether or not FSW trades with it. |
-| **Site** | `party.site` | A physical facility an organization operates: a plant, a headquarters, a distribution centre. The thing a salesperson visits. |
-| **Location** | `party.location` | A postal or physical address. Raw text plus a normalized form. Not a business entity. |
+| Concept                | Table                      | Definition                                                                                                                              |
+| ---------------------- | -------------------------- | --------------------------------------------------------------------------------------------------------------------------------------- |
+| **Organization**       | `party.organization`       | A company or legal/business entity. Exists whether or not FSW trades with it.                                                           |
+| **Site**               | `party.site`               | A physical facility an organization operates: a plant, a headquarters, a distribution centre. The thing a salesperson visits.           |
+| **Location**           | `party.location`           | A postal or physical address. Raw text plus a normalized form. Not a business entity.                                                   |
 | **Commercial account** | `party.commercial_account` | A source-system accounting construct — a P21 customer, a ValveMan web customer. Belongs to an organization; not itself an organization. |
 
 `party.ship_to` is a **commercial and logistical role referencing a location**, optionally

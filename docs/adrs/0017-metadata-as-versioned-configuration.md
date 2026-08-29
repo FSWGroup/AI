@@ -37,7 +37,7 @@ The loader:
 - validates every file against its TypeBox schema before touching the database;
 - refuses changes that would be destructive to existing data (narrowing a value type,
   removing an attribute that has values, deleting a vocabulary term in use) unless run
-  with an explicit `--allow-breaking` flag *and* a migration plan;
+  with an explicit `--allow-breaking` flag _and_ a migration plan;
 - deprecates rather than deletes;
 - is idempotent — applying the same configuration twice changes nothing;
 - runs in CI against a scratch database on every pull request touching `config/`;

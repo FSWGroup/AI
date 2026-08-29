@@ -27,15 +27,15 @@ Modules are enforced at three levels:
 
 Modules for v1:
 
-| Schema | Owns |
-|---|---|
-| `kernel` | shared primitives: id generation, source systems, operating companies, correlation |
-| `audit` | the change log |
-| `events` | domain event ledger, delivery, subscriptions, consumer inbox |
-| `iam` | principals, identities, service accounts, roles, permissions, assignments |
-| `party` | organizations, persons, sites, locations, roles, affiliations, matching, merges |
-| `pim` | units, vocabularies, attributes, product types, products, variants, facets, relationships, quality |
-| `ingest` | connectors, runs, landed files, source records, quarantine, schema fingerprints |
+| Schema   | Owns                                                                                               |
+| -------- | -------------------------------------------------------------------------------------------------- |
+| `kernel` | shared primitives: id generation, source systems, operating companies, correlation                 |
+| `audit`  | the change log                                                                                     |
+| `events` | domain event ledger, delivery, subscriptions, consumer inbox                                       |
+| `iam`    | principals, identities, service accounts, roles, permissions, assignments                          |
+| `party`  | organizations, persons, sites, locations, roles, affiliations, matching, merges                    |
+| `pim`    | units, vocabularies, attributes, product types, products, variants, facets, relationships, quality |
+| `ingest` | connectors, runs, landed files, source records, quarantine, schema fingerprints                    |
 
 ## Alternatives considered
 

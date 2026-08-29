@@ -17,8 +17,8 @@ unanswered (question K1); California residents are near-certain.
 Erasure is a **privileged, audited, reason-bearing operation** (`pii.erase`) that does
 four different things to four different classes of storage:
 
-1. **Canonical records.** `party.person` and its candidate values are *anonymized in
-   place*: name fields become `[erased]`, email and phone are nulled, and
+1. **Canonical records.** `party.person` and its candidate values are _anonymized in
+   place_: name fields become `[erased]`, email and phone are nulled, and
    `erased_at`/`erased_by`/`erasure_reason` are set. The row and its ID survive, so every
    foreign key, affiliation history, and non-PII operational fact stays intact. A contact
    who was the buyer on a 2024 order remains the buyer; they are simply no longer named.
@@ -33,7 +33,7 @@ four different things to four different classes of storage:
    remain — so run manifests still reconcile — and the plaintext is unrecoverable. This
    is crypto-shredding, and it is the standard answer to immutable-store erasure.
 4. **Audit `before`/`after`.** PII-classified fields are replaced with `[erased]` by the
-   *maintenance* role (ADR-0021), in a single transaction that writes its own audit entry
+   _maintenance_ role (ADR-0021), in a single transaction that writes its own audit entry
    recording that an erasure occurred, by whom, and why. The audit trail records that the
    record was erased; it does not preserve what was erased.
 

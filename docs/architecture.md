@@ -52,15 +52,15 @@ Each has an ADR explaining the conditions under which it would become correct.
 Each module owns a PostgreSQL schema and exposes exactly one TypeScript entry point.
 Nothing imports past another module's `index.ts` (ADR-0003).
 
-| Module | Owns |
-|---|---|
-| `kernel` | Identifiers, clock, source-system registry, operating companies, unit of work, idempotency keys |
-| `audit` | The change log — who changed what, when, through which interface |
-| `events` | Domain event ledger, delivery outbox, subscriptions, consumer inbox, the feed |
-| `iam` | Principals, IdP identity mapping, service accounts, credentials, roles, permissions, scopes |
-| `party` | Organizations, persons, sites, locations, commercial accounts, ship-tos, roles, affiliations, candidates, survivorship, matching, merges |
-| `pim` | Units, vocabularies, attributes, product types, hierarchy, variants, typed values, facets, relationships, certifications, assets, quality |
-| `ingest` | Connectors, runs, landed files, source records, quarantine, schema fingerprints, reconciliation |
+| Module   | Owns                                                                                                                                      |
+| -------- | ----------------------------------------------------------------------------------------------------------------------------------------- |
+| `kernel` | Identifiers, clock, source-system registry, operating companies, unit of work, idempotency keys                                           |
+| `audit`  | The change log — who changed what, when, through which interface                                                                          |
+| `events` | Domain event ledger, delivery outbox, subscriptions, consumer inbox, the feed                                                             |
+| `iam`    | Principals, IdP identity mapping, service accounts, credentials, roles, permissions, scopes                                               |
+| `party`  | Organizations, persons, sites, locations, commercial accounts, ship-tos, roles, affiliations, candidates, survivorship, matching, merges  |
+| `pim`    | Units, vocabularies, attributes, product types, hierarchy, variants, typed values, facets, relationships, certifications, assets, quality |
+| `ingest` | Connectors, runs, landed files, source records, quarantine, schema fingerprints, reconciliation                                           |
 
 ## The five decisions that shape everything else
 
@@ -83,7 +83,7 @@ attribute's declared value type, with database `CHECK` constraints enforcing tha
 `QUANTITY` cannot hold a term and a `PRESSURE_CLASS` cannot hold a number (ADR-0013).
 
 Fast filtering comes from `pim.variant_facet` — a fixed-schema, indexed projection that
-stores the *resolved effective* value after inheritance and is written **in the same
+stores the _resolved effective_ value after inheritance and is written **in the same
 transaction** as the canonical change, so a product is filterable the instant it is
 committed (ADR-0014).
 
@@ -114,7 +114,7 @@ lets an immutable ledger and a lawful erasure obligation coexist (ADR-0027).
 ### 5. External systems never define the domain
 
 A P21 customer is not an FSW organization. A P21 ship-to is not a plant. A Pipedrive
-organization is not an FSW organization. Each is a *source record* that **proposes**
+organization is not an FSW organization. Each is a _source record_ that **proposes**
 canonical facts through a versioned mapping (ADR-0022). No source-system identifier
 appears as a column on a canonical table; crosswalks live in `ingest`.
 

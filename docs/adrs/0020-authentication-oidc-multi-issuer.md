@@ -16,7 +16,7 @@ Whether FSW standardises on Microsoft Entra ID or Google Workspace is unanswered
 a painful retrofit later, and the uncertainty is real.
 
 - `iam.identity(person_id, issuer, subject, tenant_id, email_at_link, display_name_at_link,
-  linked_at, last_seen_at, disabled_at)` with `UNIQUE (issuer, subject)`.
+linked_at, last_seen_at, disabled_at)` with `UNIQUE (issuer, subject)`.
   The `(issuer, subject)` pair is the permanent identity. Email is stored only as a
   human-readable hint of what it was when linked, and is never used for lookup.
 - `iam.issuer` registers each trusted issuer: issuer URL, JWKS URI, audience, allowed
@@ -34,7 +34,7 @@ a painful retrofit later, and the uncertainty is real.
 
 - JIT: on first successful authentication from an issuer with `jit_enabled`, if no
   identity matches, Layer 0 creates a person **only** if the token's verified email
-  domain is on the issuer's allow-list; otherwise it creates a *pending link request* for
+  domain is on the issuer's allow-list; otherwise it creates a _pending link request_ for
   an administrator. New persons get no roles — authentication without authorization.
 - Deprovisioning is explicit: disabling in the IdP stops authentication, and a documented
   runbook ends affiliations and revokes role assignments in Layer 0.

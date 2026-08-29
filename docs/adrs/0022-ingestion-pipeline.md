@@ -16,7 +16,7 @@ initial canonical dataset arrives this way, so this is first-class, not a script
 
 Each connector implements a narrow interface and the shared pipeline runs the stages.
 A connector supplies: discovery (what is available since the watermark), fetch, parse,
-and a **mapping** from source shape to a canonical *command*. A connector never writes to
+and a **mapping** from source shape to a canonical _command_. A connector never writes to
 a canonical table. That is the anti-corruption boundary (§77) and it is enforced by
 module boundaries: connectors live in `ingest` and may call only the published interfaces
 of `party` and `pim`.
@@ -43,7 +43,7 @@ of `party` and `pim`.
 ### Guarantees
 
 - **Idempotent and restartable.** Records are keyed by `(source_system, object_type,
-  source_id)`; content changes are detected by `payload_hash`. Re-ingesting an identical
+source_id)`; content changes are detected by `payload_hash`. Re-ingesting an identical
   file or payload changes nothing and is recorded as `unchanged`. A run interrupted
   mid-way resumes from its watermark; a re-run of a completed run is a no-op.
 - **Nothing is silently discarded.** Every rejected record lands in quarantine with a

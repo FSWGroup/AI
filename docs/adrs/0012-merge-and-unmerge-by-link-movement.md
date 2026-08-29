@@ -17,7 +17,7 @@ Merging organization `B` into `A` performs exactly these operations:
 
 1. Move every `party.organization_source_link` row from `B` to `A`, recording each move
    in `party.organization_merge_link_move(merge_id, link_id, from_organization_id,
-   to_organization_id)`.
+to_organization_id)`.
 2. Re-parent `B`'s owned children — sites, commercial accounts, ship-tos, roles,
    affiliations, relationships — recording each move in the same movement ledger.
 3. Set `B.merged_into_id = A.id`, `B.lifecycle_status = 'MERGED'`.
@@ -33,7 +33,7 @@ merge record `reversed_at`/`reversed_by`/`reversal_reason`, and emits
 
 Because canonical values were never authored — only derived — recomputation after
 reversal reproduces `A`'s and `B`'s pre-merge values exactly, provided no new candidate
-arrived in the interim. If new candidates did arrive, the result is the *correct current*
+arrived in the interim. If new candidates did arrive, the result is the _correct current_
 value for each organization, which is the desired behaviour and is not the same as
 "restoring a snapshot".
 

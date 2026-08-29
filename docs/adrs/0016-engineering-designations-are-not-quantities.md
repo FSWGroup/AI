@@ -37,7 +37,7 @@ consequences.
   pressure.
 - Actual measured pressures — WOG rating, maximum working pressure, test pressure,
   set pressure — are ordinary `QUANTITY` attributes with dimension `PRESSURE` (ADR-0015).
-  A product routinely has both: pressure class *and* a WOG rating.
+  A product routinely has both: pressure class _and_ a WOG rating.
 
 ### Mechanical enforcement
 
@@ -67,7 +67,7 @@ consequences.
 ## Consequences
 
 - Sorting sizes and classes requires the ordinal metadata on the term. Cheap and correct.
-- "Find valves rated for at least 200 psig at 400 °F" is a *derived* question requiring
+- "Find valves rated for at least 200 psig at 400 °F" is a _derived_ question requiring
   pressure–temperature rating tables per material and class. Those tables are a legitimate
   future PIM capability; they are explicitly not a conversion, and they are out of scope
   for v1.

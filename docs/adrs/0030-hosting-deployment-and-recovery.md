@@ -28,7 +28,8 @@ point toward Azure.
 
 Provisional target: **Azure Container Apps + Azure Database for PostgreSQL Flexible
 Server + Azure Blob Storage (S3-compatible access via a gateway) or AWS App Runner + RDS
-+ S3**, decided when H1 is answered. Nothing in the code depends on the answer.
+
+- S3**, decided when H1 is answered. Nothing in the code depends on the answer.
 
 ### Environments
 

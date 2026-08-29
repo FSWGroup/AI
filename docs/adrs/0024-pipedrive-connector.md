@@ -15,7 +15,7 @@ endpoint coverage, pagination style, rate-limit budget, and webhook payload shap
 not been verified against Pipedrive's live documentation or a live account in this
 session**, because no credentials or network access to Pipedrive were available. Every
 endpoint-specific detail below is provisional and must be confirmed against official
-documentation before Phase 5 implementation. What is *not* provisional is the shape of
+documentation before Phase 5 implementation. What is _not_ provisional is the shape of
 the connector, which is deliberately insensitive to those details.
 
 ## Decision
@@ -26,7 +26,7 @@ the connector, which is deliberately insensitive to those details.
    an interrupted import resumes without duplicating (AC11).
 2. **Incremental sync** — driven by source updated timestamps and a watermark, with a
    deliberate overlap window to tolerate clock skew and late writes.
-3. **Webhooks** — treated strictly as *"something changed, go look"*. The webhook payload
+3. **Webhooks** — treated strictly as _"something changed, go look"_. The webhook payload
    is recorded for lineage but **the API is then called to fetch authoritative state**.
    This makes duplicate webhooks (AC12), out-of-order webhooks, and replayed webhooks
    harmless by construction rather than by careful handling.
@@ -57,14 +57,14 @@ schema-drift event handled exactly like a P21 column change (ADR-0022).
 ### Anti-corruption
 
 A Pipedrive **organization** is not an FSW organization. It is a source record that
-*proposes* one. In practice Pipedrive organizations at FSW are expected to be an
+_proposes_ one. In practice Pipedrive organizations at FSW are expected to be an
 inconsistent mix of legal entities and plants (question D5), so the mapping produces a
 candidate organization **and** a candidate site, with the site link left for entity
 resolution rather than asserted.
 
 Deals are **not** ingested in v1 (§80 places pipelines out of scope), with one exception
 under consideration: deal-to-person-to-organization links are sometimes the only evidence
-connecting a contact to a plant, and may be ingested as *evidence for matching* without
+connecting a contact to a plant, and may be ingested as _evidence for matching_ without
 creating canonical deal entities. Pending question D7.
 
 ### Direction

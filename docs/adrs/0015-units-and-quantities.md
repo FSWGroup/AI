@@ -9,7 +9,7 @@
 comparable across unit systems — so that a product entered as "10 bar" matches a PSI
 range query. Temperature makes this non-trivial, because Celsius and Fahrenheit are
 affine, not merely scaled: converting a temperature and converting a temperature
-*difference* are different operations.
+_difference_ are different operations.
 
 ## Decision
 
@@ -26,7 +26,7 @@ affine, not merely scaled: converting a temperature and converting a temperature
   `value = (base − offset) ÷ factor`. Pure scaling is the case where `offset = 0`.
 
 `TEMPERATURE` and `TEMPERATURE_DIFFERENCE` are **separate dimensions**. A 10 °C
-temperature is 283.15 K; a 10 °C *difference* is 10 K. Conflating them is a classic and
+temperature is 283.15 K; a 10 °C _difference_ is 10 K. Conflating them is a classic and
 consequential engineering bug, so the type system refuses to.
 
 ### Storage
@@ -66,7 +66,7 @@ declare which, per source, rather than guessing.
 
 ## Alternatives considered
 
-- **A units library (`js-quantities`, `mathjs` units).** Rejected as the *authority*:
+- **A units library (`js-quantities`, `mathjs` units).** Rejected as the _authority_:
   the unit table must be data in our database so that ingestion mappings, the API, and
   the facet layer share one definition and so that new units are configuration, not a
   dependency upgrade. A library may be used in tests as an independent oracle.

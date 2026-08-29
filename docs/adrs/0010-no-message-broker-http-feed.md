@@ -32,12 +32,12 @@ projection and an external consumer are the same shape of thing.
 
 ## Alternatives considered
 
-| Option | Why not now |
-|---|---|
-| Kafka / Redpanda | Operationally heavy; a broker for a system emitting thousands of events per day is unjustifiable for a small team. |
-| RabbitMQ | Lighter than Kafka but still a second durable system with its own backup and failure model. |
-| PostgreSQL `LISTEN`/`NOTIFY` | Fire-and-forget with an 8 kB payload cap and no durability if no listener is connected. Useful only as a *wake-up hint* for the dispatcher, which is how we use it. |
-| Amazon SQS / EventBridge | Reasonable, but couples Layer 0 to one cloud and adds a delivery path we cannot replay from. |
+| Option                       | Why not now                                                                                                                                                         |
+| ---------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Kafka / Redpanda             | Operationally heavy; a broker for a system emitting thousands of events per day is unjustifiable for a small team.                                                  |
+| RabbitMQ                     | Lighter than Kafka but still a second durable system with its own backup and failure model.                                                                         |
+| PostgreSQL `LISTEN`/`NOTIFY` | Fire-and-forget with an 8 kB payload cap and no durability if no listener is connected. Useful only as a _wake-up hint_ for the dispatcher, which is how we use it. |
+| Amazon SQS / EventBridge     | Reasonable, but couples Layer 0 to one cloud and adds a delivery path we cannot replay from.                                                                        |
 
 ## Why this wins
 

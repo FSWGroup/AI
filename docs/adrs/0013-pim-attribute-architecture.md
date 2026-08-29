@@ -30,18 +30,18 @@ integrity, no polymorphic pointers.
 
 Values are stored in **typed columns**, selected by the attribute's declared value type:
 
-| Value type | Columns used |
-|---|---|
-| `TEXT` | `value_text` |
-| `BOOLEAN` | `value_boolean` |
-| `INTEGER`, `DECIMAL` | `value_numeric` |
-| `DATE` | `value_date` |
-| `ENUM` | `value_term_id` → `pim.vocabulary_term` |
-| `NOMINAL_SIZE` | `value_term_id` (constrained to the nominal-size vocabulary) |
-| `PRESSURE_CLASS` | `value_term_id` (constrained to a pressure-class vocabulary) |
-| `QUANTITY` | `value_qty_original`, `value_qty_original_unit`, `value_qty_base`, `value_qty_dimension` |
-| `QUANTITY_RANGE` | the quantity columns plus `value_qty_max_original` / `value_qty_max_base` |
-| `ENTITY_REF` | `value_entity_id` + `value_entity_type` |
+| Value type           | Columns used                                                                             |
+| -------------------- | ---------------------------------------------------------------------------------------- |
+| `TEXT`               | `value_text`                                                                             |
+| `BOOLEAN`            | `value_boolean`                                                                          |
+| `INTEGER`, `DECIMAL` | `value_numeric`                                                                          |
+| `DATE`               | `value_date`                                                                             |
+| `ENUM`               | `value_term_id` → `pim.vocabulary_term`                                                  |
+| `NOMINAL_SIZE`       | `value_term_id` (constrained to the nominal-size vocabulary)                             |
+| `PRESSURE_CLASS`     | `value_term_id` (constrained to a pressure-class vocabulary)                             |
+| `QUANTITY`           | `value_qty_original`, `value_qty_original_unit`, `value_qty_base`, `value_qty_dimension` |
+| `QUANTITY_RANGE`     | the quantity columns plus `value_qty_max_original` / `value_qty_max_base`                |
+| `ENTITY_REF`         | `value_entity_id` + `value_entity_type`                                                  |
 
 A `CHECK` constraint per value type asserts that exactly the right columns are populated
 and the rest are `NULL`. The database, not the application, guarantees that a `QUANTITY`
@@ -59,12 +59,12 @@ the same point in valid time.
 ### Layer 2 — search: `pim.variant_facet`
 
 A **fixed-schema, denormalized, synchronously maintained** projection: one row per
-(variant, attribute, ordinal) holding the *resolved effective* value after inheritance —
+(variant, attribute, ordinal) holding the _resolved effective_ value after inheritance —
 `num_value`, `num_min`, `num_max`, `term_id`, `bool_value`, `text_value`. Written in the
 same transaction as the canonical change, so a newly committed product is immediately
 filterable (AC5). Fully rebuildable from Layer 1 at any time.
 
-Inheritance (§27) is resolved *into* the facet table rather than at query time, which is
+Inheritance (§27) is resolved _into_ the facet table rather than at query time, which is
 what makes faceted filtering a set of index scans rather than a recursive join.
 
 ### What we are explicitly not doing
@@ -79,13 +79,13 @@ what makes faceted filtering a set of index scans rather than a recursive join.
 
 ## Alternatives considered
 
-| Option | Assessment |
-|---|---|
-| **Generated DDL** — a column and index per attribute, created when an attribute is defined | Fastest possible filtering, and the only option that gives a genuinely wide table. Rejected: it makes production schema a function of production *data*, breaks migration checksums (ADR-0006), makes staging structurally divergent, and turns "define an attribute" into a schema-lock event on a large table. |
-| **Single `jsonb` column with a GIN index** | Simple, flexible, and genuinely fast for containment queries. Rejected as the *canonical* store by §25 — and correctly so: it cannot express typed constraints, cannot foreign-key an enum value to a vocabulary term, and makes unit-aware range queries awkward. Retained as a permitted *accelerator* shape (below). |
-| **Table-per-product-type** | Clean and fast; fails AC3 outright, since a new type means a new table. |
-| **Naive EAV with all values as text** | The specification's named anti-pattern. Rejected. |
-| **Sparse pre-allocated columns** (`num_1..num_50`, `term_1..term_50`) | A common industry hack. Rejected: attribute-to-slot mapping becomes hidden global state and slot exhaustion is a cliff. |
+| Option                                                                                     | Assessment                                                                                                                                                                                                                                                                                                              |
+| ------------------------------------------------------------------------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Generated DDL** — a column and index per attribute, created when an attribute is defined | Fastest possible filtering, and the only option that gives a genuinely wide table. Rejected: it makes production schema a function of production _data_, breaks migration checksums (ADR-0006), makes staging structurally divergent, and turns "define an attribute" into a schema-lock event on a large table.        |
+| **Single `jsonb` column with a GIN index**                                                 | Simple, flexible, and genuinely fast for containment queries. Rejected as the _canonical_ store by §25 — and correctly so: it cannot express typed constraints, cannot foreign-key an enum value to a vocabulary term, and makes unit-aware range queries awkward. Retained as a permitted _accelerator_ shape (below). |
+| **Table-per-product-type**                                                                 | Clean and fast; fails AC3 outright, since a new type means a new table.                                                                                                                                                                                                                                                 |
+| **Naive EAV with all values as text**                                                      | The specification's named anti-pattern. Rejected.                                                                                                                                                                                                                                                                       |
+| **Sparse pre-allocated columns** (`num_1..num_50`, `term_1..term_50`)                      | A common industry hack. Rejected: attribute-to-slot mapping becomes hidden global state and slot exhaustion is a cliff.                                                                                                                                                                                                 |
 
 ### Accelerators, if and only if measured
 

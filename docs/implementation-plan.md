@@ -7,22 +7,22 @@ Each phase lists migrations, events, APIs, data-quality checks, security conside
 and explicit exit criteria. The acceptance criteria (AC1–AC27) from the specification are
 mapped to the phase that demonstrates them.
 
-| Phase | Delivers | Demonstrates | Status |
-|---|---|---|---|
-| 0 | Repository, tooling, migration runner, CI, docs | `make dev` from a clean clone | ⬜ planned |
-| 1 | Kernel, audit, event ledger, outbox, unit of work | AC17, AC18, AC19, AC24 | ⬜ planned |
-| 2 | IAM: principals, OIDC, roles, permissions, scopes | AC1, AC2 | ⬜ planned |
-| 3 | PIM metadata: units, vocabularies, attributes, types, config loader | AC3, AC6, AC7 | ⬜ planned |
-| 4 | PIM products: hierarchy, typed values, inheritance, facet search, quality | AC3, AC4, AC5, AC22 | ⬜ planned |
-| 5 | PIM relationships: cross-references, supersession, certifications, assets | AC20, AC21 | ⬜ planned |
-| 6 | Party: organizations, sites, locations, accounts, candidates, survivorship | AC10, AC25 | ⬜ planned |
-| 7 | Ingestion framework + Prophet 21 file connector | AC14, AC15, AC16, AC26 | ⬜ planned |
-| 8 | Entity resolution, review queue, merge, unmerge | AC8, AC9 | ⬜ planned |
-| 9 | Pipedrive connector: backfill, incremental, webhooks, reconciliation | AC11, AC12, AC13 | ⬜ planned |
-| 10 | Event feed API, webhook dispatcher, replay tooling | AC18, AC19 (external) | ⬜ |
-| 11 | Minimal admin UI | operational review workflows | ⬜ |
-| 12 | Erasure, retention, restore drill, threat model | AC27 | ⬜ |
-| 13 | Performance benchmark at agreed scale | AC4 at real numbers | ⬜ |
+| Phase | Delivers                                                                   | Demonstrates                  | Status     |
+| ----- | -------------------------------------------------------------------------- | ----------------------------- | ---------- |
+| 0     | Repository, tooling, migration runner, CI, docs                            | `make dev` from a clean clone | ⬜ planned |
+| 1     | Kernel, audit, event ledger, outbox, unit of work                          | AC17, AC18, AC19, AC24        | ⬜ planned |
+| 2     | IAM: principals, OIDC, roles, permissions, scopes                          | AC1, AC2                      | ⬜ planned |
+| 3     | PIM metadata: units, vocabularies, attributes, types, config loader        | AC3, AC6, AC7                 | ⬜ planned |
+| 4     | PIM products: hierarchy, typed values, inheritance, facet search, quality  | AC3, AC4, AC5, AC22           | ⬜ planned |
+| 5     | PIM relationships: cross-references, supersession, certifications, assets  | AC20, AC21                    | ⬜ planned |
+| 6     | Party: organizations, sites, locations, accounts, candidates, survivorship | AC10, AC25                    | ⬜ planned |
+| 7     | Ingestion framework + Prophet 21 file connector                            | AC14, AC15, AC16, AC26        | ⬜ planned |
+| 8     | Entity resolution, review queue, merge, unmerge                            | AC8, AC9                      | ⬜ planned |
+| 9     | Pipedrive connector: backfill, incremental, webhooks, reconciliation       | AC11, AC12, AC13              | ⬜ planned |
+| 10    | Event feed API, webhook dispatcher, replay tooling                         | AC18, AC19 (external)         | ⬜         |
+| 11    | Minimal admin UI                                                           | operational review workflows  | ⬜         |
+| 12    | Erasure, retention, restore drill, threat model                            | AC27                          | ⬜         |
+| 13    | Performance benchmark at agreed scale                                      | AC4 at real numbers           | ⬜         |
 
 ---
 

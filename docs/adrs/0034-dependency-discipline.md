@@ -13,21 +13,21 @@ effortless, and a ten-year system pays for every one of them.
 
 ### The approved v1 runtime dependency set
 
-| Package | Purpose | Why it survives the test |
-|---|---|---|
-| `fastify` + `@fastify/*` (cors, helmet, rate-limit, swagger) | HTTP | Mature, widely adopted, MIT, actively maintained |
-| `@sinclair/typebox` | Schemas → types, JSON Schema, OpenAPI | Removes four separate schema definitions; MIT |
-| `ajv` | JSON Schema validation | Fastify's validator; the de facto standard |
-| `kysely` | Type-safe SQL | ADR-0005; small surface, replaceable |
-| `pg` | PostgreSQL driver | The standard driver |
-| `decimal.js` | Exact decimal arithmetic | Non-negotiable for units and money |
-| `pino` | Structured logging | Fastify's default |
-| `@opentelemetry/*` | Telemetry | ADR-0032 |
-| `yaml` | Metadata configuration | ADR-0017 |
-| `argon2` | Credential hashing | Current best practice for secret hashing |
-| `@aws-sdk/client-s3` | Object storage | Only S3-compatible client with real longevity; isolated behind `ObjectStore` |
-| `fast-check` | Property testing | ADR-0029 |
-| `vitest`, `typescript`, `eslint`, `prettier` | Development | Standard |
+| Package                                                      | Purpose                               | Why it survives the test                                                     |
+| ------------------------------------------------------------ | ------------------------------------- | ---------------------------------------------------------------------------- |
+| `fastify` + `@fastify/*` (cors, helmet, rate-limit, swagger) | HTTP                                  | Mature, widely adopted, MIT, actively maintained                             |
+| `@sinclair/typebox`                                          | Schemas → types, JSON Schema, OpenAPI | Removes four separate schema definitions; MIT                                |
+| `ajv`                                                        | JSON Schema validation                | Fastify's validator; the de facto standard                                   |
+| `kysely`                                                     | Type-safe SQL                         | ADR-0005; small surface, replaceable                                         |
+| `pg`                                                         | PostgreSQL driver                     | The standard driver                                                          |
+| `decimal.js`                                                 | Exact decimal arithmetic              | Non-negotiable for units and money                                           |
+| `pino`                                                       | Structured logging                    | Fastify's default                                                            |
+| `@opentelemetry/*`                                           | Telemetry                             | ADR-0032                                                                     |
+| `yaml`                                                       | Metadata configuration                | ADR-0017                                                                     |
+| `argon2`                                                     | Credential hashing                    | Current best practice for secret hashing                                     |
+| `@aws-sdk/client-s3`                                         | Object storage                        | Only S3-compatible client with real longevity; isolated behind `ObjectStore` |
+| `fast-check`                                                 | Property testing                      | ADR-0029                                                                     |
+| `vitest`, `typescript`, `eslint`, `prettier`                 | Development                           | Standard                                                                     |
 
 Nothing else without an entry in `docs/decisions/dependency-log.md` recording the
 justification, licence, maintenance status, and what happens if it disappears.

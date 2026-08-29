@@ -27,26 +27,26 @@ Exact agreement on a trusted key immediately links, with no scoring:
 A transparent additive model, entirely configuration-driven, using PostgreSQL-native
 similarity (`pg_trgm` for names, `fuzzystrmatch`/Double Metaphone for phonetics):
 
-| Signal | Method | Weight (initial) |
-|---|---|---|
-| Normalized name similarity | trigram | 0.30 |
-| Name token containment (after removing legal suffixes and stop words) | set overlap | 0.10 |
-| Alias match | exact on known aliases | 0.15 |
-| Address line similarity | trigram on normalized line 1 | 0.15 |
-| Postal code equality | exact | 0.10 |
-| City + state equality | exact | 0.05 |
-| Email/website domain equality | exact | 0.10 |
-| Phone equality (normalized to E.164) | exact | 0.05 |
-| Shared parent organization | graph | 0.05 |
-| Explicit negative evidence (`KNOWN_DIFFERENT`) | veto | −∞ |
+| Signal                                                                | Method                       | Weight (initial) |
+| --------------------------------------------------------------------- | ---------------------------- | ---------------- |
+| Normalized name similarity                                            | trigram                      | 0.30             |
+| Name token containment (after removing legal suffixes and stop words) | set overlap                  | 0.10             |
+| Alias match                                                           | exact on known aliases       | 0.15             |
+| Address line similarity                                               | trigram on normalized line 1 | 0.15             |
+| Postal code equality                                                  | exact                        | 0.10             |
+| City + state equality                                                 | exact                        | 0.05             |
+| Email/website domain equality                                         | exact                        | 0.10             |
+| Phone equality (normalized to E.164)                                  | exact                        | 0.05             |
+| Shared parent organization                                            | graph                        | 0.05             |
+| Explicit negative evidence (`KNOWN_DIFFERENT`)                        | veto                         | −∞               |
 
 Name normalization is its own tested component: case folding, accent stripping,
 punctuation removal, legal-suffix normalization (`Inc`, `Incorporated`, `LLC`, `L.L.C.`,
 `Co`, `Corp`, `Ltd`), and industry stop words. It is versioned, because changing it
 changes every score.
 
-**Every candidate stores its feature vector**, so the review screen shows *which signals
-fired and what each contributed* — not a bare number. That is the §49 explainability
+**Every candidate stores its feature vector**, so the review screen shows _which signals
+fired and what each contributed_ — not a bare number. That is the §49 explainability
 requirement, met literally.
 
 Thresholds: `auto_link` (default 0.92), `review` (default 0.65). Below `review`,

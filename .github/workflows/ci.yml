@@ -1,0 +1,81 @@
+name: CI
+
+on:
+  push:
+    branches: ['**']
+  pull_request:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: fsw
+          POSTGRES_PASSWORD: fsw_ci
+          POSTGRES_DB: fsw_layer0
+        ports: ['5432:5432']
+        options: >-
+          --health-cmd "pg_isready -U fsw"
+          --health-interval 5s
+          --health-timeout 3s
+          --health-retries 10
+
+    env:
+      NODE_ENV: test
+      DATABASE_URL: postgres://fsw:fsw_ci@localhost:5432/fsw_layer0
+      DATABASE_MIGRATION_URL: postgres://fsw:fsw_ci@localhost:5432/fsw_layer0
+      DATABASE_TEST_URL: postgres://fsw:fsw_ci@localhost:5432/fsw_layer0
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+
+      - run: npm ci
+
+      - name: Format
+        run: npm run format:check
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Typecheck
+        run: npm run typecheck
+
+      - name: Apply migrations
+        run: npm run db:migrate
+
+      - name: Migration history is intact
+        run: npm run db:verify
+
+      - name: Generated database types match the migrated schema
+        run: |
+          npm run db:codegen
+          git diff --exit-code src/platform/db/schema.d.ts \
+            || (echo "::error::src/platform/db/schema.d.ts is stale. Run 'npm run db:codegen' and commit." && exit 1)
+
+      - name: Test
+        run: npm test
+
+  dependencies:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+      - run: npm ci
+      - name: Audit
+        run: npm audit --audit-level=high
+      - name: Licences are on the allow-list (ADR-0034)
+        run: npx --yes license-checker-rseidelsohn --production --onlyAllow "MIT;ISC;Apache-2.0;BSD-2-Clause;BSD-3-Clause;0BSD;BlueOak-1.0.0;CC0-1.0;Unlicense;Python-2.0"

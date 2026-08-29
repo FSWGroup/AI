@@ -59,7 +59,7 @@ overwrite. Merge and review workflows require it absolutely (AC25).
 Mutating endpoints accept an `Idempotency-Key` header. `kernel.idempotency_key` stores
 key, principal, endpoint, request fingerprint, response status, response body, and
 expiry (24 h default). A replay with the same key and same fingerprint returns the stored
-response; the same key with a *different* fingerprint returns `422`. This covers AC's
+response; the same key with a _different_ fingerprint returns `422`. This covers AC's
 requirement that a retry never creates two products, two merges, or two source mappings.
 Required (not optional) on: create-product, merge, unmerge, create-relationship,
 create-source-mapping, and ingestion-run start.

@@ -10,7 +10,7 @@ where, and exactly what changed — and warns against using one table as a lazy 
 for both audit and domain events. §14 warns against hiding business workflows in
 triggers.
 
-Database triggers can capture *what* changed but cannot know the actor, the interface,
+Database triggers can capture _what_ changed but cannot know the actor, the interface,
 the correlation ID, the reason, or the originating source record, because those live in
 the request context.
 
@@ -36,7 +36,7 @@ the request context.
 - **Audit and events are different things and both are written.** Audit answers
   "who did this to this row"; events answer "what did the business assert". A row-level
   audit entry is not a domain event, and `DatabaseRowUpdated` is not an event we emit.
-- Connector writes record the service principal *and* the originating
+- Connector writes record the service principal _and_ the originating
   `ingest.source_record_id`, so any imported value traces back to the file or API payload
   that carried it.
 - Authorization **denials** are audited too (AC2), with the permission, scope, and

@@ -14,18 +14,18 @@ depending on a live Pipedrive or Prophet 21 environment.
 
 ### Layers
 
-| Layer | Runner | Against |
-|---|---|---|
-| Unit | Vitest | Pure domain logic: conversions, scoring, parsing, rule evaluation, survivorship |
-| Integration | Vitest | **A real PostgreSQL database**, migrated from zero, per test file, in a uniquely named schema-set or database |
-| API contract | Vitest + Fastify `inject` | Routes against the OpenAPI document, asserting request and response conformance |
-| Adapter contract | Vitest | Connectors against recorded, sanitized fixtures |
-| Property / table-driven | Vitest + fast-check | Units, model numbers, matching, temporal logic, supersession, attribute validation |
-| Migration | Vitest | Clean database → all migrations → schema assertions → seed load |
-| Replay | Vitest | Create data → wipe a read model → replay from sequence 0 → assert equivalence |
-| Idempotency | Vitest | Same command, webhook, file, source record, and event, twice |
-| Authorization | Vitest | Positive **and negative** cases per route and per object |
-| Performance | Vitest (tagged, excluded from the default run) | Generated catalogue at the agreed size |
+| Layer                   | Runner                                         | Against                                                                                                       |
+| ----------------------- | ---------------------------------------------- | ------------------------------------------------------------------------------------------------------------- |
+| Unit                    | Vitest                                         | Pure domain logic: conversions, scoring, parsing, rule evaluation, survivorship                               |
+| Integration             | Vitest                                         | **A real PostgreSQL database**, migrated from zero, per test file, in a uniquely named schema-set or database |
+| API contract            | Vitest + Fastify `inject`                      | Routes against the OpenAPI document, asserting request and response conformance                               |
+| Adapter contract        | Vitest                                         | Connectors against recorded, sanitized fixtures                                                               |
+| Property / table-driven | Vitest + fast-check                            | Units, model numbers, matching, temporal logic, supersession, attribute validation                            |
+| Migration               | Vitest                                         | Clean database → all migrations → schema assertions → seed load                                               |
+| Replay                  | Vitest                                         | Create data → wipe a read model → replay from sequence 0 → assert equivalence                                 |
+| Idempotency             | Vitest                                         | Same command, webhook, file, source record, and event, twice                                                  |
+| Authorization           | Vitest                                         | Positive **and negative** cases per route and per object                                                      |
+| Performance             | Vitest (tagged, excluded from the default run) | Generated catalogue at the agreed size                                                                        |
 
 **Mocks are not used for the database.** Test doubles exist only at the true system
 boundary: HTTP to third parties, object storage, the clock, and ID generation.

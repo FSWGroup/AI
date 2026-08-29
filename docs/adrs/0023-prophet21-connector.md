@@ -61,7 +61,7 @@ downstream consumer.
 
 Recorded explicitly, versioned, and tested:
 
-- a P21 **customer** is a `party.commercial_account`, and *proposes* an organization
+- a P21 **customer** is a `party.commercial_account`, and _proposes_ an organization
 - a P21 **ship-to** is a `party.ship_to` over a `party.location`, and **is not a site**
   unless separately evidenced
 - a P21 **item** proposes a `pim.variant` with identifiers, not a product hierarchy

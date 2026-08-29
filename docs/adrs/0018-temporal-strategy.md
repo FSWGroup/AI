@@ -6,7 +6,7 @@
 ## Context
 
 §20 asks for bitemporal modelling where historical truth matters, and explicitly warns
-against making every table bitemporal. Full bitemporality — valid time *and* system time
+against making every table bitemporal. Full bitemporality — valid time _and_ system time
 as first-class table structure — roughly doubles the modelling and query cost and is a
 leading source of subtle defects in small teams.
 
@@ -45,8 +45,8 @@ the table.
 
 ### Where full bitemporality is genuinely required
 
-If a named business question requires *reproducing a past query result as the system
-would have answered it on a past date* — for example reconstructing the specification
+If a named business question requires _reproducing a past query result as the system
+would have answered it on a past date_ — for example reconstructing the specification
 sheet that was submitted with a quote in 2027 — that is added to specific tables as
 `system_from`/`system_to` at that time, as an additive migration. No such requirement has
 been identified yet, and the specification's own guidance is not to build it speculatively.
@@ -63,7 +63,7 @@ been identified yet, and the specification's own guidance is not to build it spe
 ## Consequences
 
 - Queries default to "currently valid": `valid_from <= now() AND (valid_to IS NULL OR
-  valid_to > now())`, wrapped in helper views so this is not retyped and mistyped.
+valid_to > now())`, wrapped in helper views so this is not retyped and mistyped.
 - "As of" queries in valid time are supported today; "as we knew it" queries are answered
   by reading the ledger, which is slower and less convenient — an accepted trade.
 

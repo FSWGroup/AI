@@ -24,7 +24,7 @@ identity map, no migration generation from model classes.
 
 ## Alternatives considered
 
-- **Prisma** — schema-first in *its own* DSL, which would make Prisma the owner of the
+- **Prisma** — schema-first in _its own_ DSL, which would make Prisma the owner of the
   schema. It cannot express exclusion constraints, partial unique indexes with
   expressions, or generated columns without escape hatches. Rejected.
 - **TypeORM / MikroORM** — decorator-driven entity mapping; migration generation is

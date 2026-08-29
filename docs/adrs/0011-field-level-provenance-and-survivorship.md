@@ -30,7 +30,7 @@ deterministic survivorship function** over candidate values.
   foreign-keyable column. It is a cache of the survivorship result, recomputed inside
   the same transaction as any candidate change. It is never written directly.
 - The same pattern applies to `party.person`, `party.site`, and `party.location`.
-  In PIM, `pim.attribute_value` rows *are* the candidates and carry `is_selected`
+  In PIM, `pim.attribute_value` rows _are_ the candidates and carry `is_selected`
   directly, so no separate candidate table is needed there.
 
 ### The consequence that must be stated plainly
@@ -38,8 +38,8 @@ deterministic survivorship function** over candidate values.
 **A human editing a value in the admin UI does not update the canonical row.** It writes
 a candidate value attributed to the `MANUAL` source system, with a verification stamp,
 an actor, and a reason. Survivorship then runs. `MANUAL` normally has the highest
-priority, so the human's value normally wins — but it wins *through the same mechanism as
-every other source*, which is what keeps merge reversible and provenance complete.
+priority, so the human's value normally wins — but it wins _through the same mechanism as
+every other source_, which is what keeps merge reversible and provenance complete.
 
 ### Rules
 
@@ -64,7 +64,7 @@ new reason, and no candidate is ever destroyed.
 
 - Every mastered write is at least two writes: a candidate and a recomputation.
 - Provenance queries are direct: `SELECT * FROM organization_field_candidate WHERE
-  organization_id = $1 AND field_key = $2 ORDER BY is_selected DESC` answers
+organization_id = $1 AND field_key = $2 ORDER BY is_selected DESC` answers
   "why does this field have this value" with no interpretation.
 - Field-level ownership (open question B2) becomes configuration, not code.
 

@@ -42,7 +42,7 @@ filter expressed in PSI matches a value entered in bar.
 
 ### Facet counts
 
-Facet *counts* (how many results remain per candidate value) are computed over the
+Facet _counts_ (how many results remain per candidate value) are computed over the
 already-restricted variant set, not the whole catalogue, and are capped and cached per
 query shape only if measurement shows a need.
 

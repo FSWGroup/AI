@@ -38,13 +38,13 @@ path that persists a value. They travel as strings and are computed with `decima
 
 ## Alternatives considered
 
-| Option | Why not |
-|---|---|
+| Option                            | Why not                                                                                                                                                                                                                                                    |
+| --------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | **Python + FastAPI + SQLAlchemy** | Strong contender: excellent for data work, mature migrations (Alembic), first-class decimal handling. Rejected because typing is opt-in and erodes under maintenance pressure, and because it would be a second language in an otherwise TypeScript house. |
-| **C# / .NET 8** | Arguably the best pure fit: real static typing, `decimal` primitive, superb PostgreSQL driver, strong tooling. Rejected on hiring reality for a small Pennsylvania distributor and on the absence of any existing .NET footprint at FSW. |
-| **Go** | Excellent operational profile. Rejected: weak generics ergonomics for a metadata-driven domain, verbose data mapping, and a smaller hiring pool for line-of-business work. |
-| **Java / Spring** | Rejected as disproportionate operational and cognitive weight for a small team. |
-| **Ruby on Rails** | Rejected: dynamic typing is the wrong default for a system whose entire value is data correctness. |
+| **C# / .NET 8**                   | Arguably the best pure fit: real static typing, `decimal` primitive, superb PostgreSQL driver, strong tooling. Rejected on hiring reality for a small Pennsylvania distributor and on the absence of any existing .NET footprint at FSW.                   |
+| **Go**                            | Excellent operational profile. Rejected: weak generics ergonomics for a metadata-driven domain, verbose data mapping, and a smaller hiring pool for line-of-business work.                                                                                 |
+| **Java / Spring**                 | Rejected as disproportionate operational and cognitive weight for a small team.                                                                                                                                                                            |
+| **Ruby on Rails**                 | Rejected: dynamic typing is the wrong default for a system whose entire value is data correctness.                                                                                                                                                         |
 
 ## Why this wins
 

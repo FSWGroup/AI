@@ -31,12 +31,12 @@ never primary keys, and never the identity a consumer stores.
 
 ## Alternatives considered
 
-| Option | Why not |
-|---|---|
-| `bigint` identity | Smallest and fastest, but IDs are guessable, leak record counts through APIs, and cannot be minted client-side or before insert. |
-| UUIDv4 | Random distribution destroys B-tree locality and inflates index write amplification at the volumes PIM will reach. |
-| ULID (Crockford base32 text) | Same ordering benefit as v7 but as `text`: larger, no native type, no native operators. |
-| Composite natural keys | Rejected outright: source systems change their keys, and the specification forbids external identity as canonical identity. |
+| Option                       | Why not                                                                                                                          |
+| ---------------------------- | -------------------------------------------------------------------------------------------------------------------------------- |
+| `bigint` identity            | Smallest and fastest, but IDs are guessable, leak record counts through APIs, and cannot be minted client-side or before insert. |
+| UUIDv4                       | Random distribution destroys B-tree locality and inflates index write amplification at the volumes PIM will reach.               |
+| ULID (Crockford base32 text) | Same ordering benefit as v7 but as `text`: larger, no native type, no native operators.                                          |
+| Composite natural keys       | Rejected outright: source systems change their keys, and the specification forbids external identity as canonical identity.      |
 
 ## Why this wins
 
