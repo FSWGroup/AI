@@ -117,6 +117,7 @@ export async function applyMetadata(
     await applyAttributes(tx, parsed, changes, breaking);
     await applyProductTypes(tx, parsed, changes);
     await applyProductTypeAttributes(tx, parsed, changes);
+    await applyQualityRules(tx, parsed, changes);
 
     if (breaking.length > 0 && options.allowBreaking !== true) {
       throw new BreakingMetadataChangeError(breaking);
@@ -568,6 +569,74 @@ async function applyProductTypes(
     changes.push({
       kind: 'DEPRECATE',
       entity: 'product_type',
+      key: row.key,
+      detail: 'absent from configuration',
+    });
+  }
+}
+
+async function applyQualityRules(
+  tx: DbTransaction,
+  parsed: ParsedMetadata,
+  changes: MetadataChange[],
+): Promise<void> {
+  for (const rule of parsed.qualityRules) {
+    const result = await sql<{ inserted: boolean }>`
+      INSERT INTO pim.quality_rule
+        (key, name, description, channel_code, product_type_key, severity, rule_kind,
+         parameters, applies_when, is_active, updated_at)
+      VALUES (
+        ${rule.key}, ${rule.name}, ${rule.description}, ${rule.channel ?? null},
+        ${rule.productType ?? null}, ${rule.severity}, ${rule.ruleKind},
+        ${JSON.stringify(rule.parameters ?? {})}::jsonb,
+        ${rule.appliesWhen === undefined ? null : JSON.stringify(rule.appliesWhen)}::jsonb,
+        ${rule.active ?? true}, now()
+      )
+      ON CONFLICT (key) DO UPDATE SET
+        name = EXCLUDED.name,
+        description = EXCLUDED.description,
+        channel_code = EXCLUDED.channel_code,
+        product_type_key = EXCLUDED.product_type_key,
+        severity = EXCLUDED.severity,
+        rule_kind = EXCLUDED.rule_kind,
+        parameters = EXCLUDED.parameters,
+        applies_when = EXCLUDED.applies_when,
+        is_active = EXCLUDED.is_active,
+        updated_at = now()
+      WHERE pim.quality_rule.name IS DISTINCT FROM EXCLUDED.name
+         OR pim.quality_rule.description IS DISTINCT FROM EXCLUDED.description
+         OR pim.quality_rule.channel_code IS DISTINCT FROM EXCLUDED.channel_code
+         OR pim.quality_rule.product_type_key IS DISTINCT FROM EXCLUDED.product_type_key
+         OR pim.quality_rule.severity IS DISTINCT FROM EXCLUDED.severity
+         OR pim.quality_rule.rule_kind IS DISTINCT FROM EXCLUDED.rule_kind
+         OR pim.quality_rule.parameters IS DISTINCT FROM EXCLUDED.parameters
+         OR pim.quality_rule.applies_when IS DISTINCT FROM EXCLUDED.applies_when
+         OR pim.quality_rule.is_active IS DISTINCT FROM EXCLUDED.is_active
+      RETURNING (xmax = 0) AS inserted
+    `.execute(tx);
+    const row = result.rows[0];
+    if (row !== undefined) {
+      changes.push({
+        kind: row.inserted ? 'INSERT' : 'UPDATE',
+        entity: 'quality_rule',
+        key: rule.key,
+      });
+    }
+  }
+
+  // A rule removed from configuration is deactivated rather than deleted, so the
+  // findings it produced remain explicable. System rules are owned by the evaluator,
+  // never by configuration, so they are exempt.
+  const keys = parsed.qualityRules.map((r) => r.key);
+  const deactivated = await sql<{ key: string }>`
+    UPDATE pim.quality_rule SET is_active = false, updated_at = now()
+     WHERE NOT (key = ANY (${keys}::text[])) AND is_active AND NOT is_system
+    RETURNING key
+  `.execute(tx);
+  for (const row of deactivated.rows) {
+    changes.push({
+      kind: 'DEPRECATE',
+      entity: 'quality_rule',
       key: row.key,
       detail: 'absent from configuration',
     });

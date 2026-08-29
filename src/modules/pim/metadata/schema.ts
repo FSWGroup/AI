@@ -193,6 +193,43 @@ export const ProductTypesFileSchema = Type.Object(
   { additionalProperties: false },
 );
 
+/**
+ * Quality rules (spec §44). `ruleKind` is restricted to the kinds the evaluator
+ * actually implements: storing a kind nothing evaluates would mean a rule that
+ * silently passes, which is worse than no rule.
+ */
+export const IMPLEMENTED_RULE_KINDS = [
+  'REQUIRED_ATTRIBUTES',
+  'MISSING_IDENTIFIER',
+  'NUMERIC_RANGE',
+  'INVALID_COMBINATION',
+] as const;
+
+export const QualityRuleSchema = Type.Object(
+  {
+    key: MachineKey,
+    name: Type.String({ minLength: 1 }),
+    description: Type.String({ minLength: 1 }),
+    /** Omit to apply to every channel. */
+    channel: Type.Optional(CodeKey),
+    /** Omit to apply to every product type. */
+    productType: Type.Optional(MachineKey),
+    severity: Type.Union([Type.Literal('BLOCKING'), Type.Literal('WARNING')]),
+    ruleKind: Type.Union(IMPLEMENTED_RULE_KINDS.map((k) => Type.Literal(k))),
+    parameters: Type.Optional(Type.Record(Type.String(), Type.Unknown())),
+    /** FSW condition DSL: when this rule applies at all. */
+    appliesWhen: Type.Optional(Type.Unknown()),
+    active: Type.Optional(Type.Boolean()),
+  },
+  { additionalProperties: false },
+);
+
+export const QualityRulesFileSchema = Type.Object(
+  { qualityRules: Type.Array(QualityRuleSchema, { minItems: 1 }) },
+  { additionalProperties: false },
+);
+
+export type QualityRuleConfig = Static<typeof QualityRuleSchema>;
 export type DimensionConfig = Static<typeof DimensionSchema>;
 export type UnitConfig = Static<typeof UnitSchema>;
 export type TermAliasConfig = Static<typeof TermAliasSchema>;

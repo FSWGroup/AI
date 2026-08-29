@@ -34,3 +34,83 @@ export type {
 } from './metadata/apply.js';
 export { loadUnitRegistry } from './units/registry-loader.js';
 export { VALUE_TYPES } from './metadata/schema.js';
+
+// --- products (Phase 4) ------------------------------------------------------
+export {
+  AttributeRegistry,
+  loadAttributeRegistry,
+  UnknownAttributeError,
+  UnknownTermError,
+} from './products/attribute-registry.js';
+export type {
+  AttributeDefinition,
+  TermReference,
+  ValueType,
+} from './products/attribute-registry.js';
+
+export {
+  prepareValue,
+  insertAttributeValue,
+  recomputeSelection,
+  AttributeValueError,
+} from './products/attribute-values.js';
+export type {
+  AttributeValueInput,
+  PreparedValue,
+  ValueOwner,
+  OwnerLevel,
+} from './products/attribute-values.js';
+
+export {
+  refreshVariantFacets,
+  affectedVariantIds,
+  rebuildAllFacets,
+  detectFacetDrift,
+} from './products/facets.js';
+export type { FacetDrift } from './products/facets.js';
+
+export {
+  searchVariants,
+  facetCounts,
+  explainSearch,
+  SearchCriterionError,
+} from './products/search.js';
+export type {
+  FilterCriterion,
+  SearchOptions,
+  SearchResult,
+  SearchHit,
+  FacetCount,
+  PlanShape,
+} from './products/search.js';
+
+export { evaluateVariantQuality } from './products/quality.js';
+export type { VariantQuality, QualityFinding } from './products/quality.js';
+
+export {
+  loadCatalogDeps,
+  createBrand,
+  createProduct,
+  createVariant,
+  setAttributeValues,
+  setVariantLifecycle,
+  resolvedAttributes,
+  candidateValues,
+} from './products/catalog.js';
+export type {
+  CatalogDeps,
+  CreateProductInput,
+  CreateVariantInput,
+  AttributeAssignment,
+  ResolvedAttribute,
+  CandidateValue,
+} from './products/catalog.js';
+
+export {
+  ProductCreated,
+  VariantCreated,
+  ProductAttributeValueChanged,
+  VariantLifecycleChanged,
+  VariantQualityEvaluated,
+  pimEvents,
+} from './events.js';

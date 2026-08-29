@@ -1,0 +1,69 @@
+# Channel publishability and data-quality rules (spec §44).
+#
+# Every product type's REQUIRED and RECOMMENDED attributes are evaluated automatically
+# from config/metadata/product-types, including their conditional applicability. The
+# rules here are the *additional* things a specific channel needs.
+#
+# A BLOCKING failure removes the variant from that channel's publishable view. It does
+# not appear there flagged; it does not appear there at all.
+
+qualityRules:
+  - key: valveman_storefront_identifier
+    name: ValveMan storefront SKU
+    description: >-
+      A variant cannot be published to the storefront without a SKU to order it by.
+    channel: VALVEMAN
+    severity: BLOCKING
+    ruleKind: MISSING_IDENTIFIER
+    parameters: { namespace: VALVEMAN_SKU }
+
+  - key: valveman_technical_minimum
+    name: ValveMan technical minimum
+    description: >-
+      Minimum technical content a customer needs to choose a valve online without
+      calling: what it connects to, what it is made of, and how much it flows.
+    channel: VALVEMAN
+    severity: BLOCKING
+    ruleKind: REQUIRED_ATTRIBUTES
+    parameters:
+      attributes: [nominal_size, end_connection, body_material]
+
+  - key: welsford_quote_pressure_rating
+    name: Welsford quotation pressure rating
+    description: >-
+      A quotation for a pressure-containing product must state a rating. Either a
+      pressure class or a measured working pressure satisfies this; both are better.
+    channel: WELSFORD_QUOTE
+    severity: WARNING
+    ruleKind: REQUIRED_ATTRIBUTES
+    parameters:
+      attributes: [pressure_class]
+
+  - key: implausible_cv
+    name: Implausible flow coefficient
+    description: >-
+      A Cv above 100,000 is almost certainly a data entry error or a unit confusion
+      rather than a real valve.
+    severity: WARNING
+    ruleKind: NUMERIC_RANGE
+    parameters: { attribute: cv, min: 0, max: 100000 }
+
+  - key: fail_position_on_manual_valve
+    name: Fail position on a manual valve
+    description: >-
+      A manually operated valve has no fail position, so recording one means either the
+      actuation type or the fail position is wrong.
+    severity: WARNING
+    ruleKind: INVALID_COMBINATION
+    appliesWhen:
+      all:
+        - {
+            attr: actuation_type,
+            op: in,
+            value: [MANUAL_LEVER, MANUAL_GEAR, MANUAL_HANDWHEEL],
+          }
+        - { attr: fail_position, op: exists }
+    parameters:
+      message: >-
+        A manually operated valve has no fail position. Check whether the actuation
+        type or the fail position is the incorrect value.

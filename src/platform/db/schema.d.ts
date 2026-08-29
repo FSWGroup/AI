@@ -212,6 +212,91 @@ export interface PimAttribute {
   vocabulary_key: string | null;
 }
 
+export interface PimAttributeValue {
+  attribute_key: string;
+  cardinality: string;
+  confidence: Generated<Numeric>;
+  created_at: Generated<Timestamp>;
+  created_by: string | null;
+  /**
+   * Exactly what the source said, before parsing or normalization. Never overwritten.
+   */
+  entered_raw: string | null;
+  id: Generated<string>;
+  ingested_at: Generated<Timestamp>;
+  is_selected: Generated<boolean>;
+  metadata_version_id: string | null;
+  ordinal: Generated<number>;
+  owner_key: Generated<string | null>;
+  owner_level: Generated<string | null>;
+  product_family_id: string | null;
+  product_id: string | null;
+  product_line_id: string | null;
+  selected_at: Timestamp | null;
+  selected_reason: string | null;
+  source_field: string | null;
+  source_record_id: string | null;
+  source_system_code: string;
+  source_updated_at: Timestamp | null;
+  valid_from: Generated<Timestamp>;
+  valid_to: Timestamp | null;
+  validity: Generated<string | null>;
+  value_boolean: boolean | null;
+  value_date: Timestamp | null;
+  value_entity_id: string | null;
+  value_entity_type: string | null;
+  value_numeric: Numeric | null;
+  value_qty_base: Numeric | null;
+  value_qty_dimension: string | null;
+  value_qty_max_base: Numeric | null;
+  value_qty_max_original: Numeric | null;
+  /**
+   * The value as entered, in the unit it was entered in. Comparison and filtering use value_qty_base; display defaults to this.
+   */
+  value_qty_original: Numeric | null;
+  value_qty_original_unit: string | null;
+  value_term_id: string | null;
+  value_text: string | null;
+  /**
+   * Denormalized from pim.attribute by a cascading composite foreign key, so the CHECK constraints above can enforce type coherence. Changing an attribute value type cascades here, which is why the metadata loader refuses that change while values exist (ADR-0017).
+   */
+  value_type: string;
+  value_vocabulary_key: string | null;
+  variant_id: string | null;
+  verification_status: Generated<string>;
+  verified_at: Timestamp | null;
+  verified_by: string | null;
+}
+
+export interface PimBrand {
+  created_at: Generated<Timestamp>;
+  description: string | null;
+  id: Generated<string>;
+  is_active: Generated<boolean>;
+  key: string;
+  name: string;
+  owner_organization_id: string | null;
+  updated_at: Generated<Timestamp>;
+}
+
+export interface PimChannel {
+  code: string;
+  created_at: Generated<Timestamp>;
+  description: string;
+  name: string;
+  operating_company: string | null;
+}
+
+export interface PimIdentifierNamespace {
+  code: string;
+  created_at: Generated<Timestamp>;
+  description: string;
+  is_global_unique: Generated<boolean>;
+  issuer: string | null;
+  name: string;
+  value_pattern: string | null;
+}
+
 export interface PimMetadataVersion {
   applied_at: Generated<Timestamp>;
   applied_by: string;
@@ -220,6 +305,68 @@ export interface PimMetadataVersion {
   id: Generated<string>;
   note: string | null;
   summary: Json;
+}
+
+export interface PimProduct {
+  brand_id: string;
+  created_at: Generated<Timestamp>;
+  deleted_at: Timestamp | null;
+  deleted_by: string | null;
+  deletion_reason: string | null;
+  description: string | null;
+  id: Generated<string>;
+  key: string;
+  lifecycle_from: Generated<Timestamp>;
+  /**
+   * Manufacturer lifecycle. FSW commercial stocking status is a separate concept and lives with channel data, because the two genuinely differ (spec §42).
+   */
+  lifecycle_status: Generated<string>;
+  model_series: string | null;
+  name: string;
+  product_family_id: string | null;
+  product_type_key: string;
+  updated_at: Generated<Timestamp>;
+  version: Generated<number>;
+}
+
+export interface PimProductFamily {
+  created_at: Generated<Timestamp>;
+  deprecated_at: Timestamp | null;
+  description: string | null;
+  id: Generated<string>;
+  key: string;
+  name: string;
+  product_line_id: string;
+  updated_at: Generated<Timestamp>;
+}
+
+export interface PimProductIdentifier {
+  created_at: Generated<Timestamp>;
+  id: Generated<string>;
+  /**
+   * Carried from the namespace by a cascading composite foreign key so the partial unique index below can be conditioned on it. Never set by hand.
+   */
+  is_global_unique: boolean;
+  namespace_code: string;
+  normalized_value: Generated<string | null>;
+  product_id: string | null;
+  source_system_code: string;
+  valid_from: Timestamp | null;
+  valid_to: Timestamp | null;
+  validation_status: Generated<string>;
+  value: string;
+  variant_id: string | null;
+}
+
+export interface PimProductLine {
+  brand_id: string;
+  created_at: Generated<Timestamp>;
+  deprecated_at: Timestamp | null;
+  description: string | null;
+  id: Generated<string>;
+  key: string;
+  name: string;
+  updated_at: Generated<Timestamp>;
 }
 
 export interface PimProductType {
@@ -250,6 +397,31 @@ export interface PimProductTypeAttribute {
   sort_order: Generated<number>;
 }
 
+export interface PimPublishableVariant {
+  channel_code: string | null;
+  completeness: Numeric | null;
+  evaluated_at: Timestamp | null;
+  manufacturer_part_number: string | null;
+  product_id: string | null;
+  variant_id: string | null;
+  warning_count: number | null;
+}
+
+export interface PimQualityRule {
+  applies_when: Json | null;
+  channel_code: string | null;
+  created_at: Generated<Timestamp>;
+  description: string;
+  is_active: Generated<boolean>;
+  key: string;
+  name: string;
+  parameters: Generated<Json>;
+  product_type_key: string | null;
+  rule_kind: string;
+  severity: string;
+  updated_at: Generated<Timestamp>;
+}
+
 export interface PimQuantityDimension {
   code: string;
   description: string;
@@ -273,8 +445,67 @@ export interface PimUnit {
 export interface PimUnitAlias {
   alias: string;
   id: Generated<string>;
+  /**
+   * Uppercased, with punctuation other than / . - removed. Those three are preserved because they carry meaning in engineering designations: 1/2 must not normalize to the same key as 12.
+   */
   normalized_alias: Generated<string | null>;
   unit_code: string;
+}
+
+export interface PimVariant {
+  created_at: Generated<Timestamp>;
+  deleted_at: Timestamp | null;
+  deleted_by: string | null;
+  deletion_reason: string | null;
+  description: string | null;
+  id: Generated<string>;
+  lifecycle_from: Generated<Timestamp>;
+  lifecycle_status: Generated<string>;
+  manufacturer_part_number: string | null;
+  name: string | null;
+  product_id: string;
+  updated_at: Generated<Timestamp>;
+  version: Generated<number>;
+}
+
+export interface PimVariantFacet {
+  attribute_key: string;
+  attribute_value_id: string;
+  bool_value: boolean | null;
+  entity_id: string | null;
+  num_max: Numeric | null;
+  num_min: Numeric | null;
+  /**
+   * Normalized base value for quantities -- pascals, kelvin, metres -- not the value as entered. This is what makes a PSI range query match a value entered in bar.
+   */
+  num_value: Numeric | null;
+  ordinal: Generated<number>;
+  source_level: string;
+  term_id: string | null;
+  text_value: string | null;
+  value_kind: string;
+  variant_id: string;
+}
+
+export interface PimVariantQuality {
+  blocking_count: Generated<number>;
+  channel_code: string;
+  completeness: Generated<Numeric>;
+  evaluated_at: Generated<Timestamp>;
+  is_publishable: boolean;
+  variant_id: string;
+  warning_count: Generated<number>;
+}
+
+export interface PimVariantQualityFinding {
+  attribute_key: string | null;
+  channel_code: string;
+  evaluated_at: Generated<Timestamp>;
+  id: Generated<string>;
+  message: string;
+  rule_key: string;
+  severity: string;
+  variant_id: string;
 }
 
 export interface PimVocabulary {
@@ -313,6 +544,9 @@ export interface PimVocabularyTermAlias {
   confidence: Generated<Numeric>;
   created_at: Generated<Timestamp>;
   id: Generated<string>;
+  /**
+   * See pim.unit_alias.normalized_alias.
+   */
   normalized_alias: Generated<string | null>;
   note: string | null;
   source_system_code: string | null;
@@ -333,12 +567,26 @@ export interface DB {
   "kernel.schema_migration": KernelSchemaMigration;
   "kernel.source_system": KernelSourceSystem;
   "pim.attribute": PimAttribute;
+  "pim.attribute_value": PimAttributeValue;
+  "pim.brand": PimBrand;
+  "pim.channel": PimChannel;
+  "pim.identifier_namespace": PimIdentifierNamespace;
   "pim.metadata_version": PimMetadataVersion;
+  "pim.product": PimProduct;
+  "pim.product_family": PimProductFamily;
+  "pim.product_identifier": PimProductIdentifier;
+  "pim.product_line": PimProductLine;
   "pim.product_type": PimProductType;
   "pim.product_type_attribute": PimProductTypeAttribute;
+  "pim.publishable_variant": PimPublishableVariant;
+  "pim.quality_rule": PimQualityRule;
   "pim.quantity_dimension": PimQuantityDimension;
   "pim.unit": PimUnit;
   "pim.unit_alias": PimUnitAlias;
+  "pim.variant": PimVariant;
+  "pim.variant_facet": PimVariantFacet;
+  "pim.variant_quality": PimVariantQuality;
+  "pim.variant_quality_finding": PimVariantQualityFinding;
   "pim.vocabulary": PimVocabulary;
   "pim.vocabulary_term": PimVocabularyTerm;
   "pim.vocabulary_term_alias": PimVocabularyTermAlias;

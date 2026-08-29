@@ -10,6 +10,24 @@ import type { Database, DbTransaction } from '../../platform/db/index.js';
 import { registeredEvents } from './definition.js';
 import type { EventDefinition } from './definition.js';
 
+/**
+ * Stable JSON rendering with sorted keys.
+ *
+ * PostgreSQL's jsonb does not preserve key order, so a schema read back is a
+ * different string from the one written even when nothing changed. Comparing raw
+ * JSON.stringify output therefore reports every schema as modified on the second
+ * run -- which would either block every deployment or, worse, train people to pass
+ * --allow-schema-update by reflex.
+ */
+function canonicalJson(value: unknown): string {
+  if (value === null || typeof value !== 'object') return JSON.stringify(value) ?? 'null';
+  if (Array.isArray(value)) return `[${value.map(canonicalJson).join(',')}]`;
+  const entries = Object.entries(value as Record<string, unknown>)
+    .filter(([, v]) => v !== undefined)
+    .sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0));
+  return `{${entries.map(([k, v]) => `${JSON.stringify(k)}:${canonicalJson(v)}`).join(',')}}`;
+}
+
 export interface RegistrySyncResult {
   readonly registered: number;
   readonly incompatible: readonly string[];
@@ -47,8 +65,7 @@ export async function syncEventRegistry(
       continue;
     }
 
-    const same =
-      JSON.stringify(stored.json_schema) === JSON.stringify(definition.payload);
+    const same = canonicalJson(stored.json_schema) === canonicalJson(definition.payload);
     if (same) continue;
 
     if (options.allowSchemaUpdate === true) {

@@ -16,11 +16,13 @@ import {
   ProductTypesFileSchema,
   UnitsFileSchema,
   VocabularyFileSchema,
+  QualityRulesFileSchema,
   type AttributeConfig,
   type DimensionConfig,
   type ProductTypeConfig,
   type UnitConfig,
   type VocabularyConfig,
+  type QualityRuleConfig,
 } from './schema.js';
 import {
   parseCondition,
@@ -37,6 +39,7 @@ export interface ParsedMetadata {
   readonly vocabularies: readonly VocabularyConfig[];
   readonly attributes: readonly AttributeConfig[];
   readonly productTypes: readonly ProductTypeConfig[];
+  readonly qualityRules: readonly QualityRuleConfig[];
   /** Parsed conditions, keyed `productTypeKey:attributeKey`. */
   readonly conditions: ReadonlyMap<string, Condition>;
   readonly contentHash: string;
@@ -100,6 +103,7 @@ export async function readMetadata(dir: string): Promise<ParsedMetadata> {
   const vocabularies: VocabularyConfig[] = [];
   const attributes: AttributeConfig[] = [];
   const productTypes: ProductTypeConfig[] = [];
+  const qualityRules: QualityRuleConfig[] = [];
 
   const hash = createHash('sha256');
 
@@ -137,6 +141,12 @@ export async function readMetadata(dir: string): Promise<ParsedMetadata> {
             ...(value as unknown as { attributes: AttributeConfig[] }).attributes,
           );
         }
+      } else if ('qualityRules' in value) {
+        if (validateAgainst(QualityRulesFileSchema, value, file, index, problems)) {
+          qualityRules.push(
+            ...(value as unknown as { qualityRules: QualityRuleConfig[] }).qualityRules,
+          );
+        }
       } else if ('productTypes' in value) {
         if (validateAgainst(ProductTypesFileSchema, value, file, index, problems)) {
           productTypes.push(
@@ -146,7 +156,7 @@ export async function readMetadata(dir: string): Promise<ParsedMetadata> {
       } else {
         problems.push(
           `${file} (document ${index + 1}): unrecognised metadata document. Expected one ` +
-            `of: dimensions/units, terms, attributes, productTypes.`,
+            `of: dimensions/units, terms, attributes, productTypes, qualityRules.`,
         );
       }
     });
@@ -155,7 +165,7 @@ export async function readMetadata(dir: string): Promise<ParsedMetadata> {
   const conditions = new Map<string, Condition>();
   if (problems.length === 0) {
     crossValidate(
-      { dimensions, units, vocabularies, attributes, productTypes },
+      { dimensions, units, vocabularies, attributes, productTypes, qualityRules },
       conditions,
       problems,
     );
@@ -169,6 +179,7 @@ export async function readMetadata(dir: string): Promise<ParsedMetadata> {
     vocabularies,
     attributes,
     productTypes,
+    qualityRules,
     conditions,
     contentHash: hash.digest('hex'),
     fileCount: files.length,
@@ -182,6 +193,7 @@ interface Collections {
   vocabularies: VocabularyConfig[];
   attributes: AttributeConfig[];
   productTypes: ProductTypeConfig[];
+  qualityRules: QualityRuleConfig[];
 }
 
 function assertUnique(
@@ -206,7 +218,8 @@ function crossValidate(
   conditions: Map<string, Condition>,
   problems: string[],
 ): void {
-  const { dimensions, units, vocabularies, attributes, productTypes } = collections;
+  const { dimensions, units, vocabularies, attributes, productTypes, qualityRules } =
+    collections;
 
   const dimensionCodes = new Set(dimensions.map((d) => d.code));
   assertUnique(
@@ -520,6 +533,94 @@ function crossValidate(
         problems.push(
           `product type '${productType.key}' attribute '${entry.attribute}': ` +
             `${error instanceof Error ? error.message : String(error)}`,
+        );
+      }
+    }
+  }
+
+  // --- quality rules ---------------------------------------------------------
+  assertUnique(
+    qualityRules.map((r) => r.key),
+    'quality rule',
+    problems,
+  );
+  for (const rule of qualityRules) {
+    if (rule.productType !== undefined && !productTypeByKey.has(rule.productType)) {
+      problems.push(
+        `quality rule '${rule.key}' references unknown product type '${rule.productType}'`,
+      );
+    }
+    if (rule.appliesWhen !== undefined) {
+      try {
+        const condition = parseCondition(rule.appliesWhen);
+        for (const referenced of conditionAttributeKeys(condition)) {
+          if (!attributeByKey.has(referenced)) {
+            problems.push(
+              `quality rule '${rule.key}': appliesWhen references unknown attribute ` +
+                `'${referenced}'`,
+            );
+          }
+        }
+      } catch (error) {
+        problems.push(
+          `quality rule '${rule.key}': ${error instanceof Error ? error.message : String(error)}`,
+        );
+      }
+    }
+
+    const parameters = rule.parameters ?? {};
+    const referencedAttributes: string[] = [];
+    if (rule.ruleKind === 'REQUIRED_ATTRIBUTES') {
+      const list = parameters['attributes'];
+      if (!Array.isArray(list) || list.length === 0) {
+        problems.push(
+          `quality rule '${rule.key}': REQUIRED_ATTRIBUTES needs parameters.attributes`,
+        );
+      } else {
+        referencedAttributes.push(...(list as string[]));
+      }
+    }
+    if (rule.ruleKind === 'NUMERIC_RANGE') {
+      const attribute = parameters['attribute'];
+      if (typeof attribute !== 'string') {
+        problems.push(
+          `quality rule '${rule.key}': NUMERIC_RANGE needs parameters.attribute`,
+        );
+      } else {
+        referencedAttributes.push(attribute);
+      }
+      if (parameters['min'] === undefined && parameters['max'] === undefined) {
+        problems.push(
+          `quality rule '${rule.key}': NUMERIC_RANGE needs parameters.min or parameters.max`,
+        );
+      }
+    }
+    if (
+      rule.ruleKind === 'MISSING_IDENTIFIER' &&
+      typeof parameters['namespace'] !== 'string'
+    ) {
+      problems.push(
+        `quality rule '${rule.key}': MISSING_IDENTIFIER needs parameters.namespace`,
+      );
+    }
+    if (rule.ruleKind === 'INVALID_COMBINATION') {
+      if (rule.appliesWhen === undefined) {
+        problems.push(
+          `quality rule '${rule.key}': INVALID_COMBINATION needs appliesWhen describing ` +
+            `the combination it rejects`,
+        );
+      }
+      if (typeof parameters['message'] !== 'string') {
+        problems.push(
+          `quality rule '${rule.key}': INVALID_COMBINATION needs parameters.message ` +
+            `explaining, in prose, why the combination is invalid`,
+        );
+      }
+    }
+    for (const attributeKey of referencedAttributes) {
+      if (!attributeByKey.has(attributeKey)) {
+        problems.push(
+          `quality rule '${rule.key}' references unknown attribute '${attributeKey}'`,
         );
       }
     }

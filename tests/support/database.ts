@@ -153,10 +153,11 @@ export async function createTestDatabase(label = 'test'): Promise<TestDatabase> 
 export function connectTo(
   testDb: TestDatabase,
   label = 'aux',
+  poolMax = 5,
 ): { db: Database; close(): Promise<void> } {
   const pool = createPool({
     connectionString: testDb.url,
-    poolMax: 5,
+    poolMax,
     applicationName: `fsw-test-${label}`,
   });
   const db = createDatabase(pool);
