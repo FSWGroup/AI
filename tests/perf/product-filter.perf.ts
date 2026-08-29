@@ -471,7 +471,10 @@ describe('product filter performance (acceptance criterion 4)', () => {
     // The query itself, which is what the architecture controls.
     expect(
       serverSide,
-      `server-side execution ${serverSide}ms exceeds ${SLO.p50}ms`,
+      `server-side execution ${serverSide}ms exceeds ${SLO.p50}ms. Both the dataset ` +
+        `size and the SLO are provisional (assumption A-014, discovery questions F1 ` +
+        `and F2); see "What the benchmark actually measures" in docs/testing.md ` +
+        `before changing either. Do not relax the SLO to match the measurement.`,
     ).toBeLessThan(SLO.p50);
 
     // End to end, at a concurrency this host can serve.
