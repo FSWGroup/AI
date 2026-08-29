@@ -8,7 +8,7 @@
 import { loadConfig, loadDotEnv } from '../src/platform/config.js';
 import { createDatabase, createPool } from '../src/platform/db/index.js';
 import { syncEventRegistry } from '../src/modules/events/index.js';
-import { pimEvents } from '../src/modules/pim/index.js';
+import { ALL_EVENTS } from '../src/event-catalog.js';
 import { seedCatalog, seedConflictingSource } from './seed-data.js';
 
 loadDotEnv();
@@ -26,7 +26,7 @@ async function main(): Promise<void> {
   const db = createDatabase(pool);
 
   try {
-    const registry = await syncEventRegistry(db, [...pimEvents]);
+    const registry = await syncEventRegistry(db, ALL_EVENTS);
     if (registry.incompatible.length > 0) {
       throw new Error(
         `Event schemas changed in place: ${registry.incompatible.join(', ')}. ` +
