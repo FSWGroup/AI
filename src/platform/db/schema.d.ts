@@ -4,12 +4,15 @@
  */
 
 import type { ColumnType } from "kysely";
+import type { IPostgresInterval } from "postgres-interval";
 
 export type Generated<T> = T extends ColumnType<infer S, infer I, infer U>
   ? ColumnType<S, I | undefined, U>
   : ColumnType<T, T | undefined, T>;
 
 export type Int8 = ColumnType<string, bigint | number | string, bigint | number | string>;
+
+export type Interval = ColumnType<IPostgresInterval, IPostgresInterval | number | string, IPostgresInterval | number | string>;
 
 export type Json = JsonValue;
 
@@ -129,6 +132,157 @@ export interface EventsSubscription {
   max_attempts: Generated<number>;
   name: string;
   signing_secret_ref: string | null;
+}
+
+export interface IngestConnector {
+  created_at: Generated<Timestamp>;
+  description: string;
+  expected_interval: Interval | null;
+  is_enabled: Generated<boolean>;
+  key: string;
+  kind: string;
+  mapping_version: Generated<number>;
+  name: string;
+  parser_version: Generated<number>;
+  source_system_code: string;
+  updated_at: Generated<Timestamp>;
+}
+
+export interface IngestLandedFile {
+  byte_size: Int8;
+  connector_key: string;
+  encoding: Generated<string>;
+  filename: string;
+  id: Generated<string>;
+  object_ref: string;
+  object_type: string;
+  parser_version: Generated<number>;
+  received_at: Generated<Timestamp>;
+  row_count: number | null;
+  run_id: string;
+  schema_fingerprint: string;
+  sha256: string;
+  source_timezone: Generated<string>;
+}
+
+export interface IngestQuarantine {
+  attempted_mapping: Json | null;
+  connector_key: string;
+  created_at: Generated<Timestamp>;
+  failure_category: string;
+  id: Generated<string>;
+  landed_file_id: string | null;
+  messages: Generated<Json>;
+  object_type: string;
+  raw: Json;
+  resolution_note: string | null;
+  resolved_at: Timestamp | null;
+  resolved_by: string | null;
+  retry_count: Generated<number>;
+  row_number: number | null;
+  run_id: string;
+  source_id: string | null;
+  source_system_code: string;
+  status: Generated<string>;
+}
+
+export interface IngestReconciliation {
+  connector_key: string;
+  created_at: Generated<Timestamp>;
+  diverged: Generated<number>;
+  extra_locally: Generated<number>;
+  id: Generated<string>;
+  local_count: number | null;
+  method: string;
+  missing_locally: Generated<number>;
+  object_type: string;
+  repaired: Generated<number>;
+  run_id: string;
+  sample: Json | null;
+  source_count: number | null;
+}
+
+export interface IngestRun {
+  actor_principal_id: string | null;
+  added: Generated<number>;
+  changed: Generated<number>;
+  connector_key: string;
+  correlation_id: string;
+  discovered: Generated<number>;
+  downloaded: Generated<number>;
+  ended_at: Timestamp | null;
+  error_count: Generated<number>;
+  halt_reason: string | null;
+  id: Generated<string>;
+  manifest: Json | null;
+  mapping_version: Generated<number>;
+  matched: Generated<number>;
+  mode: string;
+  needs_review: Generated<number>;
+  parser_version: Generated<number>;
+  rejected: Generated<number>;
+  started_at: Generated<Timestamp>;
+  status: Generated<string>;
+  unchanged: Generated<number>;
+  watermark_after: string | null;
+  watermark_before: string | null;
+}
+
+export interface IngestSchemaFingerprint {
+  approved_at: Timestamp | null;
+  approved_by: string | null;
+  change_summary: string | null;
+  columns: string[];
+  connector_key: string;
+  fingerprint: string;
+  first_seen_at: Generated<Timestamp>;
+  first_seen_run: string | null;
+  id: Generated<string>;
+  object_type: string;
+}
+
+export interface IngestSourceFieldDefinition {
+  data_type: string | null;
+  first_seen_at: Generated<Timestamp>;
+  id: Generated<string>;
+  label: string;
+  last_seen_at: Generated<Timestamp>;
+  object_type: string;
+  options: Json | null;
+  removed_at: Timestamp | null;
+  source_key: string;
+  source_system_code: string;
+}
+
+export interface IngestSourceRecord {
+  deleted_in_source_at: Timestamp | null;
+  first_seen_at: Generated<Timestamp>;
+  first_seen_run: string | null;
+  id: Generated<string>;
+  landed_file_id: string | null;
+  last_seen_at: Generated<Timestamp>;
+  last_seen_run: string | null;
+  mapping_status: Generated<string>;
+  mapping_version: Generated<number>;
+  object_type: string;
+  parser_version: Generated<number>;
+  payload: Json;
+  payload_hash: string;
+  source_id: string;
+  source_system_code: string;
+  source_updated_at: Timestamp | null;
+  validation_status: Generated<string>;
+}
+
+export interface IngestSourceRecordVersion {
+  id: Generated<string>;
+  landed_file_id: string | null;
+  observed_at: Generated<Timestamp>;
+  payload: Json;
+  payload_hash: string;
+  run_id: string | null;
+  source_record_id: string;
+  source_updated_at: Timestamp | null;
 }
 
 export interface KernelIdempotencyKey {
@@ -639,6 +793,15 @@ export interface DB {
   "events.event_delivery": EventsEventDelivery;
   "events.event_type_version": EventsEventTypeVersion;
   "events.subscription": EventsSubscription;
+  "ingest.connector": IngestConnector;
+  "ingest.landed_file": IngestLandedFile;
+  "ingest.quarantine": IngestQuarantine;
+  "ingest.reconciliation": IngestReconciliation;
+  "ingest.run": IngestRun;
+  "ingest.schema_fingerprint": IngestSchemaFingerprint;
+  "ingest.source_field_definition": IngestSourceFieldDefinition;
+  "ingest.source_record": IngestSourceRecord;
+  "ingest.source_record_version": IngestSourceRecordVersion;
   "kernel.idempotency_key": KernelIdempotencyKey;
   "kernel.operating_company": KernelOperatingCompany;
   "kernel.schema_migration": KernelSchemaMigration;
