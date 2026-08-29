@@ -56,35 +56,35 @@ evidence that the resource is protected.
 The 27 acceptance criteria from the specification, and the test that demonstrates each.
 Rows fill in as phases land.
 
-| #   | Criterion                                                                       | Test                                  | Status |
-| --- | ------------------------------------------------------------------------------- | ------------------------------------- | ------ |
-| 17  | Every canonical mutation emits a schema-valid event                             | `datacore/unit-of-work.test.ts`       | ✅     |
-| 18  | Wipe a read model, replay from zero, reconstruct it                             | `datacore/projection.test.ts`         | ✅     |
-| 19  | Duplicate event delivery leaves consumer state correct                          | `datacore/projection.test.ts`         | ✅     |
-| 24  | Every write traces to actor, operation, time, entity, correlation, before/after | `datacore/unit-of-work.test.ts`       | ✅     |
-| 1   | One identity, two API contexts, one person ID                                   | `iam/identity.test.ts`                | ⬜     |
-| 2   | ValveMan-only principal denied a Welsford-only resource                         | `iam/object-level-authz.test.ts`      | ⬜     |
-| 3   | New product type and attributes, no code change, no migration                   | `pim/metadata-loader.test.ts`         | ⬜     |
-| 4   | Combination filter meets the SLO                                                | `perf/product-filter.perf.ts`         | ⬜     |
-| 5   | A product is filterable immediately after commit                                | `pim/search-consistency.test.ts`      | ⬜     |
-| 6   | Enter bar, preserve it, return PSI, match a PSI range                           | `pim/units.test.ts`                   | ⬜     |
-| 7   | Class 150 is not 150 PSI; NPS 1 is not 25.4 mm                                  | `pim/engineering-semantics.test.ts`   | ⬜     |
-| 8   | Two sources, explainable match, approve, both records preserved                 | `party/entity-resolution.test.ts`     | ⬜     |
-| 9   | Undo the merge, restore relationships, lose nothing                             | `party/unmerge.test.ts`               | ⬜     |
-| 10  | Two sources disagree: both values, winner, reason, origin                       | `party/survivorship.test.ts`          | ⬜     |
-| 11  | Interrupted Pipedrive backfill restarts without duplicates                      | `ingest/pipedrive-backfill.test.ts`   | ⬜     |
-| 12  | The same webhook twice is harmless                                              | `ingest/pipedrive-webhook.test.ts`    | ⬜     |
-| 13  | A missed webhook is found by reconciliation                                     | `ingest/pipedrive-reconcile.test.ts`  | ⬜     |
-| 14  | P21 import preserves lineage; re-import creates no duplicates                   | `ingest/p21-import.test.ts`           | ⬜     |
-| 15  | P21 schema drift fails safely                                                   | `ingest/p21-drift.test.ts`            | ⬜     |
-| 16  | A malformed record is quarantined with a useful reason                          | `ingest/quarantine.test.ts`           | ⬜     |
-| 20  | A → B → C resolves to C; cycles rejected                                        | `pim/supersession.test.ts`            | ⬜     |
-| 21  | Exact equivalent vs. functional alternate are distinguished                     | `pim/cross-reference.test.ts`         | ⬜     |
-| 22  | Missing required Cv excludes a variant from the publishable view                | `pim/quality.test.ts`                 | ⬜     |
-| 23  | Model-number parsing with version, confidence, warnings                         | deferred — assumption A-031           | ⬜     |
-| 25  | A stale write is rejected, not silently applied                                 | `api/concurrency.test.ts`             | ⬜     |
-| 26  | Canonical services depend on the abstract ingestion contract                    | `ingest/adapter-independence.test.ts` | ⬜     |
-| 27  | Clean environment restored from backup and verified                             | `docs/runbooks/restore.md` drill      | ⬜     |
+| #   | Criterion                                                                       | Test                                                                 | Status                                                 |
+| --- | ------------------------------------------------------------------------------- | -------------------------------------------------------------------- | ------------------------------------------------------ |
+| 17  | Every canonical mutation emits a schema-valid event                             | `datacore/unit-of-work.test.ts`                                      | ✅                                                     |
+| 18  | Wipe a read model, replay from zero, reconstruct it                             | `datacore/projection.test.ts`                                        | ✅                                                     |
+| 19  | Duplicate event delivery leaves consumer state correct                          | `datacore/projection.test.ts`                                        | ✅                                                     |
+| 24  | Every write traces to actor, operation, time, entity, correlation, before/after | `datacore/unit-of-work.test.ts`                                      | ✅                                                     |
+| 1   | One identity, two API contexts, one person ID                                   | `iam/identity.test.ts`                                               | ⬜                                                     |
+| 2   | ValveMan-only principal denied a Welsford-only resource                         | `iam/object-level-authz.test.ts`                                     | ⬜                                                     |
+| 3   | New product type and attributes, no code change, no migration                   | `pim/metadata-loader.test.ts`, `pim/catalog.test.ts`                 | ✅                                                     |
+| 4   | Combination filter meets the SLO                                                | `perf/product-filter.perf.ts`                                        | ◐ query cost met; end-to-end needs production hardware |
+| 5   | A product is filterable immediately after commit                                | `pim/catalog.test.ts`                                                | ✅                                                     |
+| 6   | Enter bar, preserve it, return PSI, match a PSI range                           | `pim/units.test.ts`, `pim/catalog.test.ts`                           | ✅                                                     |
+| 7   | Class 150 is not 150 PSI; NPS 1 is not 25.4 mm                                  | `pim/engineering-semantics.test.ts`, `pim/catalog.test.ts`           | ✅                                                     |
+| 8   | Two sources, explainable match, approve, both records preserved                 | `party/entity-resolution.test.ts`                                    | ⬜                                                     |
+| 9   | Undo the merge, restore relationships, lose nothing                             | `party/unmerge.test.ts`                                              | ⬜                                                     |
+| 10  | Two sources disagree: both values, winner, reason, origin                       | `pim/catalog.test.ts` (PIM); `party/survivorship.test.ts` (accounts) | ◐                                                      |
+| 11  | Interrupted Pipedrive backfill restarts without duplicates                      | `ingest/pipedrive-backfill.test.ts`                                  | ⬜                                                     |
+| 12  | The same webhook twice is harmless                                              | `ingest/pipedrive-webhook.test.ts`                                   | ⬜                                                     |
+| 13  | A missed webhook is found by reconciliation                                     | `ingest/pipedrive-reconcile.test.ts`                                 | ⬜                                                     |
+| 14  | P21 import preserves lineage; re-import creates no duplicates                   | `ingest/p21-import.test.ts`                                          | ⬜                                                     |
+| 15  | P21 schema drift fails safely                                                   | `ingest/p21-drift.test.ts`                                           | ⬜                                                     |
+| 16  | A malformed record is quarantined with a useful reason                          | `ingest/quarantine.test.ts`                                          | ⬜                                                     |
+| 20  | A → B → C resolves to C; cycles rejected                                        | `pim/supersession.test.ts`                                           | ⬜                                                     |
+| 21  | Exact equivalent vs. functional alternate are distinguished                     | `pim/cross-reference.test.ts`                                        | ⬜                                                     |
+| 22  | Missing required Cv excludes a variant from the publishable view                | `pim/catalog.test.ts`                                                | ✅                                                     |
+| 23  | Model-number parsing with version, confidence, warnings                         | deferred — assumption A-031                                          | ⬜                                                     |
+| 25  | A stale write is rejected, not silently applied                                 | `pim/catalog.test.ts` (domain); `api/concurrency.test.ts` (HTTP)     | ◐                                                      |
+| 26  | Canonical services depend on the abstract ingestion contract                    | `ingest/adapter-independence.test.ts`                                | ⬜                                                     |
+| 27  | Clean environment restored from backup and verified                             | `docs/runbooks/restore.md` drill                                     | ⬜                                                     |
 
 ## Determinism
 
@@ -123,3 +123,61 @@ Worth recording, because they are the reason the tests are shaped this way.
 - **The metadata loader applied changed unit definitions silently**, reporting only
   inserts. An operator would not have seen a conversion factor change. Fixed by guarding
   the upsert so an unchanged row returns nothing and a changed one is reported.
+
+- **Nominal size `1/2` normalized to the same lookup key as `12`**, because alias
+  normalization stripped every non-alphanumeric character. A half-inch valve would have
+  resolved to a twelve-inch designation. Caught by the metadata loader's own
+  cross-validation before any data was loaded; fixed by migration `0008` rather than by
+  editing the applied `0006`, and pinned by `pim/engineering-semantics.test.ts`.
+- **A bare `PSI` alias made gauge and absolute pressure interchangeable**, and a
+  case-insensitive `kv` alias made kilovolt and flow coefficient interchangeable. Both
+  caught by the loader's ambiguity check. Neither resolves now; a connector mapping must
+  declare which is meant.
+- **A wrong digit in the inch-pound-force conversion factor** made 1 ft·lbf convert to
+  11.999999999999999 in·lbf. Caught by the round-trip property test, not by any single
+  conversion.
+- **The metadata loader applied changed unit definitions silently**, reporting only
+  inserts, so an operator would not have seen a conversion factor change. Fixed by
+  guarding the upsert so an unchanged row returns nothing.
+- **The event registry reported every schema as modified on the second run**, because it
+  compared `JSON.stringify` of a value round-tripped through `jsonb` — which does not
+  preserve key order — against the original object. Left unfixed it would have blocked
+  every deployment, or trained people to bypass the check. Fixed with a canonical
+  key-sorted comparison.
+- **`refreshVariantFacets` selected `av.*` alongside the target variant id**, and
+  `pim.attribute_value` has its own `variant_id`, making every later reference ambiguous.
+  Fixed by listing columns explicitly.
+- **`setVariantLifecycle` wrote `NULL` into a `NOT NULL` column** when no effective date
+  was supplied. Caught by the optimistic-concurrency test, which exercised a path the
+  happy-path tests did not.
+
+## What the benchmark actually measures
+
+An early benchmark run reported a **280 ms p95** for a filter whose `EXPLAIN ANALYZE`
+execution time was **9 ms**. The gap was not the query. It was fifty concurrent
+PostgreSQL backends on a four-core sandbox — twelve times oversubscribed — and, in the
+first run, a five-connection client pool serving fifty concurrent callers.
+
+Reporting that as an architecture failure would have been wrong. Quietly lowering the
+target until it passed would have been worse. So `tests/perf/product-filter.perf.ts`
+asserts two different things:
+
+- **Server-side execution time** against the SLO, unconditionally. That is the number
+  ADR-0014's design controls, and a larger instance preserves it.
+- **End-to-end latency** at a concurrency the host can actually serve (two per core),
+  with the oversubscribed figure reported but not asserted.
+
+At 25,000 variants on 4 vCPU, the five-criterion acceptance-criterion filter runs in
+**5.9 ms server-side**, using bitmap index scans on `variant_facet_term_idx` exactly as
+ADR-0014 intends, and **11.2 ms p95 end-to-end** at concurrency 8. INTERSECT beat the
+single-pass aggregate plan (6.8 ms vs 12.4 ms p95), so INTERSECT is the default.
+
+**Acceptance criterion 4 is not complete until the end-to-end figure is measured at the
+real target concurrency on production-class hardware.** This sandbox also runs
+PostgreSQL with the default 128 MB `shared_buffers`, which a real deployment would not.
+
+A second finding worth recording: generating the catalogue originally used a
+`CROSS JOIN LATERAL ... ORDER BY md5(...) LIMIT 1` to pick each variant's term — a
+correlated sort per row. Fine at 25,000 variants, past the statement timeout at 250,000.
+The lesson is about the benchmark, not the product, but it is the same lesson: a
+correlated subquery per row is a scaling cliff, and only a realistic dataset finds it.

@@ -87,147 +87,163 @@ function report(label: string, timing: Timing): void {
 }
 
 /**
- * Generate a catalogue set-based rather than through the API.
+ * Generate a catalogue.
  *
- * Going through createVariant would take hours and would benchmark the write path,
- * not the read path. The rows produced are identical in shape to what the service
- * writes; the facet projection is built by the same SQL the service uses.
+ * Going through createVariant would take hours and would benchmark the write path, not
+ * the read path. The rows produced are identical in shape to what the service writes.
+ *
+ * Everything here is set-based. An earlier version picked each variant's term with a
+ * `CROSS JOIN LATERAL ... ORDER BY md5(...) LIMIT 1`, which is a correlated sort per
+ * row: fine at 25,000 variants, and well past the statement timeout at 250,000. Values
+ * are now spread by taking a coprime stride through the term list, which is
+ * deterministic, evenly distributed, and one hash join.
  */
 async function generateCatalogue(testDb: TestDatabase, variants: number): Promise<void> {
   const started = Date.now();
   console.log(`  generating ${variants.toLocaleString()} variants...`);
 
-  await sql`
-    INSERT INTO pim.brand (key, name)
-    SELECT 'brand_' || i, 'Generated Brand ' || i FROM generate_series(1, 40) i
-  `.execute(testDb.db);
+  // Generation runs on its own connection with no statement timeout: these are bulk
+  // loads, not the application's interactive queries.
+  const loader = connectTo(testDb, 'perf-generate', 2);
+  await sql`SET statement_timeout = 0`.execute(loader.db);
 
-  // Roughly 25 variants per product, which matches the shape of a real valve
-  // catalogue better than one variant per product would.
-  const products = Math.max(1, Math.ceil(variants / 25));
-  await sql`
-    INSERT INTO pim.product (key, brand_id, product_type_key, name, model_series)
-    SELECT 'gen_product_' || i,
-           (SELECT id FROM pim.brand WHERE key = 'brand_' || (1 + (i % 40))),
-           (ARRAY['ball_valve','butterfly_valve','gate_valve','globe_valve','check_valve',
-                  'solenoid_valve','plug_valve','needle_valve'])[1 + (i % 8)],
-           'Generated product ' || i,
-           'GP' || i
-      FROM generate_series(1, ${products}) i
-  `.execute(testDb.db);
+  try {
+    await sql`
+      INSERT INTO pim.brand (key, name)
+      SELECT 'brand_' || i, 'Generated Brand ' || i FROM generate_series(1, 40) i
+    `.execute(loader.db);
 
-  await sql`
-    INSERT INTO pim.variant (product_id, manufacturer_part_number, name)
-    SELECT p.id, 'GEN-' || p.key || '-' || v, 'Generated variant ' || v
-      FROM pim.product p, generate_series(1, 25) v
-     WHERE p.key LIKE 'gen_product_%'
-     LIMIT ${variants}
-  `.execute(testDb.db);
+    // Roughly 25 variants per product, which matches the shape of a real valve
+    // catalogue better than one variant per product would.
+    const products = Math.max(1, Math.ceil(variants / 25));
+    await sql`
+      INSERT INTO pim.product (key, brand_id, product_type_key, name, model_series)
+      SELECT 'gen_product_' || i,
+             (SELECT id FROM pim.brand WHERE key = 'brand_' || (1 + (i % 40))),
+             (ARRAY['ball_valve','butterfly_valve','gate_valve','globe_valve','check_valve',
+                    'solenoid_valve','plug_valve','needle_valve'])[1 + (i % 8)],
+             'Generated product ' || i,
+             'GP' || i
+        FROM generate_series(1, ${products}) i
+    `.execute(loader.db);
 
-  console.log(`  variants inserted (${((Date.now() - started) / 1000).toFixed(1)}s)`);
+    await sql`
+      INSERT INTO pim.variant (product_id, manufacturer_part_number, name)
+      SELECT p.id, 'GEN-' || p.key || '-' || v, 'Generated variant ' || v
+        FROM pim.product p, generate_series(1, 25) v
+       WHERE p.key LIKE 'gen_product_%'
+       LIMIT ${variants}
+    `.execute(loader.db);
 
-  // Enumerated attributes, spread so filters are selective but not degenerate.
-  for (const [attributeKey, vocabulary] of [
-    ['nominal_size', 'nominal_size'],
-    ['body_material', 'material'],
-    ['end_connection', 'end_connection'],
-    ['pressure_class', 'pressure_class'],
-    ['port_size', 'port_size'],
-    ['actuation_type', 'actuation_type'],
-  ] as const) {
+    // A stable row number per variant, reused by every attribute below.
+    await sql`
+      CREATE TEMP TABLE gen_variant AS
+      SELECT id, (row_number() OVER (ORDER BY id))::bigint AS rn
+        FROM pim.variant WHERE manufacturer_part_number LIKE 'GEN-%'
+    `.execute(loader.db);
+    await sql`CREATE INDEX ON gen_variant (rn)`.execute(loader.db);
+    await sql`ANALYZE gen_variant`.execute(loader.db);
+
+    console.log(`  variants inserted (${((Date.now() - started) / 1000).toFixed(1)}s)`);
+
+    // Enumerated attributes. The stride is coprime with most term-list lengths, so
+    // values spread evenly instead of clustering.
+    const strides: Record<string, number> = {
+      nominal_size: 7,
+      body_material: 11,
+      end_connection: 13,
+      pressure_class: 5,
+      port_size: 3,
+      actuation_type: 17,
+      certifications: 19,
+    };
+    for (const [attributeKey, vocabulary] of [
+      ['nominal_size', 'nominal_size'],
+      ['body_material', 'material'],
+      ['end_connection', 'end_connection'],
+      ['pressure_class', 'pressure_class'],
+      ['port_size', 'port_size'],
+      ['actuation_type', 'actuation_type'],
+      ['certifications', 'certification'],
+    ] as const) {
+      await sql`
+        WITH terms AS (
+          SELECT id,
+                 (row_number() OVER (ORDER BY code) - 1)::bigint AS n,
+                 count(*) OVER ()::bigint AS total
+            FROM pim.vocabulary_term
+           WHERE vocabulary_key = ${vocabulary} AND deprecated_at IS NULL
+        )
+        INSERT INTO pim.attribute_value
+          (attribute_key, value_type, cardinality, variant_id, ordinal, value_term_id,
+           value_vocabulary_key, source_system_code, is_selected, selected_reason, entered_raw)
+        SELECT a.key, a.value_type, a.cardinality, g.id, 0, t.id, ${vocabulary},
+               'MFR_CATALOG', true, 'generated', 'generated'
+          FROM gen_variant g
+          JOIN terms t ON t.n = (g.rn * ${strides[attributeKey] ?? 7}) % t.total
+          CROSS JOIN pim.attribute a
+         WHERE a.key = ${attributeKey}
+      `.execute(loader.db);
+    }
+
+    // Quantities, stored normalized so range filters exercise the numeric index.
     await sql`
       INSERT INTO pim.attribute_value
-        (attribute_key, value_type, cardinality, variant_id, value_term_id,
-         value_vocabulary_key, source_system_code, is_selected, selected_reason, entered_raw)
-      SELECT a.key, a.value_type, a.cardinality, v.id, t.id, ${vocabulary},
-             'MFR_CATALOG', true, 'generated', t.code
-        FROM pim.variant v
+        (attribute_key, value_type, cardinality, variant_id, value_qty_original,
+         value_qty_original_unit, value_qty_base, value_qty_dimension,
+         source_system_code, is_selected, selected_reason, entered_raw)
+      SELECT 'cv', 'QUANTITY', 'SINGLE', g.id,
+             (1 + (g.rn * 37) % 2000)::numeric, '[Cv]',
+             (1 + (g.rn * 37) % 2000)::numeric, 'FLOW_COEFFICIENT',
+             'MFR_CATALOG', true, 'generated', 'generated'
+        FROM gen_variant g
+    `.execute(loader.db);
+
+    await sql`
+      INSERT INTO pim.attribute_value
+        (attribute_key, value_type, cardinality, variant_id, value_qty_original,
+         value_qty_original_unit, value_qty_base, value_qty_dimension,
+         source_system_code, is_selected, selected_reason, entered_raw)
+      SELECT 'wog_pressure', 'QUANTITY', 'SINGLE', g.id, p.psi, '[psig]',
+             round(p.psi * 6894.75729316836133672267344535, 4), 'PRESSURE_GAUGE',
+             'MFR_CATALOG', true, 'generated', p.psi || ' WOG'
+        FROM gen_variant g
         CROSS JOIN LATERAL (
-          SELECT id, code FROM pim.vocabulary_term
-           WHERE vocabulary_key = ${vocabulary} AND deprecated_at IS NULL
-           ORDER BY md5(v.id::text || code) LIMIT 1
-        ) t
-        CROSS JOIN pim.attribute a
-       WHERE a.key = ${attributeKey}
-         AND v.manufacturer_part_number LIKE 'GEN-%'
-    `.execute(testDb.db);
+          SELECT (ARRAY[150,200,300,600,720,1000,1500,2000])
+                   [1 + (g.rn * 23) % 8]::numeric AS psi
+        ) p
+    `.execute(loader.db);
+
+    console.log(`  attribute values inserted (${((Date.now() - started) / 1000).toFixed(1)}s)`);
+
+    // Build the projection in one set-based pass, the same shape the service writes.
+    await sql`
+      INSERT INTO pim.variant_facet
+        (variant_id, attribute_key, ordinal, value_kind, num_value, term_id,
+         source_level, attribute_value_id)
+      SELECT av.variant_id, av.attribute_key, av.ordinal,
+             CASE WHEN av.value_term_id IS NOT NULL THEN 'TERM' ELSE 'NUMBER' END,
+             av.value_qty_base, av.value_term_id, 'VARIANT', av.id
+        FROM pim.attribute_value av
+       WHERE av.is_selected AND av.variant_id IS NOT NULL
+    `.execute(loader.db);
+
+    await sql`ANALYZE pim.variant_facet`.execute(loader.db);
+    await sql`ANALYZE pim.variant`.execute(loader.db);
+    await sql`ANALYZE pim.product`.execute(loader.db);
+
+    const counts = await sql<{ variants: string; facets: string }>`
+      SELECT (SELECT count(*)::text FROM pim.variant) AS variants,
+             (SELECT count(*)::text FROM pim.variant_facet) AS facets
+    `.execute(loader.db);
+    console.log(
+      `  ready: ${Number(counts.rows[0]!.variants).toLocaleString()} variants, ` +
+        `${Number(counts.rows[0]!.facets).toLocaleString()} facet rows ` +
+        `(${((Date.now() - started) / 1000).toFixed(1)}s)`,
+    );
+  } finally {
+    await loader.close();
   }
-
-  // Quantities, stored normalized so range filters exercise the numeric index.
-  await sql`
-    INSERT INTO pim.attribute_value
-      (attribute_key, value_type, cardinality, variant_id, value_qty_original,
-       value_qty_original_unit, value_qty_base, value_qty_dimension,
-       source_system_code, is_selected, selected_reason, entered_raw)
-    SELECT 'cv', 'QUANTITY', 'SINGLE', v.id,
-           round((1 + (('x' || substr(md5(v.id::text), 1, 6))::bit(24)::int % 2000))::numeric, 3),
-           '[Cv]',
-           round((1 + (('x' || substr(md5(v.id::text), 1, 6))::bit(24)::int % 2000))::numeric, 3),
-           'FLOW_COEFFICIENT', 'MFR_CATALOG', true, 'generated', 'generated'
-      FROM pim.variant v
-     WHERE v.manufacturer_part_number LIKE 'GEN-%'
-  `.execute(testDb.db);
-
-  await sql`
-    INSERT INTO pim.attribute_value
-      (attribute_key, value_type, cardinality, variant_id, value_qty_original,
-       value_qty_original_unit, value_qty_base, value_qty_dimension,
-       source_system_code, is_selected, selected_reason, entered_raw)
-    SELECT 'wog_pressure', 'QUANTITY', 'SINGLE', v.id, p.psi, '[psig]',
-           round(p.psi * 6894.75729316836133672267344535, 4), 'PRESSURE_GAUGE',
-           'MFR_CATALOG', true, 'generated', p.psi || ' WOG'
-      FROM pim.variant v
-      CROSS JOIN LATERAL (
-        SELECT (ARRAY[150,200,300,600,720,1000,1500,2000])
-                 [1 + (('x' || substr(md5(v.id::text || 'p'), 1, 6))::bit(24)::int % 8)]::numeric AS psi
-      ) p
-     WHERE v.manufacturer_part_number LIKE 'GEN-%'
-  `.execute(testDb.db);
-
-  // A multi-valued attribute, since certification filters are a stated use case.
-  await sql`
-    INSERT INTO pim.attribute_value
-      (attribute_key, value_type, cardinality, variant_id, ordinal, value_term_id,
-       value_vocabulary_key, source_system_code, is_selected, selected_reason, entered_raw)
-    SELECT 'certifications', 'ENUM', 'MULTI', v.id, 0, t.id, 'certification',
-           'MFR_CATALOG', true, 'generated', t.code
-      FROM pim.variant v
-      CROSS JOIN LATERAL (
-        SELECT id, code FROM pim.vocabulary_term
-         WHERE vocabulary_key = 'certification' ORDER BY md5(v.id::text || code) LIMIT 1
-      ) t
-     WHERE v.manufacturer_part_number LIKE 'GEN-%'
-  `.execute(testDb.db);
-
-  console.log(
-    `  attribute values inserted (${((Date.now() - started) / 1000).toFixed(1)}s)`,
-  );
-
-  // Build the projection with the same SQL the service uses, in one set-based pass.
-  await sql`
-    INSERT INTO pim.variant_facet
-      (variant_id, attribute_key, ordinal, value_kind, num_value, term_id,
-       source_level, attribute_value_id)
-    SELECT av.variant_id, av.attribute_key, av.ordinal,
-           CASE WHEN av.value_term_id IS NOT NULL THEN 'TERM' ELSE 'NUMBER' END,
-           av.value_qty_base, av.value_term_id, 'VARIANT', av.id
-      FROM pim.attribute_value av
-     WHERE av.is_selected AND av.variant_id IS NOT NULL
-  `.execute(testDb.db);
-
-  await sql`ANALYZE pim.variant_facet`.execute(testDb.db);
-  await sql`ANALYZE pim.variant`.execute(testDb.db);
-  await sql`ANALYZE pim.product`.execute(testDb.db);
-
-  const counts = await sql<{ variants: string; facets: string }>`
-    SELECT (SELECT count(*)::text FROM pim.variant) AS variants,
-           (SELECT count(*)::text FROM pim.variant_facet) AS facets
-  `.execute(testDb.db);
-  console.log(
-    `  ready: ${Number(counts.rows[0]!.variants).toLocaleString()} variants, ` +
-      `${Number(counts.rows[0]!.facets).toLocaleString()} facet rows ` +
-      `(${((Date.now() - started) / 1000).toFixed(1)}s)`,
-  );
 }
 
 describe('product filter performance (acceptance criterion 4)', () => {
