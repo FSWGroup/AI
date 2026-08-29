@@ -333,6 +333,298 @@ export interface KernelSourceSystem {
   name: string;
 }
 
+export interface PartyAffiliationType {
+  code: string;
+  description: string;
+  is_active: Generated<boolean>;
+  is_internal: Generated<boolean>;
+  name: string;
+}
+
+export interface PartyCommercialAccount {
+  account_name: string | null;
+  account_status: Generated<string>;
+  closed_on: Timestamp | null;
+  created_at: Generated<Timestamp>;
+  created_by: string | null;
+  id: Generated<string>;
+  opened_on: Timestamp | null;
+  operating_company: string;
+  organization_id: string;
+  source_account_key: string;
+  source_record_id: string | null;
+  source_system_code: string;
+  updated_at: Generated<Timestamp>;
+  updated_by: string | null;
+}
+
+export interface PartyFieldCandidate {
+  actor_principal_id: string | null;
+  /**
+   * The source positively says there is no value, which is different from the source being silent. A CRM that clears a phone number is making a claim about the world.
+   */
+  asserts_absence: Generated<boolean>;
+  confidence: Generated<Numeric>;
+  created_at: Generated<Timestamp>;
+  entity_id: string;
+  entity_type: string;
+  evaluated_at: Timestamp | null;
+  field_key: string;
+  id: Generated<string>;
+  ingested_at: Generated<Timestamp>;
+  is_selected: Generated<boolean>;
+  location_id: Generated<string | null>;
+  organization_id: Generated<string | null>;
+  person_id: Generated<string | null>;
+  reason: string | null;
+  rule_version: number | null;
+  selected_reason: string | null;
+  site_id: Generated<string | null>;
+  source_field: string | null;
+  source_record_id: string | null;
+  source_system_code: string;
+  source_updated_at: Timestamp | null;
+  value_text: string | null;
+  verification_status: Generated<string>;
+  verified_at: Timestamp | null;
+  verified_by: string | null;
+}
+
+export interface PartyFieldDivergence {
+  candidate_count: Int8 | null;
+  distinct_value_count: Int8 | null;
+  entity_id: string | null;
+  entity_type: string | null;
+  field_key: string | null;
+  has_dispute: boolean | null;
+  last_ingested_at: Timestamp | null;
+  selected_source: string | null;
+  selected_value: string | null;
+  sources: string[] | null;
+}
+
+export interface PartyFieldOwnership {
+  agreed_by: string | null;
+  allow_manual_override: Generated<boolean>;
+  created_at: Generated<Timestamp>;
+  effective_from: Generated<Timestamp>;
+  effective_to: Timestamp | null;
+  entity_type: string;
+  field_key: string;
+  id: Generated<string>;
+  is_exclusive: Generated<boolean>;
+  note: string | null;
+  operating_company: string | null;
+  owning_source_code: string;
+}
+
+export interface PartyLocation {
+  address_status: Generated<string>;
+  city: string | null;
+  country_code: Generated<string>;
+  created_at: Generated<Timestamp>;
+  created_by: string | null;
+  geocode_precision: string | null;
+  id: Generated<string>;
+  latitude: Numeric | null;
+  line1: string | null;
+  line2: string | null;
+  longitude: Numeric | null;
+  normalization_version: Generated<number>;
+  normalized_key: string | null;
+  postal_code: string | null;
+  /**
+   * Exactly what the source asserted. Never normalized in place: overwriting it makes a normalization bug indistinguishable from a bad source, permanently (spec §46).
+   */
+  raw_address: string;
+  region_code: string | null;
+  updated_at: Generated<Timestamp>;
+  updated_by: string | null;
+  version: Generated<number>;
+}
+
+export interface PartyMasteredField {
+  classification: Generated<string>;
+  column_name: string;
+  description: string;
+  entity_type: string;
+  field_key: string;
+  is_mastered: Generated<boolean>;
+  sort_ordinal: Generated<number>;
+  value_type: string;
+}
+
+export interface PartyOrganization {
+  confidence: Generated<string>;
+  created_at: Generated<Timestamp>;
+  created_by: string | null;
+  duns_number: string | null;
+  id: Generated<string>;
+  legal_name: string;
+  lifecycle_status: Generated<string>;
+  main_phone: string | null;
+  merged_at: Timestamp | null;
+  /**
+   * Set when this record lost a merge. The row is never deleted: every identifier ever issued must keep resolving, and unmerge must remain possible (ADR-0012).
+   */
+  merged_into_id: string | null;
+  naics_code: string | null;
+  organization_type: Generated<string>;
+  primary_location_id: string | null;
+  tax_identifier: string | null;
+  trade_name: string | null;
+  updated_at: Generated<Timestamp>;
+  updated_by: string | null;
+  version: Generated<number>;
+  website_url: string | null;
+}
+
+export interface PartyOrganizationRelationship {
+  created_at: Generated<Timestamp>;
+  created_by: string | null;
+  from_organization_id: string;
+  id: Generated<string>;
+  note: string | null;
+  relationship_code: string;
+  source_system_code: string | null;
+  to_organization_id: string;
+  valid_from: Timestamp | null;
+  valid_to: Timestamp | null;
+}
+
+export interface PartyOrganizationRole {
+  created_at: Generated<Timestamp>;
+  created_by: string | null;
+  id: Generated<string>;
+  operating_company: string | null;
+  organization_id: string;
+  role_code: string;
+  source_record_id: string | null;
+  source_system_code: string | null;
+  valid_from: Timestamp | null;
+  valid_to: Timestamp | null;
+}
+
+export interface PartyOrganizationRoleType {
+  code: string;
+  description: string;
+  is_active: Generated<boolean>;
+  is_company_scoped: Generated<boolean>;
+  name: string;
+  sort_ordinal: Generated<number>;
+}
+
+export interface PartyPerson {
+  created_at: Generated<Timestamp>;
+  created_by: string | null;
+  display_name: string;
+  email: string | null;
+  email_normalized: string | null;
+  erased_at: Timestamp | null;
+  family_name: string | null;
+  given_name: string | null;
+  id: Generated<string>;
+  job_title: string | null;
+  lifecycle_status: Generated<string>;
+  linkedin_url: string | null;
+  merged_at: Timestamp | null;
+  merged_into_id: string | null;
+  mobile_phone: string | null;
+  phone: string | null;
+  updated_at: Generated<Timestamp>;
+  updated_by: string | null;
+  version: Generated<number>;
+}
+
+export interface PartyPersonAffiliation {
+  affiliation_code: string;
+  created_at: Generated<Timestamp>;
+  created_by: string | null;
+  id: Generated<string>;
+  is_primary: Generated<boolean>;
+  job_title: string | null;
+  organization_id: string;
+  person_id: string;
+  site_id: string | null;
+  source_record_id: string | null;
+  source_system_code: string | null;
+  updated_at: Generated<Timestamp>;
+  valid_from: Timestamp | null;
+  valid_to: Timestamp | null;
+  work_email: string | null;
+  work_phone: string | null;
+}
+
+export interface PartyRelationshipType {
+  code: string;
+  description: string;
+  inverse_name: string;
+  is_active: Generated<boolean>;
+  is_hierarchical: Generated<boolean>;
+  name: string;
+}
+
+export interface PartyShipTo {
+  commercial_account_id: string;
+  created_at: Generated<Timestamp>;
+  delivery_note: string | null;
+  id: Generated<string>;
+  is_active: Generated<boolean>;
+  is_default: Generated<boolean>;
+  location_id: string;
+  name: string | null;
+  site_id: string | null;
+  source_ship_to_key: string;
+  updated_at: Generated<Timestamp>;
+}
+
+export interface PartySite {
+  created_at: Generated<Timestamp>;
+  created_by: string | null;
+  id: Generated<string>;
+  industry_note: string | null;
+  lifecycle_status: Generated<string>;
+  location_id: string | null;
+  merged_at: Timestamp | null;
+  merged_into_id: string | null;
+  name: string;
+  organization_id: string;
+  site_type: Generated<string>;
+  updated_at: Generated<Timestamp>;
+  updated_by: string | null;
+  version: Generated<number>;
+}
+
+export interface PartySourceLink {
+  entity_id: string;
+  entity_type: string;
+  id: Generated<string>;
+  linked_at: Generated<Timestamp>;
+  linked_by: string | null;
+  match_explanation: Json | null;
+  match_method: Generated<string>;
+  match_score: Numeric | null;
+  moved_by_merge_id: string | null;
+  moved_from_entity_id: string | null;
+  source_record_id: string;
+}
+
+export interface PartySurvivorshipRule {
+  allow_absence_to_win: Generated<boolean>;
+  created_at: Generated<Timestamp>;
+  entity_type: string;
+  field_key: string | null;
+  id: Generated<string>;
+  min_confidence: Generated<Numeric>;
+  note: string | null;
+  prefer_verified: Generated<boolean>;
+  source_priority: Generated<string[]>;
+  strategy: Generated<string>;
+  updated_at: Generated<Timestamp>;
+  updated_by: string | null;
+  version: Generated<number>;
+}
+
 export interface PimAttribute {
   cardinality: Generated<string>;
   channels: Generated<string[]>;
@@ -806,6 +1098,24 @@ export interface DB {
   "kernel.operating_company": KernelOperatingCompany;
   "kernel.schema_migration": KernelSchemaMigration;
   "kernel.source_system": KernelSourceSystem;
+  "party.affiliation_type": PartyAffiliationType;
+  "party.commercial_account": PartyCommercialAccount;
+  "party.field_candidate": PartyFieldCandidate;
+  "party.field_divergence": PartyFieldDivergence;
+  "party.field_ownership": PartyFieldOwnership;
+  "party.location": PartyLocation;
+  "party.mastered_field": PartyMasteredField;
+  "party.organization": PartyOrganization;
+  "party.organization_relationship": PartyOrganizationRelationship;
+  "party.organization_role": PartyOrganizationRole;
+  "party.organization_role_type": PartyOrganizationRoleType;
+  "party.person": PartyPerson;
+  "party.person_affiliation": PartyPersonAffiliation;
+  "party.relationship_type": PartyRelationshipType;
+  "party.ship_to": PartyShipTo;
+  "party.site": PartySite;
+  "party.source_link": PartySourceLink;
+  "party.survivorship_rule": PartySurvivorshipRule;
   "pim.attribute": PimAttribute;
   "pim.attribute_value": PimAttributeValue;
   "pim.brand": PimBrand;
