@@ -184,10 +184,28 @@ fingerprinting and drift halting; reconciliation modes; the P21 file connector w
 header-name parsing, declared encoding, explicit null semantics, time-zone handling,
 duplicate-key detection, snapshot-diff deletion detection and multi-file manifests.
 
-**Migrations.** `0023`–`0025`.
+**Migrations.** `0014` (single migration; the phase needed one schema, not three).
 
-**Events.** `fsw.ingest.RunStarted`, `RunCompleted`, `RunFailed`, `SourceRecordObserved`,
-`SourceRecordChanged`, `RecordQuarantined`, `SchemaDriftDetected`.
+**Events.** `fsw.ingest.RunStarted`, `RunCompleted`, `RunHalted`, `SourceRecordChanged`,
+`RecordQuarantined`, `SchemaDriftDetected`. `RunFailed` was folded into `RunCompleted`
+carrying a status, and `SourceRecordObserved` was dropped: an event for every unchanged
+record on every run is volume without a consumer, and "nothing changed" is already
+visible in the run counters.
+
+**Status: delivered**, except reconciliation modes, which belong with Pipedrive in
+Phase 9 — reconciliation exists to catch missed webhooks, and there are none yet. The
+run table and `ingest.reconciliation` are in place for it.
+
+Three defects this phase's own tests found are recorded in
+[`testing.md`](testing.md#bugs-this-suite-has-already-caught): a re-presented full
+extract marking every record deleted, only one half of a duplicate key being
+quarantined, and drift detection rolling back the record a reviewer needs.
+
+One limitation is worth stating rather than leaving implied: the single-byte code pages
+are total, so a file declared `windows-1252` that is really UTF-8 decodes to mojibake
+and no decoder can detect it. The reverse — a wrong `utf-8` declaration — does fail
+loudly. The declared encoding is therefore a configuration decision a person has to get
+right, and it is recorded on every landed file so a later correction is possible.
 
 **Exit criteria.** AC14 — a representative export is ingested with file identity,
 record identity, source values, mapping version and lineage preserved; re-ingesting the

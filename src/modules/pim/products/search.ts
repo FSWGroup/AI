@@ -58,25 +58,23 @@ export type FilterCriterion =
 export type PlanShape = 'join' | 'intersect' | 'aggregate';
 
 /**
- * The default plan shape, chosen by measurement (§83), not intuition.
+ * The default plan shape, chosen by measurement (§83), not intuition — and a
+ * cautionary tale about which measurement.
  *
- * At 250,000 variants and 2.25 million facet rows, INTERSECT materialises and
- * de-duplicates every branch in full before combining them. That is fine when all the
- * criteria are selective, and expensive when one is not: a pressure range covering
- * three quarters of the catalogue costs the same as the two term criteria that
- * eliminate 97% of it. Measured server-side, that filter took 114 ms.
+ * At 25,000 variants the reorderable `join` shape won both comparisons, sometimes by
+ * a factor of two. At 250,000 variants it lost badly: 326 ms p95 against INTERSECT's
+ * 122 ms on the same three-criterion filter. The 25,000-row result was real and
+ * completely misleading, which is exactly the trap §35 warns about when it refuses to
+ * accept "realistic" as an unquantified word.
  *
- * The `join` shape expresses the same question as inner joins between per-criterion
- * subqueries, which the planner is free to reorder using its own statistics. It drives
- * from whichever criterion it estimates smallest and probes the rest by index, so an
- * unselective criterion costs roughly what its index probes cost rather than what its
- * full scan costs.
+ * So the default is INTERSECT, chosen on the 250,000-variant measurement. All three
+ * shapes remain implemented and are asserted to return identical results, because the
+ * comparison has to stay runnable: the right answer changed once with scale and will
+ * change again with hardware, and a benchmark nobody can re-run is an opinion.
  *
- * `intersect` and `aggregate` remain available and remain tested against the same
- * expected results, because a plan that is faster but wrong is not an improvement, and
- * because the comparison must stay reproducible when the dataset changes.
+ * Measured figures and the environment they came from are in docs/testing.md.
  */
-export const DEFAULT_PLAN: PlanShape = 'join';
+export const DEFAULT_PLAN: PlanShape = 'intersect';
 
 export interface SearchOptions {
   readonly criteria: readonly FilterCriterion[];
