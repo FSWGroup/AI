@@ -1,0 +1,419 @@
+# Product types (spec §23, ADR-0017).
+#
+# Hierarchical: a ball valve is a valve, and inherits the attribute applicability rules
+# of its ancestors. Adding a type is a pull request against this file. No code change,
+# no migration.
+#
+# Conditional applicability uses the FSW condition DSL (spec §26): a small, versioned,
+# non-executable predicate language. If actuation is electric, voltage becomes required;
+# if pneumatic, air supply pressure does.
+
+productTypes:
+  - key: valve
+    name: Valve
+    description: >-
+      Abstract parent for all valve types. Carries the attributes every valve has, so
+      concrete types declare only what makes them different.
+    attributes:
+      - { attribute: nominal_size, requirement: REQUIRED, level: VARIANT, sortOrder: 10 }
+      - {
+          attribute: end_connection,
+          requirement: REQUIRED,
+          level: VARIANT,
+          sortOrder: 20,
+        }
+      - {
+          attribute: connection_standard,
+          requirement: RECOMMENDED,
+          level: VARIANT,
+          sortOrder: 25,
+        }
+      - { attribute: body_material, requirement: REQUIRED, level: VARIANT, sortOrder: 30 }
+      - {
+          attribute: pressure_class,
+          requirement: RECOMMENDED,
+          level: VARIANT,
+          sortOrder: 40,
+        }
+      - {
+          attribute: wog_pressure,
+          requirement: RECOMMENDED,
+          level: VARIANT,
+          sortOrder: 50,
+        }
+      - {
+          attribute: temperature_min,
+          requirement: RECOMMENDED,
+          level: PRODUCT,
+          sortOrder: 60,
+        }
+      - {
+          attribute: temperature_max,
+          requirement: RECOMMENDED,
+          level: PRODUCT,
+          sortOrder: 70,
+        }
+      - { attribute: trim_material, requirement: OPTIONAL, level: VARIANT, sortOrder: 80 }
+      - { attribute: seat_material, requirement: OPTIONAL, level: VARIANT, sortOrder: 90 }
+      - {
+          attribute: seal_material,
+          requirement: OPTIONAL,
+          level: VARIANT,
+          sortOrder: 100,
+        }
+      - {
+          attribute: actuation_type,
+          requirement: RECOMMENDED,
+          level: VARIANT,
+          sortOrder: 110,
+        }
+      - {
+          attribute: certifications,
+          requirement: OPTIONAL,
+          level: VARIANT,
+          sortOrder: 120,
+        }
+      - { attribute: face_to_face, requirement: OPTIONAL, level: VARIANT, sortOrder: 130 }
+      - { attribute: weight, requirement: OPTIONAL, level: VARIANT, sortOrder: 140 }
+      - {
+          attribute: country_of_origin,
+          requirement: OPTIONAL,
+          level: PRODUCT,
+          sortOrder: 150,
+        }
+      - { attribute: is_fire_safe, requirement: OPTIONAL, level: VARIANT, sortOrder: 160 }
+
+      # Conditional applicability. These are the rules spec §26 asks for.
+      - attribute: voltage
+        requirement: REQUIRED
+        level: VARIANT
+        sortOrder: 200
+        condition:
+          { all: [{ attr: actuation_type, op: in, value: [ELECTRIC, SOLENOID] }] }
+        conditionNote: >-
+          An electrically actuated or solenoid valve is not orderable without a supply
+          voltage, so voltage is required only when actuation is electric or solenoid.
+      - attribute: frequency
+        requirement: RECOMMENDED
+        level: VARIANT
+        sortOrder: 210
+        condition:
+          { all: [{ attr: actuation_type, op: in, value: [ELECTRIC, SOLENOID] }] }
+        conditionNote: Supply frequency matters for AC actuators and solenoids.
+      - attribute: supply_pressure
+        requirement: REQUIRED
+        level: VARIANT
+        sortOrder: 220
+        condition: { all: [{ attr: actuation_type, op: eq, value: PNEUMATIC }] }
+        conditionNote: >-
+          A pneumatic actuator cannot be selected or sized without its air supply
+          pressure.
+      - attribute: fail_position
+        requirement: REQUIRED
+        level: VARIANT
+        sortOrder: 230
+        condition:
+          {
+            any:
+              [
+                {
+                  attr: actuation_type,
+                  op: in,
+                  value: [PNEUMATIC, ELECTRIC, HYDRAULIC, SOLENOID],
+                },
+              ],
+          }
+        conditionNote: >-
+          Any powered actuator has a defined behaviour on loss of power or signal, and
+          specifying it wrong is a safety issue. Manual valves have no fail position.
+      - attribute: signal_type
+        requirement: RECOMMENDED
+        level: VARIANT
+        sortOrder: 240
+        condition:
+          {
+            all:
+              [{ attr: actuation_type, op: in, value: [PNEUMATIC, ELECTRIC, HYDRAULIC] }],
+          }
+        conditionNote: Modulating and remotely controlled actuators need a signal type.
+
+  - key: ball_valve
+    name: Ball valve
+    description: >-
+      Quarter-turn valve with a spherical closure member. The first product type
+      modelled end to end (assumption A-027).
+    parent: valve
+    attributes:
+      - { attribute: body_style, requirement: REQUIRED, level: VARIANT, sortOrder: 15 }
+      - {
+          attribute: port_configuration,
+          requirement: REQUIRED,
+          level: VARIANT,
+          sortOrder: 16,
+        }
+      - { attribute: port_size, requirement: REQUIRED, level: VARIANT, sortOrder: 17 }
+      - {
+          attribute: seat_design,
+          requirement: RECOMMENDED,
+          level: VARIANT,
+          sortOrder: 18,
+        }
+      - { attribute: cv, requirement: REQUIRED, level: VARIANT, sortOrder: 45 }
+      - {
+          attribute: bore_diameter,
+          requirement: OPTIONAL,
+          level: VARIANT,
+          sortOrder: 135,
+        }
+      - {
+          attribute: is_bidirectional,
+          requirement: OPTIONAL,
+          level: VARIANT,
+          sortOrder: 165,
+        }
+      - {
+          attribute: breakaway_torque,
+          requirement: OPTIONAL,
+          level: VARIANT,
+          sortOrder: 170,
+        }
+
+  - key: butterfly_valve
+    name: Butterfly valve
+    description: Quarter-turn valve with a disc closure member rotating on a shaft.
+    parent: valve
+    attributes:
+      - { attribute: body_style, requirement: REQUIRED, level: VARIANT, sortOrder: 15 }
+      - { attribute: cv, requirement: REQUIRED, level: VARIANT, sortOrder: 45 }
+      - {
+          attribute: seat_design,
+          requirement: RECOMMENDED,
+          level: VARIANT,
+          sortOrder: 18,
+        }
+
+  - key: gate_valve
+    name: Gate valve
+    description: Multi-turn isolation valve with a sliding gate closure member.
+    parent: valve
+    attributes:
+      - { attribute: body_style, requirement: RECOMMENDED, level: VARIANT, sortOrder: 15 }
+
+  - key: globe_valve
+    name: Globe valve
+    description: Multi-turn valve with a plug or disc seating against a port, suited to throttling.
+    parent: valve
+    attributes:
+      - { attribute: cv, requirement: REQUIRED, level: VARIANT, sortOrder: 45 }
+
+  - key: check_valve
+    name: Check valve
+    description: Valve permitting flow in one direction only.
+    parent: valve
+    attributes:
+      - { attribute: cv, requirement: RECOMMENDED, level: VARIANT, sortOrder: 45 }
+
+  - {
+      key: plug_valve,
+      name: Plug valve,
+      description: 'Quarter-turn valve with a cylindrical or tapered plug closure member.',
+      parent: valve,
+    }
+  - {
+      key: diaphragm_valve,
+      name: Diaphragm valve,
+      description: 'Valve using a flexible diaphragm as the closure member; common in sanitary and corrosive service.',
+      parent: valve,
+    }
+  - {
+      key: needle_valve,
+      name: Needle valve,
+      description: 'Fine-throttling valve with a tapered needle closure member.',
+      parent: valve,
+    }
+
+  - key: relief_valve
+    name: Pressure relief valve
+    description: Valve that opens at a set pressure to protect equipment from overpressure.
+    parent: valve
+    attributes:
+      - {
+          attribute: working_pressure,
+          requirement: REQUIRED,
+          level: VARIANT,
+          sortOrder: 55,
+        }
+
+  - key: safety_valve
+    name: Safety valve
+    description: Rapid-opening relief valve for compressible service.
+    parent: valve
+    attributes:
+      - {
+          attribute: working_pressure,
+          requirement: REQUIRED,
+          level: VARIANT,
+          sortOrder: 55,
+        }
+
+  - key: control_valve
+    name: Control valve
+    description: Modulating valve with a positioner or actuator for continuous process control.
+    parent: valve
+    attributes:
+      - { attribute: cv, requirement: REQUIRED, level: VARIANT, sortOrder: 45 }
+      - { attribute: signal_type, requirement: REQUIRED, level: VARIANT, sortOrder: 240 }
+
+  - key: solenoid_valve
+    name: Solenoid valve
+    description: Electrically operated valve using a solenoid to actuate the closure member.
+    parent: valve
+    attributes:
+      - { attribute: voltage, requirement: REQUIRED, level: VARIANT, sortOrder: 200 }
+      - {
+          attribute: port_configuration,
+          requirement: REQUIRED,
+          level: VARIANT,
+          sortOrder: 16,
+        }
+      - { attribute: cv, requirement: RECOMMENDED, level: VARIANT, sortOrder: 45 }
+
+  # --- Non-valve product types ------------------------------------------------
+  - key: regulator
+    name: Regulator
+    description: Self-operated device maintaining a downstream or upstream pressure setpoint.
+    attributes:
+      - { attribute: nominal_size, requirement: REQUIRED, level: VARIANT, sortOrder: 10 }
+      - {
+          attribute: end_connection,
+          requirement: REQUIRED,
+          level: VARIANT,
+          sortOrder: 20,
+        }
+      - { attribute: body_material, requirement: REQUIRED, level: VARIANT, sortOrder: 30 }
+      - {
+          attribute: working_pressure,
+          requirement: REQUIRED,
+          level: VARIANT,
+          sortOrder: 55,
+        }
+      - { attribute: cv, requirement: RECOMMENDED, level: VARIANT, sortOrder: 45 }
+      - {
+          attribute: temperature_max,
+          requirement: RECOMMENDED,
+          level: PRODUCT,
+          sortOrder: 70,
+        }
+
+  - key: actuator
+    name: Actuator
+    description: Device providing motive force to operate a valve.
+    attributes:
+      - {
+          attribute: actuation_type,
+          requirement: REQUIRED,
+          level: VARIANT,
+          sortOrder: 10,
+        }
+      - { attribute: fail_position, requirement: REQUIRED, level: VARIANT, sortOrder: 20 }
+      - {
+          attribute: breakaway_torque,
+          requirement: RECOMMENDED,
+          level: VARIANT,
+          sortOrder: 30,
+        }
+      - attribute: voltage
+        requirement: REQUIRED
+        level: VARIANT
+        sortOrder: 40
+        condition: { all: [{ attr: actuation_type, op: eq, value: ELECTRIC }] }
+        conditionNote: An electric actuator is not orderable without a supply voltage.
+      - attribute: supply_pressure
+        requirement: REQUIRED
+        level: VARIANT
+        sortOrder: 50
+        condition: { all: [{ attr: actuation_type, op: eq, value: PNEUMATIC }] }
+        conditionNote: A pneumatic actuator cannot be sized without its air supply pressure.
+
+  - key: positioner
+    name: Positioner
+    description: Device that drives an actuator to a commanded position from a control signal.
+    attributes:
+      - { attribute: signal_type, requirement: REQUIRED, level: VARIANT, sortOrder: 10 }
+      - {
+          attribute: supply_pressure,
+          requirement: RECOMMENDED,
+          level: VARIANT,
+          sortOrder: 20,
+        }
+      - {
+          attribute: certifications,
+          requirement: OPTIONAL,
+          level: VARIANT,
+          sortOrder: 30,
+        }
+
+  - {
+      key: steam_trap,
+      name: Steam trap,
+      description: Device that discharges condensate while retaining steam.,
+    }
+  - {
+      key: strainer,
+      name: Strainer,
+      description: Device removing particulate from a process stream.,
+    }
+
+  - key: instrument
+    name: Instrument
+    description: Abstract parent for process measurement instruments.
+    attributes:
+      - {
+          attribute: signal_type,
+          requirement: RECOMMENDED,
+          level: VARIANT,
+          sortOrder: 10,
+        }
+      - {
+          attribute: end_connection,
+          requirement: RECOMMENDED,
+          level: VARIANT,
+          sortOrder: 20,
+        }
+      - {
+          attribute: certifications,
+          requirement: OPTIONAL,
+          level: VARIANT,
+          sortOrder: 30,
+        }
+      - attribute: voltage
+        requirement: RECOMMENDED
+        level: VARIANT
+        sortOrder: 40
+        condition: { all: [{ attr: signal_type, op: notIn, value: [PNEUMATIC_3_15] }] }
+        conditionNote: A pneumatic instrument needs no electrical supply.
+
+  - {
+      key: pressure_instrument,
+      name: Pressure instrument,
+      description: 'Gauge, switch or transmitter measuring pressure.',
+      parent: instrument,
+    }
+  - {
+      key: temperature_instrument,
+      name: Temperature instrument,
+      description: 'Thermometer, thermowell, switch or transmitter measuring temperature.',
+      parent: instrument,
+    }
+  - {
+      key: flow_instrument,
+      name: Flow instrument,
+      description: 'Meter, switch or transmitter measuring flow.',
+      parent: instrument,
+    }
+  - {
+      key: level_instrument,
+      name: Level instrument,
+      description: 'Gauge, switch or transmitter measuring level.',
+      parent: instrument,
+    }

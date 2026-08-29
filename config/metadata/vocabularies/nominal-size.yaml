@@ -1,0 +1,310 @@
+# Nominal size is a DESIGNATION, not a measurement (ADR-0016, spec §29).
+#
+# NPS 1 does not mean 25.4 mm. NPS 1 pipe has an outside diameter of 1.315 in; the
+# "1" is a designation within a sizing system, not a length. A system that normalizes
+# nominal size into a length will eventually contribute to a misapplied valve.
+#
+# Terms therefore carry sizeSystem, designation and referenceStandard, plus a
+# sortOrdinal so sizes order correctly without being numbers. The unit conversion
+# service refuses any term from this vocabulary.
+#
+# Cross-system correspondence (NPS 1 ~ DN 25) is a conventional correspondence, not an
+# identity, and is modelled as an explicit relationship rather than by giving both a
+# shared numeric value.
+
+key: nominal_size
+name: Nominal size
+description: >-
+  Nominal pipe, tube and valve size designations. A designation within a sizing
+  system, never a physical dimension.
+isDesignation: true
+designationKind: NOMINAL_SIZE
+terms:
+  - {
+      code: NPS_1_8,
+      label: 'NPS 1/8"',
+      sizeSystem: NPS,
+      designation: '1/8',
+      referenceStandard: ASME B36.10M,
+      sortOrdinal: 3.175,
+      aliases: [{ alias: '1/8' }, { alias: '0.125' }, { alias: '1/8 in' }],
+    }
+  - {
+      code: NPS_1_4,
+      label: 'NPS 1/4"',
+      sizeSystem: NPS,
+      designation: '1/4',
+      referenceStandard: ASME B36.10M,
+      sortOrdinal: 6.35,
+      aliases: [{ alias: '1/4' }, { alias: '0.25' }, { alias: '1/4 in' }],
+    }
+  - {
+      code: NPS_3_8,
+      label: 'NPS 3/8"',
+      sizeSystem: NPS,
+      designation: '3/8',
+      referenceStandard: ASME B36.10M,
+      sortOrdinal: 9.525,
+      aliases: [{ alias: '3/8' }, { alias: '0.375' }],
+    }
+  - {
+      code: NPS_1_2,
+      label: 'NPS 1/2"',
+      sizeSystem: NPS,
+      designation: '1/2',
+      referenceStandard: ASME B36.10M,
+      sortOrdinal: 12.7,
+      aliases:
+        [{ alias: '1/2' }, { alias: '0.5' }, { alias: '1/2"' }, { alias: '1/2 in' }],
+    }
+  - {
+      code: NPS_3_4,
+      label: 'NPS 3/4"',
+      sizeSystem: NPS,
+      designation: '3/4',
+      referenceStandard: ASME B36.10M,
+      sortOrdinal: 19.05,
+      aliases: [{ alias: '3/4' }, { alias: '0.75' }, { alias: '3/4"' }],
+    }
+  - {
+      code: NPS_1,
+      label: 'NPS 1"',
+      sizeSystem: NPS,
+      designation: '1',
+      referenceStandard: ASME B36.10M,
+      sortOrdinal: 25.0,
+      aliases: [{ alias: '1' }, { alias: '1"' }, { alias: '1 in' }, { alias: '1 inch' }],
+    }
+  - {
+      code: NPS_1_1_4,
+      label: 'NPS 1-1/4"',
+      sizeSystem: NPS,
+      designation: '1-1/4',
+      referenceStandard: ASME B36.10M,
+      sortOrdinal: 32.0,
+      aliases: [{ alias: '1-1/4' }, { alias: '1 1/4' }, { alias: '1.25' }],
+    }
+  - {
+      code: NPS_1_1_2,
+      label: 'NPS 1-1/2"',
+      sizeSystem: NPS,
+      designation: '1-1/2',
+      referenceStandard: ASME B36.10M,
+      sortOrdinal: 40.0,
+      aliases: [{ alias: '1-1/2' }, { alias: '1 1/2' }, { alias: '1.5' }],
+    }
+  - {
+      code: NPS_2,
+      label: 'NPS 2"',
+      sizeSystem: NPS,
+      designation: '2',
+      referenceStandard: ASME B36.10M,
+      sortOrdinal: 50.0,
+      aliases: [{ alias: '2' }, { alias: '2"' }],
+    }
+  - {
+      code: NPS_2_1_2,
+      label: 'NPS 2-1/2"',
+      sizeSystem: NPS,
+      designation: '2-1/2',
+      referenceStandard: ASME B36.10M,
+      sortOrdinal: 65.0,
+      aliases: [{ alias: '2-1/2' }, { alias: '2.5' }],
+    }
+  - {
+      code: NPS_3,
+      label: 'NPS 3"',
+      sizeSystem: NPS,
+      designation: '3',
+      referenceStandard: ASME B36.10M,
+      sortOrdinal: 80.0,
+      aliases: [{ alias: '3' }, { alias: '3"' }],
+    }
+  - {
+      code: NPS_4,
+      label: 'NPS 4"',
+      sizeSystem: NPS,
+      designation: '4',
+      referenceStandard: ASME B36.10M,
+      sortOrdinal: 100.0,
+      aliases: [{ alias: '4' }, { alias: '4"' }],
+    }
+  - {
+      code: NPS_5,
+      label: 'NPS 5"',
+      sizeSystem: NPS,
+      designation: '5',
+      referenceStandard: ASME B36.10M,
+      sortOrdinal: 125.0,
+      aliases: [{ alias: '5' }],
+    }
+  - {
+      code: NPS_6,
+      label: 'NPS 6"',
+      sizeSystem: NPS,
+      designation: '6',
+      referenceStandard: ASME B36.10M,
+      sortOrdinal: 150.0,
+      aliases: [{ alias: '6' }, { alias: '6"' }],
+    }
+  - {
+      code: NPS_8,
+      label: 'NPS 8"',
+      sizeSystem: NPS,
+      designation: '8',
+      referenceStandard: ASME B36.10M,
+      sortOrdinal: 200.0,
+      aliases: [{ alias: '8' }],
+    }
+  - {
+      code: NPS_10,
+      label: 'NPS 10"',
+      sizeSystem: NPS,
+      designation: '10',
+      referenceStandard: ASME B36.10M,
+      sortOrdinal: 250.0,
+      aliases: [{ alias: '10' }],
+    }
+  - {
+      code: NPS_12,
+      label: 'NPS 12"',
+      sizeSystem: NPS,
+      designation: '12',
+      referenceStandard: ASME B36.10M,
+      sortOrdinal: 300.0,
+      aliases: [{ alias: '12' }],
+    }
+  - {
+      code: NPS_14,
+      label: 'NPS 14"',
+      sizeSystem: NPS,
+      designation: '14',
+      referenceStandard: ASME B36.10M,
+      sortOrdinal: 350.0,
+    }
+  - {
+      code: NPS_16,
+      label: 'NPS 16"',
+      sizeSystem: NPS,
+      designation: '16',
+      referenceStandard: ASME B36.10M,
+      sortOrdinal: 400.0,
+    }
+  - {
+      code: NPS_18,
+      label: 'NPS 18"',
+      sizeSystem: NPS,
+      designation: '18',
+      referenceStandard: ASME B36.10M,
+      sortOrdinal: 450.0,
+    }
+  - {
+      code: NPS_20,
+      label: 'NPS 20"',
+      sizeSystem: NPS,
+      designation: '20',
+      referenceStandard: ASME B36.10M,
+      sortOrdinal: 500.0,
+    }
+  - {
+      code: NPS_24,
+      label: 'NPS 24"',
+      sizeSystem: NPS,
+      designation: '24',
+      referenceStandard: ASME B36.10M,
+      sortOrdinal: 600.0,
+    }
+
+  - {
+      code: DN_15,
+      label: DN 15,
+      sizeSystem: DN,
+      designation: DN15,
+      referenceStandard: ISO 6708,
+      sortOrdinal: 12.7,
+    }
+  - {
+      code: DN_20,
+      label: DN 20,
+      sizeSystem: DN,
+      designation: DN20,
+      referenceStandard: ISO 6708,
+      sortOrdinal: 19.05,
+    }
+  - {
+      code: DN_25,
+      label: DN 25,
+      sizeSystem: DN,
+      designation: DN25,
+      referenceStandard: ISO 6708,
+      sortOrdinal: 25.0,
+    }
+  - {
+      code: DN_40,
+      label: DN 40,
+      sizeSystem: DN,
+      designation: DN40,
+      referenceStandard: ISO 6708,
+      sortOrdinal: 40.0,
+    }
+  - {
+      code: DN_50,
+      label: DN 50,
+      sizeSystem: DN,
+      designation: DN50,
+      referenceStandard: ISO 6708,
+      sortOrdinal: 50.0,
+    }
+  - {
+      code: DN_80,
+      label: DN 80,
+      sizeSystem: DN,
+      designation: DN80,
+      referenceStandard: ISO 6708,
+      sortOrdinal: 80.0,
+    }
+  - {
+      code: DN_100,
+      label: DN 100,
+      sizeSystem: DN,
+      designation: DN100,
+      referenceStandard: ISO 6708,
+      sortOrdinal: 100.0,
+    }
+  - {
+      code: DN_150,
+      label: DN 150,
+      sizeSystem: DN,
+      designation: DN150,
+      referenceStandard: ISO 6708,
+      sortOrdinal: 150.0,
+    }
+
+  - {
+      code: OD_TUBE_1_4,
+      label: '1/4" OD tube',
+      sizeSystem: OD_TUBE,
+      designation: '1/4',
+      sortOrdinal: 6.35,
+    }
+  - {
+      code: OD_TUBE_3_8,
+      label: '3/8" OD tube',
+      sizeSystem: OD_TUBE,
+      designation: '3/8',
+      sortOrdinal: 9.525,
+    }
+  - {
+      code: OD_TUBE_1_2,
+      label: '1/2" OD tube',
+      sizeSystem: OD_TUBE,
+      designation: '1/2',
+      sortOrdinal: 12.7,
+    }
+  - {
+      code: OD_TUBE_1,
+      label: '1" OD tube',
+      sizeSystem: OD_TUBE,
+      designation: '1',
+      sortOrdinal: 25.4,
+    }

@@ -26,7 +26,7 @@ mapped to the phase that demonstrates them.
 
 ---
 
-## Phase 0 — Foundation
+## Phase 0 — Foundation ✅
 
 **Delivers.** Repository layout, TypeScript strict configuration, Fastify bootstrap,
 Kysely wiring, the checksum-enforcing migration runner, the test harness against real
@@ -37,7 +37,7 @@ PostgreSQL, `make dev`, CI, and the documentation skeleton.
 **Exit criteria.** A clean clone runs `make dev` and gets a migrated database, a running
 API, and a passing test suite. Editing an applied migration fails the runner.
 
-## Phase 1 — Data core
+## Phase 1 — Data core ✅
 
 **Delivers.** UUIDv7 in TypeScript and SQL; source-system and operating-company
 registries; the UnitOfWork that owns transactions, audit entries and event flushing;
@@ -62,6 +62,12 @@ AC18 — a read model is wiped and rebuilt by replay from sequence zero. AC19 �
 delivery leaves consumer state correct. AC24 — every write traces to actor, operation,
 timestamp, entity, correlation, before/after.
 
+> **Sequencing note.** Phase 3 was built before Phase 2. The PIM metadata layer carries
+> the project's highest technical risk (ADR-0013 and ADR-0016), it is testable without an
+> HTTP surface, and proving it early is worth more than proving conventional
+> authentication early. Identity and access remain a prerequisite for the API layer and
+> for acceptance criteria 1 and 2.
+
 ## Phase 2 — Identity and access
 
 **Delivers.** `party.person` as the single canonical human; `iam.principal` unifying
@@ -85,7 +91,7 @@ authorization denials are audited; credentials are never returned after creation
 second person ID. AC2 — a ValveMan-only principal is denied a Welsford-only resource,
 with a negative test and an audit entry.
 
-## Phase 3 — PIM metadata
+## Phase 3 — PIM metadata ✅
 
 **Delivers.** Quantity dimensions and UCUM units with affine conversion; the conversion
 service with property and reference tests; controlled vocabularies with aliases that

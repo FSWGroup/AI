@@ -108,3 +108,18 @@ Worth recording, because they are the reason the tests are shaped this way.
   on the row's existence.
 - **The UnitOfWork imported past two module indexes**, violating ADR-0003 the day the
   rule was written. Caught by `architecture/boundaries.test.ts`.
+- **Nominal size `1/2` normalized to the same lookup key as `12`**, because alias
+  normalization stripped every non-alphanumeric character. A half-inch valve would have
+  resolved to a twelve-inch designation. Caught by the metadata loader's own
+  cross-validation before any data was loaded; fixed by migration `0008` and pinned by
+  `pim/engineering-semantics.test.ts`.
+- **A bare `PSI` alias made gauge and absolute pressure interchangeable**, and a
+  case-insensitive `kv` alias made kilovolt and flow coefficient interchangeable. Both
+  caught by the loader's ambiguity check. Neither is resolvable now; the connector
+  mapping must declare which is meant.
+- **A wrong digit in the inch-pound-force conversion factor** (`0.112984829027616706`
+  instead of `0.1129848290276167`) made 1 ft·lbf convert to 11.999999999999999 in·lbf.
+  Caught by the round-trip property test, not by any single conversion.
+- **The metadata loader applied changed unit definitions silently**, reporting only
+  inserts. An operator would not have seen a conversion factor change. Fixed by guarding
+  the upsert so an unchanged row returns nothing and a changed one is reported.

@@ -1,0 +1,132 @@
+# Pressure class is a DESIGNATION, not a pressure (ADR-0016, spec §30).
+#
+# ASME Class 150 is not 150 PSI. It is a pressure-temperature rating designation whose
+# allowable working pressure depends on material and temperature: a Class 150
+# carbon-steel flange is rated around 285 psig at ambient and well under 150 psig at
+# 750 F. The numeral in the designation is part of the name.
+#
+# `sortOrdinal` exists so classes order correctly for display and comparison. It is
+# NOT a pressure and is never exposed as one. Measured pressures — working pressure,
+# WOG rating, test pressure, set pressure — are QUANTITY attributes with a dimension.
+
+key: pressure_class
+name: Pressure class
+description: >-
+  Pressure-temperature rating class designations. Never a pressure value; see the
+  working_pressure and wog_pressure attributes for measured pressures.
+isDesignation: true
+designationKind: PRESSURE_CLASS
+terms:
+  - {
+      code: ASME_CLASS_125,
+      label: ASME Class 125,
+      designation: '125',
+      referenceStandard: ASME B16.1,
+      sortOrdinal: 125,
+      aliases: [{ alias: 'class 125' }, { alias: '125#' }, { alias: '125 lb' }],
+    }
+  - {
+      code: ASME_CLASS_150,
+      label: ASME Class 150,
+      designation: '150',
+      referenceStandard: ASME B16.34,
+      sortOrdinal: 150,
+      aliases:
+        [
+          { alias: 'class 150' },
+          { alias: '150#' },
+          { alias: '150 lb' },
+          { alias: 'cl150' },
+          { alias: 'ANSI 150' },
+        ],
+    }
+  - {
+      code: ASME_CLASS_250,
+      label: ASME Class 250,
+      designation: '250',
+      referenceStandard: ASME B16.1,
+      sortOrdinal: 250,
+      aliases: [{ alias: 'class 250' }, { alias: '250#' }],
+    }
+  - {
+      code: ASME_CLASS_300,
+      label: ASME Class 300,
+      designation: '300',
+      referenceStandard: ASME B16.34,
+      sortOrdinal: 300,
+      aliases:
+        [
+          { alias: 'class 300' },
+          { alias: '300#' },
+          { alias: 'cl300' },
+          { alias: 'ANSI 300' },
+        ],
+    }
+  - {
+      code: ASME_CLASS_600,
+      label: ASME Class 600,
+      designation: '600',
+      referenceStandard: ASME B16.34,
+      sortOrdinal: 600,
+      aliases: [{ alias: 'class 600' }, { alias: '600#' }],
+    }
+  - {
+      code: ASME_CLASS_900,
+      label: ASME Class 900,
+      designation: '900',
+      referenceStandard: ASME B16.34,
+      sortOrdinal: 900,
+      aliases: [{ alias: 'class 900' }, { alias: '900#' }],
+    }
+  - {
+      code: ASME_CLASS_1500,
+      label: ASME Class 1500,
+      designation: '1500',
+      referenceStandard: ASME B16.34,
+      sortOrdinal: 1500,
+      aliases: [{ alias: 'class 1500' }, { alias: '1500#' }],
+    }
+  - {
+      code: ASME_CLASS_2500,
+      label: ASME Class 2500,
+      designation: '2500',
+      referenceStandard: ASME B16.34,
+      sortOrdinal: 2500,
+      aliases: [{ alias: 'class 2500' }, { alias: '2500#' }],
+    }
+
+  - {
+      code: PN_6,
+      label: PN 6,
+      designation: PN6,
+      referenceStandard: EN 1092-1,
+      sortOrdinal: 87,
+    }
+  - {
+      code: PN_10,
+      label: PN 10,
+      designation: PN10,
+      referenceStandard: EN 1092-1,
+      sortOrdinal: 145,
+    }
+  - {
+      code: PN_16,
+      label: PN 16,
+      designation: PN16,
+      referenceStandard: EN 1092-1,
+      sortOrdinal: 232,
+    }
+  - {
+      code: PN_25,
+      label: PN 25,
+      designation: PN25,
+      referenceStandard: EN 1092-1,
+      sortOrdinal: 363,
+    }
+  - {
+      code: PN_40,
+      label: PN 40,
+      designation: PN40,
+      referenceStandard: EN 1092-1,
+      sortOrdinal: 580,
+    }

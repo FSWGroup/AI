@@ -23,6 +23,8 @@ export type JsonPrimitive = boolean | number | string | null;
 
 export type JsonValue = JsonArray | JsonObject | JsonPrimitive;
 
+export type Numeric = ColumnType<string, number | string, number | string>;
+
 export type Timestamp = ColumnType<Date, Date | string, Date | string>;
 
 export interface AuditChangeLog {
@@ -177,6 +179,147 @@ export interface KernelSourceSystem {
   name: string;
 }
 
+export interface PimAttribute {
+  cardinality: Generated<string>;
+  channels: Generated<string[]>;
+  created_at: Generated<Timestamp>;
+  default_unit_code: string | null;
+  definition_version: Generated<number>;
+  deprecated_at: Timestamp | null;
+  description: string;
+  dimension_code: string | null;
+  entity_type: string | null;
+  id: Generated<string>;
+  is_comparable: Generated<boolean>;
+  is_filterable: Generated<boolean>;
+  key: string;
+  max_length: number | null;
+  max_numeric: Numeric | null;
+  min_length: number | null;
+  min_numeric: Numeric | null;
+  name: string;
+  numeric_scale: number | null;
+  required_designation_kind: Generated<string | null>;
+  /**
+   * Attributes are deprecated and superseded, never deleted: values already recorded against them remain meaningful.
+   */
+  superseded_by_key: string | null;
+  updated_at: Generated<Timestamp>;
+  /**
+   * NOMINAL_SIZE and PRESSURE_CLASS are deliberately distinct from ENUM and from QUANTITY. Making them their own value types is what makes it structurally impossible for Class 150 to be stored as, or compared against, 150 PSI (ADR-0016).
+   */
+  value_type: string;
+  vocabulary_key: string | null;
+}
+
+export interface PimMetadataVersion {
+  applied_at: Generated<Timestamp>;
+  applied_by: string;
+  content_hash: string;
+  file_count: number;
+  id: Generated<string>;
+  note: string | null;
+  summary: Json;
+}
+
+export interface PimProductType {
+  created_at: Generated<Timestamp>;
+  deprecated_at: Timestamp | null;
+  description: string;
+  etim_class: string | null;
+  etim_release: string | null;
+  id: Generated<string>;
+  key: string;
+  name: string;
+  parent_key: string | null;
+  updated_at: Generated<Timestamp>;
+}
+
+export interface PimProductTypeAttribute {
+  attribute_key: string;
+  /**
+   * Applicability predicate in the FSW rule DSL. If actuation is electric, voltage becomes applicable; if pneumatic, supply pressure does. Data, not code.
+   */
+  condition: Json | null;
+  condition_note: string | null;
+  created_at: Generated<Timestamp>;
+  id: Generated<string>;
+  level: Generated<string>;
+  product_type_key: string;
+  requirement: Generated<string>;
+  sort_order: Generated<number>;
+}
+
+export interface PimQuantityDimension {
+  code: string;
+  description: string;
+  name: string;
+}
+
+export interface PimUnit {
+  code: string;
+  dimension_code: string;
+  /**
+   * Exact where the definition is exact: 1 [in_i] = 25.4 mm by definition.
+   */
+  factor_to_base: Numeric;
+  is_base: Generated<boolean>;
+  name: string;
+  offset_to_base: Generated<Numeric>;
+  sort_order: Generated<number>;
+  symbol: string;
+}
+
+export interface PimUnitAlias {
+  alias: string;
+  id: Generated<string>;
+  normalized_alias: Generated<string | null>;
+  unit_code: string;
+}
+
+export interface PimVocabulary {
+  created_at: Generated<Timestamp>;
+  description: string;
+  designation_kind: string | null;
+  is_designation: Generated<boolean>;
+  key: string;
+  name: string;
+}
+
+export interface PimVocabularyTerm {
+  code: string;
+  created_at: Generated<Timestamp>;
+  deprecated_at: Timestamp | null;
+  description: string | null;
+  /**
+   * The designation itself: 1, DN25, 150, PN16. For a pressure class the numeral is part of the designation and is NEVER a pressure value.
+   */
+  designation: string | null;
+  id: Generated<string>;
+  label: string;
+  parent_id: string | null;
+  reference_standard: string | null;
+  size_system: string | null;
+  /**
+   * Display and comparison ordering only. Not a measurement and not convertible.
+   */
+  sort_ordinal: Numeric | null;
+  vocabulary_key: string;
+}
+
+export interface PimVocabularyTermAlias {
+  alias: string;
+  asserts_equivalence: Generated<boolean>;
+  confidence: Generated<Numeric>;
+  created_at: Generated<Timestamp>;
+  id: Generated<string>;
+  normalized_alias: Generated<string | null>;
+  note: string | null;
+  source_system_code: string | null;
+  term_id: string;
+  vocabulary_key: string;
+}
+
 export interface DB {
   "audit.change_log": AuditChangeLog;
   "events.consumer_cursor": EventsConsumerCursor;
@@ -189,4 +332,14 @@ export interface DB {
   "kernel.operating_company": KernelOperatingCompany;
   "kernel.schema_migration": KernelSchemaMigration;
   "kernel.source_system": KernelSourceSystem;
+  "pim.attribute": PimAttribute;
+  "pim.metadata_version": PimMetadataVersion;
+  "pim.product_type": PimProductType;
+  "pim.product_type_attribute": PimProductTypeAttribute;
+  "pim.quantity_dimension": PimQuantityDimension;
+  "pim.unit": PimUnit;
+  "pim.unit_alias": PimUnitAlias;
+  "pim.vocabulary": PimVocabulary;
+  "pim.vocabulary_term": PimVocabularyTerm;
+  "pim.vocabulary_term_alias": PimVocabularyTermAlias;
 }

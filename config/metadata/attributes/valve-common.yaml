@@ -1,0 +1,317 @@
+# Attribute definitions (ADR-0013, ADR-0017).
+#
+# These are DATA. Adding one is a pull request against this file plus
+# `npm run metadata:apply`. No code change. No migration. No runtime DDL.
+#
+# Three value types deserve attention:
+#   NOMINAL_SIZE    a size designation, never a length (ADR-0016)
+#   PRESSURE_CLASS  a rating designation, never a pressure (ADR-0016)
+#   QUANTITY        a real measurement, with a dimension and a normalized base value
+#
+# `wog_pressure` and `pressure_class` sitting side by side is the whole point: a valve
+# genuinely has both, and they are different kinds of fact.
+
+attributes:
+  # --- Size and rating designations -----------------------------------------
+  - key: nominal_size
+    name: Nominal size
+    description: >-
+      Nominal line size designation. NPS 1 is a designation, not 25.4 mm; the physical
+      dimensions of the valve are separate measured attributes.
+    valueType: NOMINAL_SIZE
+    vocabulary: nominal_size
+    isFilterable: true
+    isComparable: true
+
+  - key: pressure_class
+    name: Pressure class
+    description: >-
+      Pressure-temperature rating class. ASME Class 150 is a designation; the pressure
+      a valve is actually rated for at a given temperature is wog_pressure or
+      working_pressure.
+    valueType: PRESSURE_CLASS
+    vocabulary: pressure_class
+    isFilterable: true
+    isComparable: true
+
+  # --- Materials -------------------------------------------------------------
+  - {
+      key: body_material,
+      name: Body material,
+      description: Material of the pressure-retaining body.,
+      valueType: ENUM,
+      vocabulary: material,
+    }
+  - {
+      key: trim_material,
+      name: Trim material,
+      description: Material of the closure member and stem.,
+      valueType: ENUM,
+      vocabulary: material,
+    }
+  - {
+      key: seat_material,
+      name: Seat material,
+      description: Material of the seat.,
+      valueType: ENUM,
+      vocabulary: material,
+    }
+  - {
+      key: seal_material,
+      name: Seal material,
+      description: Material of the body seals and stem packing.,
+      valueType: ENUM,
+      vocabulary: material,
+    }
+  - {
+      key: body_material_grade,
+      name: Body material grade,
+      description: 'Specific grade designation where the material vocabulary is broader than the grade, e.g. a heat-specific callout.',
+      valueType: TEXT,
+      maxLength: 120,
+      isFilterable: false,
+    }
+
+  # --- Connections and construction -----------------------------------------
+  - {
+      key: end_connection,
+      name: End connection,
+      description: How the product connects to the process piping.,
+      valueType: ENUM,
+      vocabulary: end_connection,
+    }
+  - {
+      key: connection_standard,
+      name: Connection standard,
+      description: Dimensional standard the end connection conforms to.,
+      valueType: ENUM,
+      vocabulary: connection_standard,
+    }
+  - {
+      key: body_style,
+      name: Body style,
+      description: Physical construction of the valve body.,
+      valueType: ENUM,
+      vocabulary: body_style,
+    }
+  - {
+      key: port_configuration,
+      name: Port configuration,
+      description: Number of ports and flow pattern.,
+      valueType: ENUM,
+      vocabulary: port_configuration,
+    }
+  - {
+      key: port_size,
+      name: Port size,
+      description: Bore relative to nominal line size.,
+      valueType: ENUM,
+      vocabulary: port_size,
+    }
+  - {
+      key: seat_design,
+      name: Seat design,
+      description: Sealing arrangement between closure member and body.,
+      valueType: ENUM,
+      vocabulary: seat_design,
+    }
+
+  # --- Measured performance --------------------------------------------------
+  - key: cv
+    name: Flow coefficient (Cv)
+    description: >-
+      Valve capacity coefficient. Its own dimension because Cv is a defined coefficient
+      with a specific test basis, not a plain volumetric flow.
+    valueType: QUANTITY
+    dimension: FLOW_COEFFICIENT
+    defaultUnit: '[Cv]'
+    numericScale: 3
+    minNumeric: '0'
+
+  - key: wog_pressure
+    name: WOG pressure rating
+    description: >-
+      Water, oil and gas non-shock pressure rating at ambient temperature. A measured
+      pressure, gauge. Distinct from pressure_class, which is a designation.
+    valueType: QUANTITY
+    dimension: PRESSURE_GAUGE
+    defaultUnit: '[psig]'
+    numericScale: 2
+    minNumeric: '0'
+
+  - key: working_pressure
+    name: Maximum working pressure
+    description: Maximum allowable working pressure at the stated reference temperature. Gauge.
+    valueType: QUANTITY
+    dimension: PRESSURE_GAUGE
+    defaultUnit: '[psig]'
+    numericScale: 2
+    minNumeric: '0'
+
+  - key: temperature_min
+    name: Minimum temperature
+    description: Lowest process temperature the product is rated for.
+    valueType: QUANTITY
+    dimension: TEMPERATURE
+    defaultUnit: '[degF]'
+    numericScale: 2
+
+  - key: temperature_max
+    name: Maximum temperature
+    description: Highest process temperature the product is rated for.
+    valueType: QUANTITY
+    dimension: TEMPERATURE
+    defaultUnit: '[degF]'
+    numericScale: 2
+
+  - key: face_to_face
+    name: Face-to-face dimension
+    description: >-
+      Measured length between end faces. A real physical length, unlike nominal size.
+    valueType: QUANTITY
+    dimension: LENGTH
+    defaultUnit: '[in_i]'
+    numericScale: 4
+    minNumeric: '0'
+
+  - {
+      key: bore_diameter,
+      name: Bore diameter,
+      description: Measured bore diameter through the closure member.,
+      valueType: QUANTITY,
+      dimension: LENGTH,
+      defaultUnit: '[in_i]',
+      numericScale: 4,
+      minNumeric: '0',
+    }
+  - {
+      key: weight,
+      name: Weight,
+      description: Shipping weight of the product as configured.,
+      valueType: QUANTITY,
+      dimension: MASS,
+      defaultUnit: '[lb_av]',
+      numericScale: 3,
+      minNumeric: '0',
+      isFilterable: false,
+    }
+  - {
+      key: breakaway_torque,
+      name: Breakaway torque,
+      description: Torque required to unseat the closure member.,
+      valueType: QUANTITY,
+      dimension: TORQUE,
+      defaultUnit: '[in_lbf]',
+      numericScale: 2,
+      minNumeric: '0',
+    }
+
+  # --- Actuation --------------------------------------------------------------
+  - {
+      key: actuation_type,
+      name: Actuation type,
+      description: How the valve is operated.,
+      valueType: ENUM,
+      vocabulary: actuation_type,
+    }
+  - {
+      key: fail_position,
+      name: Fail position,
+      description: Position on loss of motive power or signal.,
+      valueType: ENUM,
+      vocabulary: fail_position,
+    }
+  - {
+      key: voltage,
+      name: Supply voltage,
+      description: Electrical supply voltage for an actuator or instrument.,
+      valueType: QUANTITY,
+      dimension: VOLTAGE,
+      defaultUnit: V,
+      numericScale: 1,
+      minNumeric: '0',
+    }
+  - {
+      key: frequency,
+      name: Supply frequency,
+      description: Electrical supply frequency where applicable.,
+      valueType: QUANTITY,
+      dimension: FREQUENCY,
+      defaultUnit: Hz,
+      numericScale: 1,
+      minNumeric: '0',
+    }
+  - {
+      key: supply_pressure,
+      name: Air supply pressure,
+      description: Instrument air supply pressure for a pneumatic actuator. Gauge.,
+      valueType: QUANTITY,
+      dimension: PRESSURE_GAUGE,
+      defaultUnit: '[psig]',
+      numericScale: 2,
+      minNumeric: '0',
+    }
+  - {
+      key: signal_type,
+      name: Signal type,
+      description: Control or feedback signal.,
+      valueType: ENUM,
+      vocabulary: signal_type,
+    }
+  - {
+      key: stroke_time,
+      name: Stroke time,
+      description: Time to travel full stroke.,
+      valueType: QUANTITY,
+      dimension: TIME,
+      defaultUnit: s,
+      numericScale: 2,
+      minNumeric: '0',
+      isFilterable: false,
+    }
+
+  # --- Compliance and flags ---------------------------------------------------
+  - key: certifications
+    name: Certifications
+    description: >-
+      Standards and approvals this product carries. Multi-valued. A certification here
+      is a claim about the product as configured; certificate evidence with scope and
+      expiry is modelled separately.
+    valueType: ENUM
+    vocabulary: certification
+    cardinality: MULTI
+
+  - {
+      key: is_fire_safe,
+      name: Fire-safe certified,
+      description: Whether the product carries a fire-safe certification such as API 607.,
+      valueType: BOOLEAN,
+    }
+  - {
+      key: is_lead_free,
+      name: Lead-free,
+      description: Whether the product meets the weighted-average lead content limit for potable water.,
+      valueType: BOOLEAN,
+    }
+  - {
+      key: is_bidirectional,
+      name: Bidirectional,
+      description: Whether the valve seals in both flow directions.,
+      valueType: BOOLEAN,
+    }
+  - {
+      key: country_of_origin,
+      name: Country of origin,
+      description: ISO 3166-1 alpha-2 country of manufacture.,
+      valueType: TEXT,
+      minLength: 2,
+      maxLength: 2,
+    }
+  - {
+      key: warranty_months,
+      name: Warranty period,
+      description: Manufacturer warranty in months.,
+      valueType: INTEGER,
+      minNumeric: '0',
+      isFilterable: false,
+    }

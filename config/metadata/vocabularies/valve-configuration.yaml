@@ -1,0 +1,366 @@
+# Configuration vocabularies for valves and actuation. Ordinary controlled
+# vocabularies: these are categories, not designations, so no designationKind.
+---
+key: end_connection
+name: End connection
+description: How the product connects to the process piping.
+terms:
+  - {
+      code: FLANGED,
+      label: Flanged,
+      sortOrdinal: 10,
+      aliases: [{ alias: 'flg' }, { alias: 'flange' }],
+    }
+  - {
+      code: THREADED_NPT,
+      label: Threaded NPT,
+      sortOrdinal: 20,
+      aliases:
+        [
+          { alias: 'NPT' },
+          { alias: 'FNPT' },
+          { alias: 'threaded' },
+          { alias: 'screwed' },
+        ],
+    }
+  - {
+      code: THREADED_BSPP,
+      label: Threaded BSPP,
+      sortOrdinal: 25,
+      aliases: [{ alias: 'BSPP' }, { alias: 'G thread' }],
+    }
+  - {
+      code: THREADED_BSPT,
+      label: Threaded BSPT,
+      sortOrdinal: 26,
+      aliases: [{ alias: 'BSPT' }],
+    }
+  - {
+      code: SOCKET_WELD,
+      label: Socket weld,
+      sortOrdinal: 30,
+      aliases: [{ alias: 'SW' }, { alias: 'socket-weld' }, { alias: 'socketweld' }],
+    }
+  - {
+      code: BUTT_WELD,
+      label: Butt weld,
+      sortOrdinal: 40,
+      aliases: [{ alias: 'BW' }, { alias: 'buttweld' }],
+    }
+  - {
+      code: TRI_CLAMP,
+      label: Tri-clamp sanitary,
+      sortOrdinal: 50,
+      aliases:
+        [
+          { alias: 'triclamp' },
+          { alias: 'tri clover' },
+          { alias: 'clamp' },
+          { alias: 'TC' },
+        ],
+    }
+  - {
+      code: SANITARY_WELD,
+      label: Sanitary butt weld,
+      sortOrdinal: 55,
+      aliases: [{ alias: 'sanitary weld' }],
+    }
+  - {
+      code: GROOVED,
+      label: Grooved,
+      sortOrdinal: 60,
+      aliases: [{ alias: 'victaulic' }, { alias: 'roll groove' }],
+    }
+  - {
+      code: COMPRESSION,
+      label: Compression,
+      sortOrdinal: 70,
+      aliases: [{ alias: 'tube fitting' }, { alias: 'swagelok' }],
+    }
+  - {
+      code: SOLDER,
+      label: Solder / sweat,
+      sortOrdinal: 80,
+      aliases: [{ alias: 'sweat' }, { alias: 'solder joint' }],
+    }
+  - {
+      code: WAFER,
+      label: Wafer,
+      sortOrdinal: 90,
+      description: Clamped between flanges without its own bolt holes.,
+    }
+  - {
+      code: LUG,
+      label: Lug,
+      sortOrdinal: 95,
+      description: Threaded lugs allow downstream removal with the valve in place.,
+    }
+  - { code: PUSH_TO_CONNECT, label: Push-to-connect, sortOrdinal: 100 }
+---
+key: connection_standard
+name: Connection standard
+description: The dimensional standard the end connection conforms to.
+terms:
+  - {
+      code: ASME_B16_5,
+      label: ASME B16.5,
+      sortOrdinal: 10,
+      description: 'Pipe flanges and flanged fittings, NPS 1/2 through 24.',
+    }
+  - {
+      code: ASME_B16_47,
+      label: ASME B16.47,
+      sortOrdinal: 15,
+      description: Large diameter steel flanges.,
+    }
+  - {
+      code: ASME_B1_20_1,
+      label: ASME B1.20.1,
+      sortOrdinal: 20,
+      description: 'Pipe threads, general purpose (NPT).',
+    }
+  - {
+      code: ASME_B16_11,
+      label: ASME B16.11,
+      sortOrdinal: 30,
+      description: 'Forged fittings, socket-welding and threaded.',
+    }
+  - {
+      code: ASME_BPE,
+      label: ASME BPE,
+      sortOrdinal: 40,
+      description: Bioprocessing equipment.,
+    }
+  - { code: EN_1092_1, label: EN 1092-1, sortOrdinal: 50 }
+  - { code: ISO_1127, label: ISO 1127, sortOrdinal: 60 }
+  - { code: DIN_11851, label: DIN 11851, sortOrdinal: 70 }
+  - {
+      code: ISO_2852,
+      label: ISO 2852,
+      sortOrdinal: 80,
+      description: Sanitary clamp connections.,
+    }
+---
+key: body_style
+name: Body style
+description: Physical construction of the valve body.
+terms:
+  - {
+      code: ONE_PIECE,
+      label: One-piece,
+      sortOrdinal: 10,
+      aliases: [{ alias: '1 piece' }, { alias: '1-pc' }],
+    }
+  - {
+      code: TWO_PIECE,
+      label: Two-piece,
+      sortOrdinal: 20,
+      aliases: [{ alias: '2 piece' }, { alias: '2-pc' }],
+    }
+  - {
+      code: THREE_PIECE,
+      label: Three-piece,
+      sortOrdinal: 30,
+      aliases: [{ alias: '3 piece' }, { alias: '3-pc' }],
+    }
+  - { code: SPLIT_BODY, label: Split body, sortOrdinal: 40 }
+  - { code: TOP_ENTRY, label: Top entry, sortOrdinal: 50 }
+  - { code: WAFER_BODY, label: Wafer body, sortOrdinal: 60 }
+  - { code: LUG_BODY, label: Lug body, sortOrdinal: 70 }
+  - { code: FLANGED_BODY, label: Flanged body, sortOrdinal: 80 }
+  - { code: UNIBODY, label: Unibody, sortOrdinal: 90 }
+---
+key: port_configuration
+name: Port configuration
+description: Number of ports and flow pattern.
+terms:
+  - {
+      code: TWO_WAY,
+      label: 2-way,
+      sortOrdinal: 10,
+      aliases: [{ alias: '2 way' }, { alias: 'two way' }],
+    }
+  - {
+      code: THREE_WAY_L,
+      label: 3-way L-port,
+      sortOrdinal: 20,
+      aliases: [{ alias: '3 way L' }, { alias: 'L port' }, { alias: 'L-port' }],
+    }
+  - {
+      code: THREE_WAY_T,
+      label: 3-way T-port,
+      sortOrdinal: 30,
+      aliases: [{ alias: '3 way T' }, { alias: 'T port' }, { alias: 'T-port' }],
+    }
+  - { code: FOUR_WAY, label: 4-way, sortOrdinal: 40, aliases: [{ alias: '4 way' }] }
+  - { code: DIVERTING, label: Diverting, sortOrdinal: 50 }
+  - { code: MIXING, label: Mixing, sortOrdinal: 60 }
+---
+key: port_size
+name: Port size
+description: >-
+  Bore relative to the nominal line size. A separate concept from port configuration:
+  a full-port valve has a bore matching the pipe, a reduced-port valve does not.
+terms:
+  - {
+      code: FULL_PORT,
+      label: Full port,
+      sortOrdinal: 10,
+      aliases: [{ alias: 'full bore' }, { alias: 'FB' }, { alias: 'fullport' }],
+    }
+  - {
+      code: STANDARD_PORT,
+      label: Standard port,
+      sortOrdinal: 20,
+      aliases: [{ alias: 'regular port' }, { alias: 'standard bore' }],
+    }
+  - {
+      code: REDUCED_PORT,
+      label: Reduced port,
+      sortOrdinal: 30,
+      aliases: [{ alias: 'reduced bore' }, { alias: 'RB' }],
+    }
+  - { code: VENTURI_PORT, label: Venturi port, sortOrdinal: 40 }
+---
+key: actuation_type
+name: Actuation type
+description: How the valve is operated.
+terms:
+  - {
+      code: MANUAL_LEVER,
+      label: Manual lever,
+      sortOrdinal: 10,
+      aliases: [{ alias: 'lever' }, { alias: 'handle' }, { alias: 'lever handle' }],
+    }
+  - {
+      code: MANUAL_GEAR,
+      label: Manual gear operator,
+      sortOrdinal: 20,
+      aliases: [{ alias: 'gear' }, { alias: 'gear operated' }, { alias: 'worm gear' }],
+    }
+  - {
+      code: MANUAL_HANDWHEEL,
+      label: Manual handwheel,
+      sortOrdinal: 30,
+      aliases: [{ alias: 'handwheel' }, { alias: 'hand wheel' }],
+    }
+  - {
+      code: PNEUMATIC,
+      label: Pneumatic,
+      sortOrdinal: 40,
+      aliases: [{ alias: 'air actuated' }, { alias: 'air operated' }, { alias: 'pneu' }],
+    }
+  - {
+      code: ELECTRIC,
+      label: Electric,
+      sortOrdinal: 50,
+      aliases:
+        [{ alias: 'motor operated' }, { alias: 'electric actuator' }, { alias: 'MOV' }],
+    }
+  - { code: HYDRAULIC, label: Hydraulic, sortOrdinal: 60 }
+  - {
+      code: SOLENOID,
+      label: Solenoid,
+      sortOrdinal: 70,
+      aliases: [{ alias: 'solenoid operated' }],
+    }
+  - {
+      code: SELF_OPERATED,
+      label: Self-operated,
+      sortOrdinal: 80,
+      description: 'Operated by process pressure, as in a direct-acting regulator.',
+    }
+---
+key: fail_position
+name: Fail position
+description: Where the valve goes on loss of motive power or signal.
+terms:
+  - {
+      code: FAIL_CLOSED,
+      label: Fail closed,
+      sortOrdinal: 10,
+      aliases:
+        [
+          { alias: 'FC' },
+          { alias: 'NC' },
+          { alias: 'normally closed' },
+          { alias: 'spring to close' },
+        ],
+    }
+  - {
+      code: FAIL_OPEN,
+      label: Fail open,
+      sortOrdinal: 20,
+      aliases:
+        [
+          { alias: 'FO' },
+          { alias: 'NO' },
+          { alias: 'normally open' },
+          { alias: 'spring to open' },
+        ],
+    }
+  - {
+      code: FAIL_LAST,
+      label: Fail in place,
+      sortOrdinal: 30,
+      aliases:
+        [
+          { alias: 'fail last' },
+          { alias: 'FL' },
+          { alias: 'double acting' },
+          { alias: 'fail in position' },
+        ],
+    }
+---
+key: signal_type
+name: Signal type
+description: Control and feedback signal.
+terms:
+  - {
+      code: MA_4_20,
+      label: 4-20 mA,
+      sortOrdinal: 10,
+      aliases: [{ alias: '4-20ma' }, { alias: '4 to 20 ma' }, { alias: '420ma' }],
+    }
+  - {
+      code: V_0_10,
+      label: 0-10 V,
+      sortOrdinal: 20,
+      aliases: [{ alias: '0-10v' }, { alias: '0 to 10 v' }],
+    }
+  - { code: HART, label: HART, sortOrdinal: 30 }
+  - {
+      code: FOUNDATION_FB,
+      label: FOUNDATION Fieldbus,
+      sortOrdinal: 40,
+      aliases: [{ alias: 'foundation fieldbus' }, { alias: 'FF' }],
+    }
+  - { code: PROFIBUS_PA, label: PROFIBUS PA, sortOrdinal: 50 }
+  - { code: MODBUS, label: Modbus, sortOrdinal: 60 }
+  - {
+      code: DISCRETE,
+      label: Discrete on/off,
+      sortOrdinal: 70,
+      aliases: [{ alias: 'on/off' }, { alias: 'digital' }],
+    }
+  - {
+      code: PNEUMATIC_3_15,
+      label: Pneumatic 3-15 psi,
+      sortOrdinal: 80,
+      aliases: [{ alias: '3-15 psi' }, { alias: '3 to 15' }],
+    }
+---
+key: seat_design
+name: Seat design
+description: Sealing arrangement between closure member and body.
+terms:
+  - { code: SOFT_SEATED, label: Soft seated, sortOrdinal: 10 }
+  - { code: METAL_SEATED, label: Metal seated, sortOrdinal: 20 }
+  - { code: RESILIENT, label: Resilient seated, sortOrdinal: 30 }
+  - { code: FLOATING_BALL, label: Floating ball, sortOrdinal: 40 }
+  - {
+      code: TRUNNION_BALL,
+      label: Trunnion mounted ball,
+      sortOrdinal: 50,
+      aliases: [{ alias: 'trunnion' }],
+    }

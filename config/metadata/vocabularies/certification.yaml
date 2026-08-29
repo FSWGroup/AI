@@ -1,0 +1,104 @@
+# Standards and certifications as entities, never as a free-text list (spec §38).
+#
+# A certificate applying to one size and material configuration does not certify a
+# whole product family. That constraint is enforced where certifications are attached
+# to products, not here; this vocabulary just names the standards.
+
+key: certification
+name: Certification or standard
+description: Standards, approvals and compliance claims a product may carry.
+terms:
+  - {
+      code: THREE_A,
+      label: 3-A Sanitary Standards,
+      sortOrdinal: 10,
+      aliases: [{ alias: '3A' }, { alias: '3-A' }, { alias: '3a sanitary' }],
+    }
+  - {
+      code: NSF_ANSI_61,
+      label: NSF/ANSI 61,
+      sortOrdinal: 20,
+      aliases: [{ alias: 'NSF61' }, { alias: 'NSF 61' }],
+      description: 'Drinking water system components, health effects.',
+    }
+  - {
+      code: NSF_ANSI_372,
+      label: NSF/ANSI 372,
+      sortOrdinal: 25,
+      description: 'Drinking water system components, lead content.',
+    }
+  - {
+      code: NACE_MR0175,
+      label: NACE MR0175 / ISO 15156,
+      sortOrdinal: 30,
+      aliases: [{ alias: 'NACE' }, { alias: 'MR0175' }, { alias: 'ISO 15156' }],
+    }
+  - {
+      code: API_607,
+      label: API 607,
+      sortOrdinal: 40,
+      aliases: [{ alias: 'API607' }, { alias: 'fire safe' }, { alias: 'firesafe' }],
+      description: Fire test for quarter-turn valves and valves with non-metallic seats.,
+    }
+  - { code: API_6D, label: API 6D, sortOrdinal: 50, aliases: [{ alias: 'API6D' }] }
+  - {
+      code: API_598,
+      label: API 598,
+      sortOrdinal: 55,
+      description: Valve inspection and testing.,
+    }
+  - {
+      code: ASME_SECTION_I,
+      label: ASME BPVC Section I,
+      sortOrdinal: 60,
+      aliases: [{ alias: 'ASME I' }, { alias: 'section I' }],
+    }
+  - {
+      code: ASME_SECTION_VIII,
+      label: ASME BPVC Section VIII,
+      sortOrdinal: 70,
+      aliases: [{ alias: 'ASME VIII' }, { alias: 'section VIII' }],
+    }
+  - { code: ATEX, label: ATEX, sortOrdinal: 80 }
+  - { code: IECEX, label: IECEx, sortOrdinal: 85 }
+  - {
+      code: CRN,
+      label: CRN registration,
+      sortOrdinal: 90,
+      description: 'Canadian Registration Number, jurisdiction-specific.',
+    }
+  - {
+      code: CE_PED,
+      label: CE / PED 2014/68/EU,
+      sortOrdinal: 100,
+      aliases: [{ alias: 'PED' }, { alias: 'CE' }],
+    }
+  - {
+      code: FDA_MATERIALS,
+      label: FDA-compliant materials,
+      sortOrdinal: 110,
+      aliases: [{ alias: 'FDA' }],
+      description: Materials meeting 21 CFR requirements for food contact.,
+    }
+  - {
+      code: LEAD_FREE,
+      label: Lead-free (SDWA),
+      sortOrdinal: 120,
+      aliases: [{ alias: 'lead free' }, { alias: 'LF' }],
+      description: Meets the weighted-average lead content limit for potable water.,
+    }
+  - {
+      code: USP_CLASS_VI,
+      label: USP Class VI,
+      sortOrdinal: 130,
+      aliases: [{ alias: 'USP VI' }],
+    }
+  - { code: SIL_2, label: SIL 2 capable, sortOrdinal: 140 }
+  - { code: SIL_3, label: SIL 3 capable, sortOrdinal: 150 }
+  - { code: UL_LISTED, label: UL listed, sortOrdinal: 160, aliases: [{ alias: 'UL' }] }
+  - {
+      code: FM_APPROVED,
+      label: FM approved,
+      sortOrdinal: 170,
+      aliases: [{ alias: 'FM' }],
+    }

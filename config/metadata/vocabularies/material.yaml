@@ -1,0 +1,315 @@
+# Materials of construction. One hierarchical vocabulary serves body, trim, seat, seal
+# and gasket attributes; which values are sensible for which attribute is a data-quality
+# question, not a vocabulary one.
+#
+# Aliases carry the distinction spec §28 requires. '316SS' and 'SS316' are the same
+# thing, so they assert equivalence. 'CF8M' is the cast grade commonly supplied for 316
+# service and is NOT the identical wrought material, so it normalizes without asserting
+# equivalence and must carry a note saying why. The system normalizes messy source data
+# without blindly declaring things equal.
+
+key: material
+name: Material
+description: >-
+  Materials of construction for bodies, trim, seats, seals and gaskets. Hierarchical:
+  specific grades sit under their material family.
+terms:
+  - { code: METAL, label: Metal, sortOrdinal: 1000, description: Metallic materials. }
+  - {
+      code: POLYMER,
+      label: Polymer,
+      sortOrdinal: 2000,
+      description: Rigid and semi-rigid plastics.,
+    }
+  - {
+      code: ELASTOMER,
+      label: Elastomer,
+      sortOrdinal: 3000,
+      description: Resilient sealing materials.,
+    }
+  - {
+      code: CERAMIC,
+      label: Ceramic,
+      sortOrdinal: 4000,
+      description: Ceramic and cermet materials.,
+    }
+
+  # --- Stainless steels ----------------------------------------------------
+  - code: SS_316
+    label: 316 stainless steel
+    parent: METAL
+    sortOrdinal: 1100
+    description: Austenitic molybdenum-bearing stainless steel, wrought.
+    aliases:
+      - { alias: '316 SS' }
+      - { alias: '316SS' }
+      - { alias: 'SS316' }
+      - { alias: 'SS 316' }
+      - { alias: 'AISI 316' }
+      - { alias: 'UNS S31600' }
+      - alias: 'CF8M'
+        assertsEquivalence: false
+        confidence: 0.80
+        note: >-
+          CF8M is the cast equivalent grade (ASTM A351) commonly supplied for 316
+          service. It is not the identical wrought material: composition ranges and
+          mechanical properties differ. Normalize to 316 for search, but do not treat
+          a CF8M casting and wrought 316 as interchangeable without engineering review.
+      - alias: 'ASTM A351 CF8M'
+        assertsEquivalence: false
+        confidence: 0.80
+        note: Cast grade; see the CF8M alias note.
+  - code: SS_316L
+    label: 316L stainless steel
+    parent: METAL
+    sortOrdinal: 1110
+    description: Low-carbon 316, preferred where welding and intergranular corrosion matter.
+    aliases:
+      - { alias: '316L SS' }
+      - { alias: 'SS316L' }
+      - { alias: 'UNS S31603' }
+      - alias: 'CF3M'
+        assertsEquivalence: false
+        confidence: 0.80
+        note: Cast equivalent grade of 316L; not the identical wrought material.
+  - code: SS_304
+    label: 304 stainless steel
+    parent: METAL
+    sortOrdinal: 1120
+    aliases:
+      - { alias: '304 SS' }
+      - { alias: 'SS304' }
+      - { alias: 'UNS S30400' }
+      - alias: 'CF8'
+        assertsEquivalence: false
+        confidence: 0.80
+        note: Cast equivalent grade of 304; not the identical wrought material.
+  - {
+      code: SS_304L,
+      label: 304L stainless steel,
+      parent: METAL,
+      sortOrdinal: 1130,
+      aliases: [{ alias: 'SS304L' }, { alias: 'UNS S30403' }],
+    }
+  - {
+      code: SS_17_4PH,
+      label: 17-4 PH stainless steel,
+      parent: METAL,
+      sortOrdinal: 1140,
+      aliases: [{ alias: '17-4PH' }, { alias: 'UNS S17400' }],
+    }
+  - {
+      code: SS_2205,
+      label: 2205 duplex stainless steel,
+      parent: METAL,
+      sortOrdinal: 1150,
+      aliases: [{ alias: 'duplex 2205' }, { alias: 'UNS S32205' }],
+    }
+
+  # --- Carbon and alloy steels ---------------------------------------------
+  - code: CS_A216_WCB
+    label: Carbon steel ASTM A216 WCB
+    parent: METAL
+    sortOrdinal: 1200
+    description: The default cast carbon steel body material for general service valves.
+    aliases:
+      [
+        { alias: 'WCB' },
+        { alias: 'A216 WCB' },
+        { alias: 'carbon steel' },
+        { alias: 'CS' },
+      ]
+  - {
+      code: CS_A105,
+      label: Carbon steel ASTM A105,
+      parent: METAL,
+      sortOrdinal: 1210,
+      aliases: [{ alias: 'A105' }],
+    }
+  - {
+      code: ALLOY_STEEL_WC6,
+      label: Alloy steel ASTM A217 WC6,
+      parent: METAL,
+      sortOrdinal: 1220,
+      aliases: [{ alias: 'WC6' }],
+    }
+
+  # --- Irons ----------------------------------------------------------------
+  - {
+      code: DUCTILE_IRON,
+      label: Ductile iron,
+      parent: METAL,
+      sortOrdinal: 1300,
+      aliases: [{ alias: 'DI' }, { alias: 'nodular iron' }, { alias: 'ASTM A536' }],
+    }
+  - {
+      code: CAST_IRON,
+      label: Cast iron,
+      parent: METAL,
+      sortOrdinal: 1310,
+      aliases: [{ alias: 'grey iron' }, { alias: 'gray iron' }, { alias: 'ASTM A126' }],
+    }
+
+  # --- Copper alloys --------------------------------------------------------
+  - {
+      code: BRONZE_C83600,
+      label: Bronze C83600,
+      parent: METAL,
+      sortOrdinal: 1400,
+      aliases: [{ alias: 'bronze' }, { alias: '85-5-5-5' }, { alias: 'C83600' }],
+    }
+  - {
+      code: BRASS_C36000,
+      label: Brass C36000,
+      parent: METAL,
+      sortOrdinal: 1410,
+      aliases: [{ alias: 'brass' }, { alias: 'C36000' }, { alias: 'free cutting brass' }],
+    }
+  - code: BRASS_LEAD_FREE
+    label: Lead-free brass
+    parent: METAL
+    sortOrdinal: 1420
+    description: >-
+      Brass meeting the weighted-average lead content limit for potable water service.
+      Modelled as its own material because the compliance claim is a material property,
+      not a certificate on an otherwise identical part.
+    aliases: [{ alias: 'lead free brass' }, { alias: 'LF brass' }, { alias: 'C46500' }]
+
+  # --- Nickel and high alloys ----------------------------------------------
+  - {
+      code: MONEL_400,
+      label: Monel 400,
+      parent: METAL,
+      sortOrdinal: 1500,
+      aliases: [{ alias: 'monel' }, { alias: 'UNS N04400' }],
+    }
+  - {
+      code: HASTELLOY_C276,
+      label: Hastelloy C-276,
+      parent: METAL,
+      sortOrdinal: 1510,
+      aliases: [{ alias: 'C276' }, { alias: 'hastelloy c' }, { alias: 'UNS N10276' }],
+    }
+  - {
+      code: ALLOY_20,
+      label: Alloy 20,
+      parent: METAL,
+      sortOrdinal: 1520,
+      aliases: [{ alias: 'carpenter 20' }, { alias: 'UNS N08020' }],
+    }
+  - {
+      code: INCONEL_625,
+      label: Inconel 625,
+      parent: METAL,
+      sortOrdinal: 1530,
+      aliases: [{ alias: 'UNS N06625' }],
+    }
+  - { code: TITANIUM, label: Titanium, parent: METAL, sortOrdinal: 1540 }
+
+  # --- Rigid polymers -------------------------------------------------------
+  - {
+      code: PTFE,
+      label: PTFE,
+      parent: POLYMER,
+      sortOrdinal: 2100,
+      aliases: [{ alias: 'teflon' }, { alias: 'P.T.F.E.' }],
+    }
+  - {
+      code: RPTFE,
+      label: Reinforced PTFE,
+      parent: POLYMER,
+      sortOrdinal: 2110,
+      aliases:
+        [
+          { alias: 'RTFE' },
+          { alias: 'reinforced teflon' },
+          { alias: 'glass filled ptfe' },
+        ],
+    }
+  - { code: PEEK, label: PEEK, parent: POLYMER, sortOrdinal: 2120 }
+  - {
+      code: PVDF,
+      label: PVDF,
+      parent: POLYMER,
+      sortOrdinal: 2130,
+      aliases: [{ alias: 'kynar' }],
+    }
+  - { code: UHMWPE, label: UHMWPE, parent: POLYMER, sortOrdinal: 2140 }
+  - { code: PVC, label: PVC, parent: POLYMER, sortOrdinal: 2150 }
+  - { code: CPVC, label: CPVC, parent: POLYMER, sortOrdinal: 2160 }
+  - {
+      code: PP,
+      label: Polypropylene,
+      parent: POLYMER,
+      sortOrdinal: 2170,
+      aliases: [{ alias: 'polypro' }],
+    }
+  - {
+      code: DELRIN,
+      label: Acetal (Delrin),
+      parent: POLYMER,
+      sortOrdinal: 2180,
+      aliases: [{ alias: 'acetal' }, { alias: 'POM' }],
+    }
+
+  # --- Elastomers -----------------------------------------------------------
+  - {
+      code: NBR,
+      label: Nitrile (Buna-N),
+      parent: ELASTOMER,
+      sortOrdinal: 3100,
+      aliases: [{ alias: 'buna' }, { alias: 'buna-n' }, { alias: 'nitrile' }],
+    }
+  - { code: EPDM, label: EPDM, parent: ELASTOMER, sortOrdinal: 3110 }
+  - {
+      code: FKM,
+      label: FKM (Viton),
+      parent: ELASTOMER,
+      sortOrdinal: 3120,
+      aliases: [{ alias: 'viton' }, { alias: 'fluoroelastomer' }],
+    }
+  - {
+      code: FFKM,
+      label: FFKM (Kalrez),
+      parent: ELASTOMER,
+      sortOrdinal: 3130,
+      aliases: [{ alias: 'kalrez' }, { alias: 'chemraz' }],
+    }
+  - {
+      code: SILICONE,
+      label: Silicone,
+      parent: ELASTOMER,
+      sortOrdinal: 3140,
+      aliases: [{ alias: 'VMQ' }],
+    }
+  - {
+      code: NEOPRENE,
+      label: Neoprene,
+      parent: ELASTOMER,
+      sortOrdinal: 3150,
+      aliases: [{ alias: 'CR' }, { alias: 'chloroprene' }],
+    }
+  - {
+      code: GRAPHITE,
+      label: Graphite,
+      parent: ELASTOMER,
+      sortOrdinal: 3160,
+      description: Flexible graphite packing and gasket material.,
+    }
+
+  # --- Ceramics -------------------------------------------------------------
+  - { code: CERAMIC_ALUMINA, label: Alumina ceramic, parent: CERAMIC, sortOrdinal: 4100 }
+  - {
+      code: TUNGSTEN_CARBIDE,
+      label: Tungsten carbide,
+      parent: CERAMIC,
+      sortOrdinal: 4110,
+      aliases: [{ alias: 'TC' }],
+    }
+  - {
+      code: STELLITE,
+      label: Stellite,
+      parent: METAL,
+      sortOrdinal: 1600,
+      description: Cobalt-chromium hardfacing alloy used on trim.,
+    }

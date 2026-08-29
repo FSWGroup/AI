@@ -1,0 +1,716 @@
+# Units and quantity dimensions (ADR-0015).
+#
+# Codes follow UCUM so they are unambiguous and interoperable. Conversion is affine:
+#   base = value * factorToBase + offsetToBase
+#
+# Two deliberate modelling choices worth understanding before editing this file:
+#
+# 1. Gauge and absolute pressure are SEPARATE DIMENSIONS, not a flag. Converting
+#    between them requires ambient pressure and must be an explicit engineering
+#    decision, never an implicit one. Industrial valve data ("WOG 600 PSI",
+#    "150 psi working pressure") is almost always gauge, so PRESSURE_GAUGE is the
+#    dimension most product attributes use.
+#
+# 2. TEMPERATURE and TEMPERATURE_DIFFERENCE are separate dimensions. 10 degC is
+#    283.15 K; a 10 degC *difference* is 10 K. Conflating them is a classic bug.
+#
+# Factors for non-terminating conversions (degF, GPM, radians) are stored to 30
+# significant digits. Round-trip tests assert equality to a documented tolerance.
+
+dimensions:
+  - code: PRESSURE_GAUGE
+    name: Pressure (gauge)
+    description: >-
+      Pressure relative to ambient. What industrial product data means by "600 PSI"
+      unless it explicitly says absolute. No conversion path to PRESSURE exists,
+      because that conversion needs ambient pressure.
+  - code: PRESSURE
+    name: Pressure (absolute)
+    description: Pressure relative to a perfect vacuum.
+  - code: TEMPERATURE
+    name: Temperature
+    description: Absolute temperature. Affine conversion; see TEMPERATURE_DIFFERENCE.
+  - code: TEMPERATURE_DIFFERENCE
+    name: Temperature difference
+    description: >-
+      A temperature interval or tolerance. Scales without an offset, unlike a
+      temperature. A 10 degC difference is 10 K, not 283.15 K.
+  - code: LENGTH
+    name: Length
+    description: >-
+      Measured physical length. NOT nominal pipe size, which is a designation, not a
+      measurement (ADR-0016).
+  - code: MASS
+    name: Mass
+    description: Mass, used for shipping and handling weights.
+  - code: FLOW_VOLUMETRIC
+    name: Volumetric flow
+    description: Volume per unit time.
+  - code: FLOW_COEFFICIENT
+    name: Flow coefficient
+    description: >-
+      Valve capacity. Cv is the US convention (US gallons per minute of 60 degF water
+      at 1 psi differential); Kv is the metric convention. Its own dimension because it
+      is a defined coefficient, not a plain volumetric flow.
+  - code: TORQUE
+    name: Torque
+    description: Actuator output and valve breakaway torque.
+  - code: FORCE
+    name: Force
+    description: Linear actuator thrust.
+  - code: VOLTAGE
+    name: Voltage
+    description: Electrical potential, for actuator and instrument supply.
+  - code: CURRENT
+    name: Current
+    description: Electrical current, including 4-20 mA instrument loops.
+  - code: POWER
+    name: Power
+    description: Electrical or mechanical power.
+  - code: FREQUENCY
+    name: Frequency
+    description: Supply frequency.
+  - code: AREA
+    name: Area
+    description: Cross-sectional and orifice areas.
+  - code: VOLUME
+    name: Volume
+    description: Vessel and displacement volumes.
+  - code: ANGLE
+    name: Angle
+    description: Rotation, for quarter-turn and multi-turn actuation.
+  - code: TIME
+    name: Time
+    description: Stroke and response times.
+  - code: DENSITY
+    name: Density
+    description: Fluid density, used in sizing calculations downstream of Layer 0.
+  - code: DIMENSIONLESS
+    name: Dimensionless
+    description: Ratios and counts that still need a declared dimension.
+
+units:
+  # --- Pressure, gauge ------------------------------------------------------
+  - {
+      code: 'Pa{gauge}',
+      dimension: PRESSURE_GAUGE,
+      name: pascal (gauge),
+      symbol: 'Pa g',
+      factorToBase: '1',
+      isBase: true,
+      sortOrder: 10,
+      aliases: ['pa gauge', 'pag'],
+    }
+  - {
+      code: 'kPa{gauge}',
+      dimension: PRESSURE_GAUGE,
+      name: kilopascal (gauge),
+      symbol: 'kPa g',
+      factorToBase: '1000',
+      sortOrder: 20,
+      aliases: ['kpag'],
+    }
+  - {
+      code: 'MPa{gauge}',
+      dimension: PRESSURE_GAUGE,
+      name: megapascal (gauge),
+      symbol: 'MPa g',
+      factorToBase: '1000000',
+      sortOrder: 30,
+      aliases: ['mpag'],
+    }
+  - {
+      code: 'bar{gauge}',
+      dimension: PRESSURE_GAUGE,
+      name: bar (gauge),
+      symbol: 'barg',
+      factorToBase: '100000',
+      sortOrder: 40,
+      aliases: ['barg', 'bar g'],
+    }
+  # A bare "PSI" is deliberately NOT an alias of either psig or psia. It is genuinely
+  # ambiguous, and resolving it by guessing is how gauge data ends up compared against
+  # absolute data. A connector mapping declares the unit for its column once
+  # (ADR-0023); only free-text values ever reach this lookup.
+  - {
+      code: '[psig]',
+      dimension: PRESSURE_GAUGE,
+      name: pound per square inch (gauge),
+      symbol: psig,
+      factorToBase: '6894.75729316836133672267344535',
+      sortOrder: 50,
+      aliases: ['psig', 'psi g', 'psi gauge', 'lbs/in2 g'],
+    }
+  - {
+      code: "[in_i'H2O]{gauge}",
+      dimension: PRESSURE_GAUGE,
+      name: inch of water (gauge),
+      symbol: 'inH2O',
+      factorToBase: '249.0889',
+      sortOrder: 60,
+      aliases: ['inh2o', 'inwc', 'in wc', 'wc'],
+    }
+
+  # --- Pressure, absolute ---------------------------------------------------
+  - {
+      code: Pa,
+      dimension: PRESSURE,
+      name: pascal,
+      symbol: Pa,
+      factorToBase: '1',
+      isBase: true,
+      sortOrder: 10,
+      aliases: [pascal],
+    }
+  - {
+      code: kPa,
+      dimension: PRESSURE,
+      name: kilopascal,
+      symbol: kPa,
+      factorToBase: '1000',
+      sortOrder: 20,
+    }
+  - {
+      code: MPa,
+      dimension: PRESSURE,
+      name: megapascal,
+      symbol: MPa,
+      factorToBase: '1000000',
+      sortOrder: 30,
+    }
+  - {
+      code: bar,
+      dimension: PRESSURE,
+      name: bar,
+      symbol: bar,
+      factorToBase: '100000',
+      sortOrder: 40,
+      aliases: ['bara', 'bar a', 'bar abs'],
+    }
+  - {
+      code: mbar,
+      dimension: PRESSURE,
+      name: millibar,
+      symbol: mbar,
+      factorToBase: '100',
+      sortOrder: 45,
+    }
+  - {
+      code: '[psi]',
+      dimension: PRESSURE,
+      name: pound per square inch (absolute),
+      symbol: psia,
+      factorToBase: '6894.75729316836133672267344535',
+      sortOrder: 50,
+      aliases: ['psia', 'psi a', 'psi abs'],
+    }
+  - {
+      code: atm,
+      dimension: PRESSURE,
+      name: standard atmosphere,
+      symbol: atm,
+      factorToBase: '101325',
+      sortOrder: 60,
+    }
+  - {
+      code: torr,
+      dimension: PRESSURE,
+      name: torr,
+      symbol: Torr,
+      factorToBase: '133.3223684210526315789473684211',
+      sortOrder: 70,
+      aliases: ['mmhg', 'mm hg'],
+    }
+
+  # --- Temperature (affine) -------------------------------------------------
+  - {
+      code: K,
+      dimension: TEMPERATURE,
+      name: kelvin,
+      symbol: K,
+      factorToBase: '1',
+      offsetToBase: '0',
+      isBase: true,
+      sortOrder: 30,
+      aliases: [kelvin],
+    }
+  - {
+      code: Cel,
+      dimension: TEMPERATURE,
+      name: degree Celsius,
+      symbol: 'degC',
+      factorToBase: '1',
+      offsetToBase: '273.15',
+      sortOrder: 10,
+      aliases: ['c', 'degc', 'celsius', 'centigrade', '°c'],
+    }
+  - {
+      code: '[degF]',
+      dimension: TEMPERATURE,
+      name: degree Fahrenheit,
+      symbol: 'degF',
+      factorToBase: '0.555555555555555555555555555556',
+      offsetToBase: '255.372222222222222222222222222222',
+      sortOrder: 20,
+      aliases: ['f', 'degf', 'fahrenheit', '°f'],
+    }
+  - {
+      code: '[degR]',
+      dimension: TEMPERATURE,
+      name: degree Rankine,
+      symbol: 'degR',
+      factorToBase: '0.555555555555555555555555555556',
+      offsetToBase: '0',
+      sortOrder: 40,
+      aliases: ['degr', 'rankine'],
+    }
+
+  # --- Temperature difference (scales, no offset) ---------------------------
+  - {
+      code: 'K{diff}',
+      dimension: TEMPERATURE_DIFFERENCE,
+      name: kelvin (difference),
+      symbol: 'dK',
+      factorToBase: '1',
+      isBase: true,
+      sortOrder: 10,
+    }
+  - {
+      code: 'Cel{diff}',
+      dimension: TEMPERATURE_DIFFERENCE,
+      name: Celsius (difference),
+      symbol: 'ddegC',
+      factorToBase: '1',
+      sortOrder: 20,
+    }
+  - {
+      code: '[degF]{diff}',
+      dimension: TEMPERATURE_DIFFERENCE,
+      name: Fahrenheit (difference),
+      symbol: 'ddegF',
+      factorToBase: '0.555555555555555555555555555556',
+      sortOrder: 30,
+    }
+
+  # --- Length ---------------------------------------------------------------
+  - {
+      code: m,
+      dimension: LENGTH,
+      name: metre,
+      symbol: m,
+      factorToBase: '1',
+      isBase: true,
+      sortOrder: 30,
+      aliases: [metre, meter],
+    }
+  - {
+      code: mm,
+      dimension: LENGTH,
+      name: millimetre,
+      symbol: mm,
+      factorToBase: '0.001',
+      sortOrder: 10,
+      aliases: [millimetre, millimeter],
+    }
+  - {
+      code: cm,
+      dimension: LENGTH,
+      name: centimetre,
+      symbol: cm,
+      factorToBase: '0.01',
+      sortOrder: 20,
+    }
+  - {
+      code: '[in_i]',
+      dimension: LENGTH,
+      name: inch,
+      symbol: in,
+      factorToBase: '0.0254',
+      sortOrder: 40,
+      aliases: [in, inch, inches, '"'],
+    }
+  - {
+      code: '[ft_i]',
+      dimension: LENGTH,
+      name: foot,
+      symbol: ft,
+      factorToBase: '0.3048',
+      sortOrder: 50,
+      aliases: [ft, foot, feet],
+    }
+
+  # --- Mass -----------------------------------------------------------------
+  - {
+      code: kg,
+      dimension: MASS,
+      name: kilogram,
+      symbol: kg,
+      factorToBase: '1',
+      isBase: true,
+      sortOrder: 20,
+      aliases: [kilogram, kilo],
+    }
+  - {
+      code: g,
+      dimension: MASS,
+      name: gram,
+      symbol: g,
+      factorToBase: '0.001',
+      sortOrder: 10,
+    }
+  - {
+      code: '[lb_av]',
+      dimension: MASS,
+      name: pound,
+      symbol: lb,
+      factorToBase: '0.45359237',
+      sortOrder: 30,
+      aliases: [lb, lbs, pound, pounds],
+    }
+  - {
+      code: '[oz_av]',
+      dimension: MASS,
+      name: ounce,
+      symbol: oz,
+      factorToBase: '0.028349523125',
+      sortOrder: 25,
+      aliases: [oz, ounce],
+    }
+
+  # --- Volumetric flow ------------------------------------------------------
+  - {
+      code: 'm3/s',
+      dimension: FLOW_VOLUMETRIC,
+      name: cubic metre per second,
+      symbol: 'm3/s',
+      factorToBase: '1',
+      isBase: true,
+      sortOrder: 40,
+    }
+  - {
+      code: 'm3/h',
+      dimension: FLOW_VOLUMETRIC,
+      name: cubic metre per hour,
+      symbol: 'm3/h',
+      factorToBase: '0.000277777777777777777777777778',
+      sortOrder: 30,
+      aliases: ['m3/hr', 'cmh'],
+    }
+  - {
+      code: 'L/min',
+      dimension: FLOW_VOLUMETRIC,
+      name: litre per minute,
+      symbol: 'L/min',
+      factorToBase: '0.0000166666666666666666666666666667',
+      sortOrder: 20,
+      aliases: ['lpm', 'l/min'],
+    }
+  - {
+      code: '[gal_us]/min',
+      dimension: FLOW_VOLUMETRIC,
+      name: US gallon per minute,
+      symbol: GPM,
+      factorToBase: '0.0000630901964',
+      sortOrder: 10,
+      aliases: [gpm, 'gal/min', 'usgpm'],
+    }
+
+  # --- Flow coefficient -----------------------------------------------------
+  - {
+      code: '[Cv]',
+      dimension: FLOW_COEFFICIENT,
+      name: flow coefficient Cv,
+      symbol: Cv,
+      factorToBase: '1',
+      isBase: true,
+      sortOrder: 10,
+      aliases: [cv, 'c v'],
+    }
+  # No case-insensitive alias for Kv: it differs from kV (kilovolt) only by case, and
+  # conflating valve capacity with electrical supply is not a mistake worth risking.
+  # The exact code "[Kv]" resolves; "kv" does not.
+  - {
+      code: '[Kv]',
+      dimension: FLOW_COEFFICIENT,
+      name: flow coefficient Kv,
+      symbol: Kv,
+      factorToBase: '1.156069364161849710982658959538',
+      sortOrder: 20,
+    }
+
+  # --- Torque and force -----------------------------------------------------
+  - {
+      code: 'N.m',
+      dimension: TORQUE,
+      name: newton metre,
+      symbol: 'N.m',
+      factorToBase: '1',
+      isBase: true,
+      sortOrder: 10,
+      aliases: ['nm', 'n-m', 'newton metre', 'newton meter'],
+    }
+  - {
+      code: '[in_lbf]',
+      dimension: TORQUE,
+      name: inch pound-force,
+      symbol: 'in.lbf',
+      factorToBase: '0.1129848290276167',
+      sortOrder: 20,
+      aliases: ['in-lb', 'inlb', 'in lbs', 'in-lbs'],
+    }
+  - {
+      code: '[ft_lbf]',
+      dimension: TORQUE,
+      name: foot pound-force,
+      symbol: 'ft.lbf',
+      factorToBase: '1.3558179483314004',
+      sortOrder: 30,
+      aliases: ['ft-lb', 'ftlb', 'ft lbs', 'ft-lbs'],
+    }
+  - {
+      code: N,
+      dimension: FORCE,
+      name: newton,
+      symbol: N,
+      factorToBase: '1',
+      isBase: true,
+      sortOrder: 10,
+    }
+  - {
+      code: '[lbf_av]',
+      dimension: FORCE,
+      name: pound-force,
+      symbol: lbf,
+      factorToBase: '4.4482216152605',
+      sortOrder: 20,
+      aliases: [lbf],
+    }
+
+  # --- Electrical -----------------------------------------------------------
+  - {
+      code: V,
+      dimension: VOLTAGE,
+      name: volt,
+      symbol: V,
+      factorToBase: '1',
+      isBase: true,
+      sortOrder: 20,
+      aliases: [volt, volts, vac, vdc],
+    }
+  - {
+      code: mV,
+      dimension: VOLTAGE,
+      name: millivolt,
+      symbol: mV,
+      factorToBase: '0.001',
+      sortOrder: 10,
+    }
+  - {
+      code: kV,
+      dimension: VOLTAGE,
+      name: kilovolt,
+      symbol: kV,
+      factorToBase: '1000',
+      sortOrder: 30,
+    }
+  - {
+      code: A,
+      dimension: CURRENT,
+      name: ampere,
+      symbol: A,
+      factorToBase: '1',
+      isBase: true,
+      sortOrder: 20,
+      aliases: [amp, amps, ampere],
+    }
+  - {
+      code: mA,
+      dimension: CURRENT,
+      name: milliampere,
+      symbol: mA,
+      factorToBase: '0.001',
+      sortOrder: 10,
+      aliases: [ma, milliamp],
+    }
+  - {
+      code: W,
+      dimension: POWER,
+      name: watt,
+      symbol: W,
+      factorToBase: '1',
+      isBase: true,
+      sortOrder: 10,
+      aliases: [watt, watts],
+    }
+  - {
+      code: kW,
+      dimension: POWER,
+      name: kilowatt,
+      symbol: kW,
+      factorToBase: '1000',
+      sortOrder: 20,
+    }
+  - {
+      code: '[HP]',
+      dimension: POWER,
+      name: horsepower,
+      symbol: hp,
+      factorToBase: '745.6998715822702',
+      sortOrder: 30,
+      aliases: [hp, horsepower],
+    }
+  - {
+      code: Hz,
+      dimension: FREQUENCY,
+      name: hertz,
+      symbol: Hz,
+      factorToBase: '1',
+      isBase: true,
+      sortOrder: 10,
+      aliases: [hz, hertz, cps],
+    }
+  - {
+      code: kHz,
+      dimension: FREQUENCY,
+      name: kilohertz,
+      symbol: kHz,
+      factorToBase: '1000',
+      sortOrder: 20,
+    }
+
+  # --- Geometry and time ----------------------------------------------------
+  - {
+      code: m2,
+      dimension: AREA,
+      name: square metre,
+      symbol: 'm2',
+      factorToBase: '1',
+      isBase: true,
+      sortOrder: 20,
+    }
+  - {
+      code: mm2,
+      dimension: AREA,
+      name: square millimetre,
+      symbol: 'mm2',
+      factorToBase: '0.000001',
+      sortOrder: 10,
+    }
+  - {
+      code: '[sin_i]',
+      dimension: AREA,
+      name: square inch,
+      symbol: 'in2',
+      factorToBase: '0.00064516',
+      sortOrder: 30,
+      aliases: ['in2', 'sq in'],
+    }
+  - {
+      code: m3,
+      dimension: VOLUME,
+      name: cubic metre,
+      symbol: 'm3',
+      factorToBase: '1',
+      isBase: true,
+      sortOrder: 30,
+    }
+  - {
+      code: L,
+      dimension: VOLUME,
+      name: litre,
+      symbol: L,
+      factorToBase: '0.001',
+      sortOrder: 20,
+      aliases: [litre, liter, l],
+    }
+  - {
+      code: '[gal_us]',
+      dimension: VOLUME,
+      name: US gallon,
+      symbol: gal,
+      factorToBase: '0.003785411784',
+      sortOrder: 10,
+      aliases: [gal, gallon, gallons],
+    }
+  - {
+      code: deg,
+      dimension: ANGLE,
+      name: degree,
+      symbol: 'deg',
+      factorToBase: '1',
+      isBase: true,
+      sortOrder: 10,
+      aliases: [degree, degrees, '°'],
+    }
+  - {
+      code: rad,
+      dimension: ANGLE,
+      name: radian,
+      symbol: rad,
+      factorToBase: '57.295779513082320876798154814105',
+      sortOrder: 20,
+    }
+  - {
+      code: s,
+      dimension: TIME,
+      name: second,
+      symbol: s,
+      factorToBase: '1',
+      isBase: true,
+      sortOrder: 10,
+      aliases: [sec, second, seconds],
+    }
+  - {
+      code: min,
+      dimension: TIME,
+      name: minute,
+      symbol: min,
+      factorToBase: '60',
+      sortOrder: 20,
+    }
+  - {
+      code: h,
+      dimension: TIME,
+      name: hour,
+      symbol: h,
+      factorToBase: '3600',
+      sortOrder: 30,
+      aliases: [hr, hour, hours],
+    }
+  - {
+      code: 'kg/m3',
+      dimension: DENSITY,
+      name: kilogram per cubic metre,
+      symbol: 'kg/m3',
+      factorToBase: '1',
+      isBase: true,
+      sortOrder: 10,
+    }
+  - {
+      code: '[lb_av]/[ft_i]3',
+      dimension: DENSITY,
+      name: pound per cubic foot,
+      symbol: 'lb/ft3',
+      factorToBase: '16.018463373960140',
+      sortOrder: 20,
+      aliases: ['lb/ft3', 'pcf'],
+    }
+  - {
+      code: '1',
+      dimension: DIMENSIONLESS,
+      name: dimensionless,
+      symbol: '',
+      factorToBase: '1',
+      isBase: true,
+      sortOrder: 10,
+      aliases: [none, ratio, unitless],
+    }
+  - {
+      code: '%',
+      dimension: DIMENSIONLESS,
+      name: percent,
+      symbol: '%',
+      factorToBase: '0.01',
+      sortOrder: 20,
+      aliases: [percent, pct],
+    }
