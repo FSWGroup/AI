@@ -11,6 +11,10 @@
  * already support. That matters: if the brief and the report could ever
  * disagree, the brief would be a second, unvalidated instrument.
  *
+ * Every list is capped at three. That is a layout constraint with a purpose:
+ * the brief has to print on one sheet, and a manager who is handed ten things
+ * to probe will probe none of them.
+ *
  * There is deliberately no overall fit score, no ranking, and no
  * recommendation. Counting how many required dimensions fall inside their
  * range is a fact; turning that count into "hire" or "pass" would be an
@@ -97,7 +101,7 @@ export function buildManagerBrief(payload: ReportPayload): ManagerBrief {
   );
   const alignsWith: BriefPoint[] = withinPool
     .sort((a, b) => b.band - a.band)
-    .slice(0, 4)
+    .slice(0, 3)
     .map((d) => ({
       name: d.name,
       band: d.band,
@@ -115,7 +119,7 @@ export function buildManagerBrief(payload: ReportPayload): ManagerBrief {
       if (req !== 0) return req;
       return Math.abs(b.deviation) - Math.abs(a.deviation);
     })
-    .slice(0, 4)
+    .slice(0, 3)
     .map((d) => ({
       name: d.name,
       band: d.band,
@@ -127,7 +131,7 @@ export function buildManagerBrief(payload: ReportPayload): ManagerBrief {
   // One question per selected dimension, taken verbatim from the full
   // report's interview guide so the two documents never diverge.
   const questions: BriefQuestion[] = payload.interviewGuide
-    .slice(0, 4)
+    .slice(0, 3)
     .flatMap((g) =>
       g.questions.length > 0
         ? [

@@ -88,10 +88,15 @@ it restores their exact session and remaining time.
 When the candidate finishes, their row shows **Completed** with the report
 ready: score sheet vs. the Welsford ranges, narratives, sales analysis,
 interview guide, integrity log, and the recording (HR/Super Admin only,
-audited). For a PDF, open the report and use **Print / Save as PDF** —
-Netlify Functions don't ship a Chromium runtime, so the server-side
-`Download PDF` button responds with that guidance there. The print output
-is the same paginated, footered document.
+audited). The Report tab also offers the **hiring manager brief** — the
+same data condensed onto one page for whoever is running the interview.
+
+For a PDF of any of them, open the view and use **Print / Save as PDF**.
+Netlify Functions don't ship a Chromium runtime, so the full report's
+server-side `Download PDF` button responds with that guidance there
+instead; the print output is the same paginated, footered document. The
+brief prints to exactly one sheet, and the candidate's own summary (if you
+enable it) to about four.
 
 ## Platform notes and limits
 

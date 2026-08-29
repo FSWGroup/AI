@@ -220,7 +220,8 @@ describe("buildManagerBrief", () => {
       }),
     );
     const brief = buildManagerBrief(payload({ dimensions: many }));
-    expect(brief.alignsWith).toHaveLength(4);
+    // The list is capped, but the count still reflects every dimension.
+    expect(brief.alignsWith).toHaveLength(3);
     expect(brief.alignment.inRange).toBe(8);
   });
 

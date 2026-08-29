@@ -192,7 +192,7 @@ test("candidate completes the full assessment and HR sees the report", async ({
   expect(briefRes.ok()).toBe(true);
   const briefHtml = await briefRes.text();
   expect(briefHtml).toContain("Hiring manager brief");
-  expect(briefHtml).toContain("required dimensions fall inside range");
+  expect(briefHtml).toContain("required dimensions fall inside this role");
   // The brief must never turn the count into a decision.
   expect(briefHtml).not.toMatch(/\brecommend hiring\b|\bdo not hire\b|\bpass\/fail\b/i);
 });

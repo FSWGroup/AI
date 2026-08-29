@@ -7,22 +7,36 @@ import { Button, Card, Input, Label } from "@/components/ui";
 import { pickMimeType } from "@/lib/client/recording";
 import type { AttemptState } from "./types";
 
+/**
+ * @param plain Renders the children as-is, without the step counter or the
+ *   wrapping Card, and top-aligned. Used by screens that supply their own
+ *   cards and can run long — nesting those inside a Card looks like a bug,
+ *   and vertical centring clips content taller than the viewport.
+ */
 export function ScreenFrame({
   step,
   totalSteps,
   children,
+  plain = false,
 }: {
   step: number;
   totalSteps: number;
   children: React.ReactNode;
+  plain?: boolean;
 }) {
   return (
-    <main className="mx-auto flex min-h-screen w-full max-w-2xl flex-col justify-center p-6">
-      <p className="mb-3 text-center text-xs font-semibold uppercase tracking-widest text-navy-400">
-        Step {step} of {totalSteps}
-      </p>
-      <Card className="p-8 sm:p-10">{children}</Card>
-      <p className="mt-6 text-center text-xs text-navy-400">
+    <main
+      className={`mx-auto flex min-h-screen w-full flex-col p-6 ${
+        plain ? "max-w-3xl justify-start py-10" : "max-w-2xl justify-center"
+      }`}
+    >
+      {!plain && (
+        <p className="mb-3 text-center text-xs font-semibold uppercase tracking-widest text-navy-400">
+          Step {step} of {totalSteps}
+        </p>
+      )}
+      {plain ? children : <Card className="p-8 sm:p-10">{children}</Card>}
+      <p className="mt-6 text-center text-xs text-navy-400 print:hidden">
         FSW WorkFit Assessment · Confidential
       </p>
     </main>

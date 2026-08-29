@@ -41,7 +41,9 @@ export function CompletionFlow({ state }: { state: AttemptState | null }) {
 
   return (
     <div className="space-y-5">
-      <CompletionScreen />
+      <Card className="p-8">
+        <CompletionScreen />
+      </Card>
 
       {(offerFeedback || (offerSelfId && !selfIdDone)) && (
         <Card className="p-6">

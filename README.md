@@ -210,7 +210,14 @@ Netlify Blobs; PDFs via the report's Print button there).
 - Real email delivery requires wiring a provider (`src/lib/email/index.ts`).
 - Norm tables must be imported from actual calibration data; until then all
   bands are provisional and labeled as such.
-- PDF rendering requires a Chromium binary at runtime.
+- **Getting results as a PDF.** Every report view — the full report, the
+  one-page manager brief, and the candidate's own summary — is print-styled
+  and produces a clean PDF through the browser's **Print / Save as PDF**
+  (admin navigation, buttons, and toolbars are suppressed). The full
+  report's server-side *Download PDF* button additionally needs a Chromium
+  binary at runtime; serverless hosts such as Netlify Functions do not ship
+  one, so there it returns a 501 pointing at Print / Save as PDF, which
+  produces the same document.
 - The EEO/adverse-impact module is off by default and collects nothing until
   FSW switches it on in Settings. Once on, the four-fifths table still needs
   30+ scored candidates with 5+ per group before it reports a ratio; below

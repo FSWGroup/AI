@@ -107,8 +107,10 @@ page tells the candidate to save a copy, and offers Print / Save as PDF.
 ## 3. Hiring manager brief
 
 **Candidates → a completed candidate → Report tab → Hiring manager brief**,
-or the *One-page brief* link on the full report. It prints to a single
-sheet.
+or the *One-page brief* link on the full report. **Print / Save as PDF**
+produces exactly one Letter sheet — verified by rendering it, not assumed.
+That is why every list on it is capped at three: a one-page brief that runs
+to two pages is not a one-page brief.
 
 It is a view over the stored report payload — `buildManagerBrief()` reads
 nothing else and computes no new score. That matters: if the brief and the

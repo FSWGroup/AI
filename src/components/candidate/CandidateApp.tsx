@@ -374,7 +374,7 @@ export function CandidateApp({
 
   if (phase.kind === "completed") {
     return (
-      <ScreenFrame step={1} totalSteps={1}>
+      <ScreenFrame plain step={1} totalSteps={1}>
         <CompletionFlow state={phase.state} />
       </ScreenFrame>
     );

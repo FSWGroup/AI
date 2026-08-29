@@ -39,11 +39,30 @@ body {
   outline-offset: 2px;
 }
 
+@page {
+  size: letter;
+  margin: 0.5in;
+}
+
 @media print {
   body {
     background: white;
   }
   .no-print {
     display: none !important;
+  }
+  /* Keep the printed page honest: a Letter sheet at 0.5in margins is only
+     ~720 CSS px wide, below Tailwind's `md` breakpoint, so responsive
+     two-column layouts would silently stack and double the page count. */
+  .print-cols-2 {
+    display: grid !important;
+    grid-template-columns: 1fr 1fr !important;
+  }
+  /* Cards keep their tint on paper; without this the greys drop out and
+     sections run together. */
+  .report-print,
+  .report-print * {
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
   }
 }
