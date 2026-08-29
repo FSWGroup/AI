@@ -4,11 +4,13 @@ import { createTestDatabase, connectTo, type TestDatabase } from '../support/dat
 import { applyRealMetadata } from '../support/metadata.js';
 import type { Database } from '../../src/platform/db/index.js';
 import {
+  DEFAULT_PLAN,
   explainSearch,
   loadCatalogDeps,
   searchVariants,
   type CatalogDeps,
   type FilterCriterion,
+  type PlanShape,
 } from '../../src/modules/pim/index.js';
 
 /**
@@ -138,7 +140,7 @@ async function generateCatalogue(testDb: TestDatabase, variants: number): Promis
     // A stable row number per variant, reused by every attribute below.
     await sql`
       CREATE TEMP TABLE gen_variant AS
-      SELECT id, (row_number() OVER (ORDER BY id))::bigint AS rn
+      SELECT id, product_id, (row_number() OVER (ORDER BY id))::bigint AS rn
         FROM pim.variant WHERE manufacturer_part_number LIKE 'GEN-%'
     `.execute(loader.db);
     await sql`CREATE INDEX ON gen_variant (rn)`.execute(loader.db);
@@ -146,17 +148,43 @@ async function generateCatalogue(testDb: TestDatabase, variants: number): Promis
 
     console.log(`  variants inserted (${((Date.now() - started) / 1000).toFixed(1)}s)`);
 
-    // Enumerated attributes. The stride is coprime with most term-list lengths, so
-    // values spread evenly instead of clustering.
-    const strides: Record<string, number> = {
-      nominal_size: 7,
-      body_material: 11,
-      end_connection: 13,
-      pressure_class: 5,
-      port_size: 3,
-      actuation_type: 17,
-      certifications: 19,
+    // Enumerated attributes, generated to look like a real catalogue rather than like
+    // independent random draws. Two properties matter, and an earlier version had
+    // neither:
+    //
+    //   * DECORRELATION between products. A per-attribute stride over one row number
+    //     made every attribute a function of the same variable, so only lcm(term
+    //     counts) combinations existed out of the product of them.
+    //   * CORRELATION within a product. Body material, end connection, port size and
+    //     actuation are properties of a model series: a socket-weld 316 valve family
+    //     exists in every size. Drawing them per variant makes a five-criterion filter
+    //     match nothing, and a benchmark over an empty result set measures the
+    //     planner's ability to find nothing.
+    //
+    // So archetype attributes hash the PRODUCT id and configuration attributes hash
+    // the VARIANT id, and both draw from the commonly used head of each vocabulary
+    // rather than uniformly across every term — which is also what a real catalogue
+    // does.
+    const source: Record<string, 'product' | 'variant'> = {
+      body_material: 'product',
+      end_connection: 'product',
+      port_size: 'product',
+      actuation_type: 'product',
+      certifications: 'product',
+      nominal_size: 'variant',
+      pressure_class: 'variant',
     };
+    /** How many of a vocabulary's terms the generated catalogue actually uses. */
+    const commonTerms: Record<string, number> = {
+      material: 8,
+      end_connection: 6,
+      port_size: 4,
+      actuation_type: 5,
+      certification: 8,
+      nominal_size: 20,
+      pressure_class: 5,
+    };
+
     for (const [attributeKey, vocabulary] of [
       ['nominal_size', 'nominal_size'],
       ['body_material', 'material'],
@@ -168,11 +196,21 @@ async function generateCatalogue(testDb: TestDatabase, variants: number): Promis
     ] as const) {
       await sql`
         WITH terms AS (
-          SELECT id,
-                 (row_number() OVER (ORDER BY code) - 1)::bigint AS n,
-                 count(*) OVER ()::bigint AS total
-            FROM pim.vocabulary_term
-           WHERE vocabulary_key = ${vocabulary} AND deprecated_at IS NULL
+          SELECT id, n, least(max(n) OVER () + 1, ${commonTerms[vocabulary] ?? 8})::bigint AS used
+            FROM (
+              -- Ordered by the vocabulary's own ordinal, not alphabetically. Ordering
+              -- materials by code puts ALLOY_20 first and SS_316 nowhere near the
+              -- head, so "the eight commonly used materials" excluded the one every
+              -- realistic filter asks for -- and the benchmark matched nothing.
+              -- Parent terms (METAL, POLYMER) are grouping nodes, not values.
+              SELECT id, (row_number() OVER (ORDER BY sort_ordinal NULLS LAST, code) - 1)::bigint AS n
+                FROM pim.vocabulary_term t
+               WHERE t.vocabulary_key = ${vocabulary}
+                 AND t.deprecated_at IS NULL
+                 AND NOT EXISTS (
+                   SELECT 1 FROM pim.vocabulary_term child WHERE child.parent_id = t.id
+                 )
+            ) ranked
         )
         INSERT INTO pim.attribute_value
           (attribute_key, value_type, cardinality, variant_id, ordinal, value_term_id,
@@ -180,7 +218,12 @@ async function generateCatalogue(testDb: TestDatabase, variants: number): Promis
         SELECT a.key, a.value_type, a.cardinality, g.id, 0, t.id, ${vocabulary},
                'MFR_CATALOG', true, 'generated', 'generated'
           FROM gen_variant g
-          JOIN terms t ON t.n = (g.rn * ${strides[attributeKey] ?? 7}) % t.total
+          JOIN terms t
+            ON t.n = ((hashtext(
+                 CASE ${source[attributeKey] ?? 'variant'}
+                   WHEN 'product' THEN g.product_id::text
+                   ELSE g.id::text
+                 END || ${attributeKey})::bigint & 2147483647) % t.used)
           CROSS JOIN pim.attribute a
          WHERE a.key = ${attributeKey}
       `.execute(loader.db);
@@ -193,8 +236,9 @@ async function generateCatalogue(testDb: TestDatabase, variants: number): Promis
          value_qty_original_unit, value_qty_base, value_qty_dimension,
          source_system_code, is_selected, selected_reason, entered_raw)
       SELECT 'cv', 'QUANTITY', 'SINGLE', g.id,
-             (1 + (g.rn * 37) % 2000)::numeric, '[Cv]',
-             (1 + (g.rn * 37) % 2000)::numeric, 'FLOW_COEFFICIENT',
+             (1 + (hashtext(g.id::text || 'cv')::bigint & 2147483647) % 2000)::numeric, '[Cv]',
+             (1 + (hashtext(g.id::text || 'cv')::bigint & 2147483647) % 2000)::numeric,
+             'FLOW_COEFFICIENT',
              'MFR_CATALOG', true, 'generated', 'generated'
         FROM gen_variant g
     `.execute(loader.db);
@@ -210,11 +254,48 @@ async function generateCatalogue(testDb: TestDatabase, variants: number): Promis
         FROM gen_variant g
         CROSS JOIN LATERAL (
           SELECT (ARRAY[150,200,300,600,720,1000,1500,2000])
-                   [1 + (g.rn * 23) % 8]::numeric AS psi
+                   [1 + (hashtext(g.id::text || 'wog')::bigint & 2147483647) % 8]::numeric AS psi
         ) p
     `.execute(loader.db);
 
-    console.log(`  attribute values inserted (${((Date.now() - started) / 1000).toFixed(1)}s)`);
+    // A deliberate cohort matching the acceptance-criterion combination exactly.
+    //
+    // Five independent criteria over a generated catalogue are astronomically
+    // selective: at 25,000 variants the AC4 filter matched ZERO rows, and a benchmark
+    // over an empty result set measures the planner's ability to find nothing.
+    //
+    // Real catalogues are not like that. NPS 1 socket-weld 316 Class 150 API 607 ball
+    // valves are a staple that a distributor stocks in depth. So roughly one variant in
+    // five hundred is forced to that configuration, which is both realistic and what
+    // makes the benchmark measure a real result set at any dataset size.
+    await sql`
+      CREATE TEMP TABLE gen_cohort AS
+      SELECT id FROM gen_variant
+       WHERE (hashtext(id::text || 'cohort')::bigint & 2147483647) % 500 = 0
+    `.execute(loader.db);
+    await sql`CREATE INDEX ON gen_cohort (id)`.execute(loader.db);
+    await sql`ANALYZE gen_cohort`.execute(loader.db);
+
+    for (const [attributeKey, vocabulary, code] of [
+      ['nominal_size', 'nominal_size', 'NPS_1'],
+      ['body_material', 'material', 'SS_316'],
+      ['end_connection', 'end_connection', 'SOCKET_WELD'],
+      ['pressure_class', 'pressure_class', 'ASME_CLASS_150'],
+      ['certifications', 'certification', 'API_607'],
+    ] as const) {
+      await sql`
+        UPDATE pim.attribute_value av
+           SET value_term_id = t.id
+          FROM pim.vocabulary_term t, gen_cohort c
+         WHERE t.vocabulary_key = ${vocabulary}
+           AND t.code = ${code}
+           AND av.attribute_key = ${attributeKey}
+           AND av.variant_id = c.id
+      `.execute(loader.db);
+    }
+    console.log(
+      `  attribute values inserted (${((Date.now() - started) / 1000).toFixed(1)}s)`,
+    );
 
     // Build the projection in one set-based pass, the same shape the service writes.
     await sql`
@@ -236,10 +317,27 @@ async function generateCatalogue(testDb: TestDatabase, variants: number): Promis
       SELECT (SELECT count(*)::text FROM pim.variant) AS variants,
              (SELECT count(*)::text FROM pim.variant_facet) AS facets
     `.execute(loader.db);
-    console.log(
+    // How many variants carry the full acceptance-criterion combination. Logged
+    // because a benchmark over an empty result set proves nothing, and because this is
+    // the number that changes when the generator changes.
+    const cohort = await sql<{ count: string }>`
+      SELECT count(*)::text AS count FROM (
+        SELECT f.variant_id
+          FROM pim.variant_facet f
+          JOIN pim.vocabulary_term t ON t.id = f.term_id
+         WHERE (f.attribute_key, t.code) IN (
+                 ('nominal_size','NPS_1'), ('body_material','SS_316'),
+                 ('end_connection','SOCKET_WELD'), ('pressure_class','ASME_CLASS_150'),
+                 ('certifications','API_607'))
+         GROUP BY f.variant_id HAVING count(DISTINCT f.attribute_key) = 5
+      ) matched
+    `.execute(loader.db);
+
+    process.stdout.write(
       `  ready: ${Number(counts.rows[0]!.variants).toLocaleString()} variants, ` +
-        `${Number(counts.rows[0]!.facets).toLocaleString()} facet rows ` +
-        `(${((Date.now() - started) / 1000).toFixed(1)}s)`,
+        `${Number(counts.rows[0]!.facets).toLocaleString()} facet rows, ` +
+        `${cohort.rows[0]!.count} in the acceptance-criterion cohort ` +
+        `(${((Date.now() - started) / 1000).toFixed(1)}s)\n`,
     );
   } finally {
     await loader.close();
@@ -282,10 +380,21 @@ describe('product filter performance (acceptance criterion 4)', () => {
     return match === null ? Number.NaN : Number(match[1]);
   }
 
+  /** How many variants a filter actually matches. A benchmark over zero rows is noise. */
+  async function matchCount(criteria: readonly FilterCriterion[]): Promise<number> {
+    const result = await searchVariants(
+      pool.db,
+      { criteria: [...criteria], limit: 500 },
+      catalog.attributes,
+      catalog.units,
+    );
+    return result.hits.length;
+  }
+
   async function measure(
     label: string,
     criteria: readonly FilterCriterion[],
-    plan: 'intersect' | 'aggregate' = 'intersect',
+    plan: PlanShape = DEFAULT_PLAN,
   ): Promise<Timing> {
     // Warm the cache first: the SLO is a warm-cache figure, and measuring the first
     // cold read tells us about disk, not about the query.
@@ -348,7 +457,15 @@ describe('product filter performance (acceptance criterion 4)', () => {
       { attributeKey: 'certifications', kind: 'term', anyOf: ['API_607'] },
     ];
 
-    const timing = await measure('AC4 five-criterion filter (intersect)', criteria);
+    const matches = await matchCount(criteria);
+    console.log(`  the acceptance-criterion filter matches ${matches} variant(s)`);
+    // A filter that matches nothing would pass any latency target while proving
+    // nothing about the index.
+    expect(matches, 'the benchmark filter must actually match something').toBeGreaterThan(
+      0,
+    );
+
+    const timing = await measure('AC4 five-criterion filter', criteria);
     const serverSide = await serverSideMillis(criteria);
 
     // The query itself, which is what the architecture controls.
@@ -400,20 +517,79 @@ describe('product filter performance (acceptance criterion 4)', () => {
     expect(timing.p95).toBeLessThan(SLO.p95);
   }, 600_000);
 
-  it('records how the two plan shapes compare', async () => {
-    // §83: the default plan is chosen by measurement, not intuition.
-    const criteria: FilterCriterion[] = [
-      { attributeKey: 'body_material', kind: 'term', anyOf: ['SS_316'] },
-      { attributeKey: 'end_connection', kind: 'term', anyOf: ['SOCKET_WELD'] },
-      { attributeKey: 'pressure_class', kind: 'term', anyOf: ['ASME_CLASS_150'] },
+  it('records how the plan shapes compare, and that they agree', async () => {
+    // §83: the default plan is chosen by measurement, not intuition. All three shapes
+    // must return the same set -- a plan that is faster but wrong is not an
+    // improvement -- and the comparison stays runnable so the choice can be revisited
+    // when the dataset changes.
+    const shapes: { label: string; criteria: FilterCriterion[] }[] = [
+      {
+        label: 'three term criteria',
+        criteria: [
+          { attributeKey: 'body_material', kind: 'term', anyOf: ['SS_316'] },
+          { attributeKey: 'end_connection', kind: 'term', anyOf: ['SOCKET_WELD'] },
+          { attributeKey: 'pressure_class', kind: 'term', anyOf: ['ASME_CLASS_150'] },
+        ],
+      },
+      {
+        label: 'unselective range plus two terms',
+        criteria: [
+          {
+            attributeKey: 'wog_pressure',
+            kind: 'range',
+            min: 10,
+            max: 70,
+            unit: 'bar{gauge}',
+          },
+          { attributeKey: 'body_material', kind: 'term', anyOf: ['SS_316'] },
+          { attributeKey: 'nominal_size', kind: 'term', anyOf: ['NPS_2'] },
+        ],
+      },
     ];
-    const intersect = await measure('three criteria (intersect)', criteria, 'intersect');
-    const aggregate = await measure('three criteria (aggregate)', criteria, 'aggregate');
-    console.log(
-      `\n  Plan comparison at ${VARIANTS.toLocaleString()} variants: ` +
-        `intersect p95 ${intersect.p95.toFixed(1)}ms, aggregate p95 ${aggregate.p95.toFixed(1)}ms`,
-    );
-    // Both must be correct; only one needs to be fast enough to be the default.
-    expect(Math.min(intersect.p95, aggregate.p95)).toBeLessThan(SLO.p95);
-  }, 900_000);
+
+    for (const shape of shapes) {
+      const results = await Promise.all(
+        (['join', 'intersect', 'aggregate'] as const).map(async (plan) => ({
+          plan,
+          hits: (
+            await searchVariants(
+              pool.db,
+              { criteria: shape.criteria, plan, limit: 500 },
+              catalog.attributes,
+              catalog.units,
+            )
+          ).hits
+            .map((h) => h.variantId)
+            .sort(),
+        })),
+      );
+      // Same question, same answer, whatever the shape.
+      expect(results[1]!.hits, `${shape.label}: intersect disagrees with join`).toEqual(
+        results[0]!.hits,
+      );
+      expect(results[2]!.hits, `${shape.label}: aggregate disagrees with join`).toEqual(
+        results[0]!.hits,
+      );
+
+      expect(
+        results[0]!.hits.length,
+        `${shape.label}: matched nothing, so the comparison is meaningless`,
+      ).toBeGreaterThan(0);
+      console.log(`\n  ${shape.label} (${results[0]!.hits.length} matches):`);
+      const timings: Record<string, number> = {};
+      for (const plan of ['join', 'intersect', 'aggregate'] as const) {
+        const timing = await measure(`  ${shape.label} (${plan})`, shape.criteria, plan);
+        timings[plan] = timing.p95;
+      }
+      const best = Math.min(...Object.values(timings));
+      expect(best, `${shape.label}: no plan shape met the SLO`).toBeLessThan(SLO.p95);
+      console.log(
+        `  best plan for "${shape.label}": ` +
+          Object.entries(timings)
+            .sort(([, a], [, b]) => a - b)
+            .map(([plan, p95]) => `${plan} ${p95.toFixed(1)}ms`)
+            .join(' < '),
+      );
+    }
+  }, 1_500_000);
 });

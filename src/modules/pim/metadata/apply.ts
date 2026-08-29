@@ -110,18 +110,26 @@ export async function applyMetadata(
     `.execute(tx);
     const unchanged = alreadyApplied.rows[0]?.content_hash === parsed.contentHash;
 
+    // Detect destructive attribute changes BEFORE writing anything.
+    //
+    // The composite foreign keys carrying value_type onto attribute_value cascade on
+    // update, so redefining an attribute's type while values exist makes the database
+    // reject the row against its own check constraints. That backstop is correct, but
+    // a raw constraint violation is a poor explanation of a decision someone needs to
+    // make deliberately -- so the loader checks first and says what is wrong.
+    await detectBreakingAttributeChanges(tx, parsed, changes, breaking);
+    if (breaking.length > 0 && options.allowBreaking !== true) {
+      throw new BreakingMetadataChangeError(breaking);
+    }
+
     await applyDimensions(tx, parsed, changes);
     await applyUnits(tx, parsed, changes);
     await applyVocabularies(tx, parsed, changes);
     await applyTerms(tx, parsed, changes);
-    await applyAttributes(tx, parsed, changes, breaking);
+    await applyAttributes(tx, parsed, changes);
     await applyProductTypes(tx, parsed, changes);
     await applyProductTypeAttributes(tx, parsed, changes);
     await applyQualityRules(tx, parsed, changes);
-
-    if (breaking.length > 0 && options.allowBreaking !== true) {
-      throw new BreakingMetadataChangeError(breaking);
-    }
 
     if (options.dryRun === true) {
       // Roll the transaction back by throwing a sentinel the caller unwraps.
@@ -393,7 +401,16 @@ async function applyTerms(
   }
 }
 
-async function applyAttributes(
+/**
+ * Report attribute redefinitions that would reinterpret values already recorded.
+ *
+ * A value type, dimension or vocabulary change rewrites the meaning of every existing
+ * value; narrowing MULTI to SINGLE discards some. None is refused outright -- FSW may
+ * genuinely need to correct a mistake -- but none happens by accident either.
+ *
+ * Returns the keys whose definition version must be bumped.
+ */
+async function detectBreakingAttributeChanges(
   tx: DbTransaction,
   parsed: ParsedMetadata,
   changes: MetadataChange[],
@@ -405,102 +422,139 @@ async function applyAttributes(
     dimension_code: string | null;
     vocabulary_key: string | null;
     cardinality: string;
-    definition_version: number;
   }>`
-    SELECT key, value_type, dimension_code, vocabulary_key, cardinality, definition_version
-      FROM pim.attribute
+    SELECT key, value_type, dimension_code, vocabulary_key, cardinality FROM pim.attribute
   `.execute(tx);
   const existingByKey = new Map(existing.rows.map((r) => [r.key, r]));
+  redefinedAttributes.clear();
 
   for (const attribute of parsed.attributes) {
     const previous = existingByKey.get(attribute.key);
-    let definitionVersion = 1;
+    if (previous === undefined) continue;
 
-    if (previous !== undefined) {
-      const reinterpretations: string[] = [];
-      if (previous.value_type !== attribute.valueType) {
-        reinterpretations.push(
-          `value type ${previous.value_type} -> ${attribute.valueType}`,
-        );
-      }
-      if ((previous.dimension_code ?? undefined) !== attribute.dimension) {
-        reinterpretations.push(
-          `dimension ${previous.dimension_code ?? 'none'} -> ${attribute.dimension ?? 'none'}`,
-        );
-      }
-      if ((previous.vocabulary_key ?? undefined) !== attribute.vocabulary) {
-        reinterpretations.push(
-          `vocabulary ${previous.vocabulary_key ?? 'none'} -> ${attribute.vocabulary ?? 'none'}`,
-        );
-      }
-      if (
-        previous.cardinality === 'MULTI' &&
-        (attribute.cardinality ?? 'SINGLE') === 'SINGLE'
-      ) {
-        reinterpretations.push('cardinality MULTI -> SINGLE');
-      }
-
-      if (reinterpretations.length > 0) {
-        definitionVersion = previous.definition_version + 1;
-        const valueCount = await attributeValueCount(tx, attribute.key);
-        if (valueCount > 0) {
-          breaking.push(
-            `attribute '${attribute.key}': ${reinterpretations.join(', ')} ` +
-              `(${valueCount} existing value(s) would be reinterpreted)`,
-          );
-        }
-        changes.push({
-          kind: 'UPDATE',
-          entity: 'attribute',
-          key: attribute.key,
-          detail: reinterpretations.join(', '),
-        });
-      }
+    const reinterpretations: string[] = [];
+    if (previous.value_type !== attribute.valueType) {
+      reinterpretations.push(
+        `value type ${previous.value_type} -> ${attribute.valueType}`,
+      );
     }
+    if ((previous.dimension_code ?? undefined) !== attribute.dimension) {
+      reinterpretations.push(
+        `dimension ${previous.dimension_code ?? 'none'} -> ${attribute.dimension ?? 'none'}`,
+      );
+    }
+    if ((previous.vocabulary_key ?? undefined) !== attribute.vocabulary) {
+      reinterpretations.push(
+        `vocabulary ${previous.vocabulary_key ?? 'none'} -> ${attribute.vocabulary ?? 'none'}`,
+      );
+    }
+    if (
+      previous.cardinality === 'MULTI' &&
+      (attribute.cardinality ?? 'SINGLE') === 'SINGLE'
+    ) {
+      reinterpretations.push('cardinality MULTI -> SINGLE');
+    }
+    if (reinterpretations.length === 0) continue;
 
-    const result = await sql<{ inserted: boolean }>`
-      INSERT INTO pim.attribute (
-        key, name, description, value_type, dimension_code, default_unit_code,
-        vocabulary_key, entity_type, cardinality, numeric_scale, min_numeric,
-        max_numeric, min_length, max_length, is_filterable, is_comparable, channels,
-        deprecated_at, superseded_by_key, definition_version, updated_at
-      ) VALUES (
-        ${attribute.key}, ${attribute.name}, ${attribute.description},
-        ${attribute.valueType}, ${attribute.dimension ?? null},
-        ${attribute.defaultUnit ?? null}, ${attribute.vocabulary ?? null},
-        ${attribute.entityType ?? null}, ${attribute.cardinality ?? 'SINGLE'},
-        ${attribute.numericScale ?? null}, ${attribute.minNumeric ?? null}::numeric,
-        ${attribute.maxNumeric ?? null}::numeric, ${attribute.minLength ?? null},
-        ${attribute.maxLength ?? null}, ${attribute.isFilterable ?? true},
-        ${attribute.isComparable ?? true}, ${attribute.channels ?? []}::text[],
-        ${attribute.deprecated === true ? sql`now()` : null},
-        ${attribute.supersededBy ?? null}, ${definitionVersion}, now()
-      )
-      ON CONFLICT (key) DO UPDATE SET
-        name = EXCLUDED.name,
-        description = EXCLUDED.description,
-        value_type = EXCLUDED.value_type,
-        dimension_code = EXCLUDED.dimension_code,
-        default_unit_code = EXCLUDED.default_unit_code,
-        vocabulary_key = EXCLUDED.vocabulary_key,
-        entity_type = EXCLUDED.entity_type,
-        cardinality = EXCLUDED.cardinality,
-        numeric_scale = EXCLUDED.numeric_scale,
-        min_numeric = EXCLUDED.min_numeric,
-        max_numeric = EXCLUDED.max_numeric,
-        min_length = EXCLUDED.min_length,
-        max_length = EXCLUDED.max_length,
-        is_filterable = EXCLUDED.is_filterable,
-        is_comparable = EXCLUDED.is_comparable,
-        channels = EXCLUDED.channels,
-        deprecated_at = EXCLUDED.deprecated_at,
-        superseded_by_key = EXCLUDED.superseded_by_key,
-        definition_version = GREATEST(pim.attribute.definition_version, EXCLUDED.definition_version),
-        updated_at = now()
-      RETURNING (xmax = 0) AS inserted
-    `.execute(tx);
-    if (result.rows[0]?.inserted === true) {
-      changes.push({ kind: 'INSERT', entity: 'attribute', key: attribute.key });
+    redefinedAttributes.add(attribute.key);
+    changes.push({
+      kind: 'UPDATE',
+      entity: 'attribute',
+      key: attribute.key,
+      detail: reinterpretations.join(', '),
+    });
+
+    const valueCount = await attributeValueCount(tx, attribute.key);
+    if (valueCount > 0) {
+      breaking.push(
+        `attribute '${attribute.key}': ${reinterpretations.join(', ')} ` +
+          `(${valueCount} existing value(s) would be reinterpreted). Migrate or remove ` +
+          `those values first -- the database will reject the change while they hold ` +
+          `columns the new type does not use.`,
+      );
+    }
+  }
+}
+
+/** Attributes redefined in the current run, so the writer bumps their version. */
+const redefinedAttributes = new Set<string>();
+
+async function applyAttributes(
+  tx: DbTransaction,
+  parsed: ParsedMetadata,
+  changes: MetadataChange[],
+): Promise<void> {
+  const existing = await sql<{ key: string; definition_version: number }>`
+    SELECT key, definition_version FROM pim.attribute
+  `.execute(tx);
+  const versionByKey = new Map(existing.rows.map((r) => [r.key, r.definition_version]));
+
+  for (const attribute of parsed.attributes) {
+    const previousVersion = versionByKey.get(attribute.key);
+    const definitionVersion =
+      previousVersion === undefined
+        ? 1
+        : redefinedAttributes.has(attribute.key)
+          ? previousVersion + 1
+          : previousVersion;
+
+    try {
+      const result = await sql<{ inserted: boolean }>`
+        INSERT INTO pim.attribute (
+          key, name, description, value_type, dimension_code, default_unit_code,
+          vocabulary_key, entity_type, cardinality, numeric_scale, min_numeric,
+          max_numeric, min_length, max_length, is_filterable, is_comparable, channels,
+          deprecated_at, superseded_by_key, definition_version, updated_at
+        ) VALUES (
+          ${attribute.key}, ${attribute.name}, ${attribute.description},
+          ${attribute.valueType}, ${attribute.dimension ?? null},
+          ${attribute.defaultUnit ?? null}, ${attribute.vocabulary ?? null},
+          ${attribute.entityType ?? null}, ${attribute.cardinality ?? 'SINGLE'},
+          ${attribute.numericScale ?? null}, ${attribute.minNumeric ?? null}::numeric,
+          ${attribute.maxNumeric ?? null}::numeric, ${attribute.minLength ?? null},
+          ${attribute.maxLength ?? null}, ${attribute.isFilterable ?? true},
+          ${attribute.isComparable ?? true}, ${attribute.channels ?? []}::text[],
+          ${attribute.deprecated === true ? sql`now()` : null},
+          ${attribute.supersededBy ?? null}, ${definitionVersion}, now()
+        )
+        ON CONFLICT (key) DO UPDATE SET
+          name = EXCLUDED.name,
+          description = EXCLUDED.description,
+          value_type = EXCLUDED.value_type,
+          dimension_code = EXCLUDED.dimension_code,
+          default_unit_code = EXCLUDED.default_unit_code,
+          vocabulary_key = EXCLUDED.vocabulary_key,
+          entity_type = EXCLUDED.entity_type,
+          cardinality = EXCLUDED.cardinality,
+          numeric_scale = EXCLUDED.numeric_scale,
+          min_numeric = EXCLUDED.min_numeric,
+          max_numeric = EXCLUDED.max_numeric,
+          min_length = EXCLUDED.min_length,
+          max_length = EXCLUDED.max_length,
+          is_filterable = EXCLUDED.is_filterable,
+          is_comparable = EXCLUDED.is_comparable,
+          channels = EXCLUDED.channels,
+          deprecated_at = EXCLUDED.deprecated_at,
+          superseded_by_key = EXCLUDED.superseded_by_key,
+          definition_version = EXCLUDED.definition_version,
+          updated_at = now()
+        RETURNING (xmax = 0) AS inserted
+      `.execute(tx);
+      if (result.rows[0]?.inserted === true) {
+        changes.push({ kind: 'INSERT', entity: 'attribute', key: attribute.key });
+      }
+    } catch (error) {
+      // The schema is the backstop when --allow-breaking is used but the existing
+      // values genuinely cannot carry the new type.
+      const message = error instanceof Error ? error.message : String(error);
+      if (/no_value_columns_from_other_types|value_is_populated/.test(message)) {
+        throw new BreakingMetadataChangeError([
+          `attribute '${attribute.key}': the new definition contradicts values already ` +
+            `stored against it, and the database refused the change. Migrate those ` +
+            `values to the new shape first, then re-apply.`,
+        ]);
+      }
+      throw error;
     }
   }
 

@@ -279,6 +279,14 @@ export interface PimBrand {
   updated_at: Generated<Timestamp>;
 }
 
+export interface PimCertificationBody {
+  code: string;
+  created_at: Generated<Timestamp>;
+  description: string | null;
+  name: string;
+  website: string | null;
+}
+
 export interface PimChannel {
   code: string;
   created_at: Generated<Timestamp>;
@@ -329,6 +337,30 @@ export interface PimProduct {
   version: Generated<number>;
 }
 
+export interface PimProductCertification {
+  certificate_id: string | null;
+  certification_term_id: string;
+  created_at: Generated<Timestamp>;
+  created_by: string | null;
+  expires_on: Timestamp | null;
+  id: Generated<string>;
+  issued_on: Timestamp | null;
+  issuing_body_code: string | null;
+  product_id: string | null;
+  /**
+   * What the certificate covers. Recorded because "the product is 3-A certified" is usually shorthand for "these configurations are".
+   */
+  scope: string | null;
+  source_system_code: string;
+  standard_revision: string | null;
+  subject_key: Generated<string | null>;
+  variant_id: string | null;
+  verification_status: Generated<string>;
+  verified_at: Timestamp | null;
+  verified_by: string | null;
+  vocabulary_key: Generated<string>;
+}
+
 export interface PimProductFamily {
   created_at: Generated<Timestamp>;
   deprecated_at: Timestamp | null;
@@ -367,6 +399,34 @@ export interface PimProductLine {
   key: string;
   name: string;
   updated_at: Generated<Timestamp>;
+}
+
+export interface PimProductRelationship {
+  /**
+   * How sure the assertion is. Orthogonal to verification_status: an unverified claim can be confident, and a verified one can be narrow in scope.
+   */
+  confidence: Generated<Numeric>;
+  created_at: Generated<Timestamp>;
+  created_by: string | null;
+  evidence: string | null;
+  from_key: Generated<string | null>;
+  from_level: Generated<string | null>;
+  from_product_id: string | null;
+  from_variant_id: string | null;
+  id: Generated<string>;
+  notes: string | null;
+  relationship_type: string;
+  source_system_code: string;
+  to_key: Generated<string | null>;
+  to_level: Generated<string | null>;
+  to_product_id: string | null;
+  to_variant_id: string | null;
+  valid_from: Generated<Timestamp>;
+  valid_to: Timestamp | null;
+  validity: Generated<string | null>;
+  verification_status: Generated<string>;
+  verified_at: Timestamp | null;
+  verified_by: string | null;
 }
 
 export interface PimProductType {
@@ -413,6 +473,10 @@ export interface PimQualityRule {
   created_at: Generated<Timestamp>;
   description: string;
   is_active: Generated<boolean>;
+  /**
+   * True for rules the evaluator implements directly. The metadata loader leaves them alone: they are not absent from configuration, they were never in it.
+   */
+  is_system: Generated<boolean>;
   key: string;
   name: string;
   parameters: Generated<Json>;
@@ -426,6 +490,19 @@ export interface PimQuantityDimension {
   code: string;
   description: string;
   name: string;
+}
+
+export interface PimRelationshipType {
+  code: string;
+  created_at: Generated<Timestamp>;
+  description: string;
+  implies_interchangeable: Generated<boolean>;
+  is_directional: Generated<boolean>;
+  is_symmetric: Generated<boolean>;
+  must_be_acyclic: Generated<boolean>;
+  name: string;
+  requires_verification: Generated<boolean>;
+  sort_order: Generated<number>;
 }
 
 export interface PimUnit {
@@ -569,18 +646,22 @@ export interface DB {
   "pim.attribute": PimAttribute;
   "pim.attribute_value": PimAttributeValue;
   "pim.brand": PimBrand;
+  "pim.certification_body": PimCertificationBody;
   "pim.channel": PimChannel;
   "pim.identifier_namespace": PimIdentifierNamespace;
   "pim.metadata_version": PimMetadataVersion;
   "pim.product": PimProduct;
+  "pim.product_certification": PimProductCertification;
   "pim.product_family": PimProductFamily;
   "pim.product_identifier": PimProductIdentifier;
   "pim.product_line": PimProductLine;
+  "pim.product_relationship": PimProductRelationship;
   "pim.product_type": PimProductType;
   "pim.product_type_attribute": PimProductTypeAttribute;
   "pim.publishable_variant": PimPublishableVariant;
   "pim.quality_rule": PimQualityRule;
   "pim.quantity_dimension": PimQuantityDimension;
+  "pim.relationship_type": PimRelationshipType;
   "pim.unit": PimUnit;
   "pim.unit_alias": PimUnitAlias;
   "pim.variant": PimVariant;

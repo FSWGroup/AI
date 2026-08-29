@@ -55,7 +55,28 @@ export interface PresenceCriterion {
 export type FilterCriterion =
   TermCriterion | RangeCriterion | BooleanCriterion | TextCriterion | PresenceCriterion;
 
-export type PlanShape = 'intersect' | 'aggregate';
+export type PlanShape = 'join' | 'intersect' | 'aggregate';
+
+/**
+ * The default plan shape, chosen by measurement (§83), not intuition.
+ *
+ * At 250,000 variants and 2.25 million facet rows, INTERSECT materialises and
+ * de-duplicates every branch in full before combining them. That is fine when all the
+ * criteria are selective, and expensive when one is not: a pressure range covering
+ * three quarters of the catalogue costs the same as the two term criteria that
+ * eliminate 97% of it. Measured server-side, that filter took 114 ms.
+ *
+ * The `join` shape expresses the same question as inner joins between per-criterion
+ * subqueries, which the planner is free to reorder using its own statistics. It drives
+ * from whichever criterion it estimates smallest and probes the rest by index, so an
+ * unselective criterion costs roughly what its index probes cost rather than what its
+ * full scan costs.
+ *
+ * `intersect` and `aggregate` remain available and remain tested against the same
+ * expected results, because a plan that is faster but wrong is not an improvement, and
+ * because the comparison must stay reproducible when the dataset changes.
+ */
+export const DEFAULT_PLAN: PlanShape = 'join';
 
 export interface SearchOptions {
   readonly criteria: readonly FilterCriterion[];
@@ -206,6 +227,76 @@ function predicateFor(
   }
 }
 
+/**
+ * Build the set of matching variant ids under the requested plan shape.
+ *
+ * All three shapes must return the same set; the benchmark asserts that and compares
+ * their cost. Keeping the three side by side is what makes the choice reviewable —
+ * "we measured" is only meaningful if the alternative is still runnable.
+ */
+function matchedVariants(
+  criteria: readonly FilterCriterion[],
+  plan: PlanShape,
+  attributes: AttributeRegistry,
+  units: UnitRegistry,
+): RawBuilder<unknown> {
+  if (criteria.length === 0) {
+    return sql`SELECT v.id AS variant_id FROM pim.variant v WHERE v.deleted_at IS NULL`;
+  }
+
+  const predicates = criteria.map((criterion) => ({
+    sql: predicateFor(criterion, attributes, units),
+    // A MULTI-valued attribute can match several rows for one variant, so its branch
+    // must de-duplicate. INTERSECT does that implicitly; a join does not.
+    multi: attributes.get(criterion.attributeKey).cardinality === 'MULTI',
+  }));
+
+  if (plan === 'intersect') {
+    return sql.join(
+      predicates.map(
+        (p) => sql`SELECT f.variant_id FROM pim.variant_facet f WHERE ${p.sql}`,
+      ),
+      sql` INTERSECT `,
+    );
+  }
+
+  if (plan === 'aggregate') {
+    return sql`
+      SELECT f.variant_id
+        FROM pim.variant_facet f
+       WHERE ${sql.join(
+         predicates.map((p) => sql`(${p.sql})`),
+         sql` OR `,
+       )}
+       GROUP BY f.variant_id
+      HAVING count(DISTINCT CASE ${sql.join(
+        predicates.map((p, i) => sql`WHEN (${p.sql}) THEN ${i}`),
+        sql` `,
+      )} END) = ${predicates.length}
+    `;
+  }
+
+  // 'join': inner joins between per-criterion subqueries. Inner joins are freely
+  // reorderable, so the planner drives from whichever branch its statistics say is
+  // smallest and probes the rest by index — which is the whole point.
+  const branches = predicates.map(
+    (p, i) => sql`
+      (SELECT ${p.multi ? sql`DISTINCT` : sql``} f.variant_id
+         FROM pim.variant_facet f WHERE ${p.sql}) AS ${sql.raw(`s${i}`)}
+    `,
+  );
+  const joins = branches
+    .slice(1)
+    .map(
+      (branch, i) =>
+        sql` JOIN ${branch} ON ${sql.raw(`s${i + 1}`)}.variant_id = s0.variant_id`,
+    );
+
+  return sql`
+    SELECT s0.variant_id FROM ${branches[0]!}${sql.join(joins, sql``)}
+  `;
+}
+
 export async function searchVariants(
   db: Database | DbTransaction,
   options: SearchOptions,
@@ -213,34 +304,9 @@ export async function searchVariants(
   units: UnitRegistry,
 ): Promise<SearchResult> {
   const limit = Math.min(Math.max(options.limit ?? 50, 1), MAX_LIMIT);
-  const plan = options.plan ?? 'intersect';
+  const plan = options.plan ?? DEFAULT_PLAN;
   const after = options.after ?? ZERO_UUID;
-  const predicates = options.criteria.map((c) => predicateFor(c, attributes, units));
-
-  const matched =
-    predicates.length === 0
-      ? sql`SELECT v.id AS variant_id FROM pim.variant v WHERE v.deleted_at IS NULL`
-      : plan === 'intersect'
-        ? sql.join(
-            predicates.map(
-              (predicate) =>
-                sql`SELECT f.variant_id FROM pim.variant_facet f WHERE ${predicate}`,
-            ),
-            sql` INTERSECT `,
-          )
-        : sql`
-            SELECT f.variant_id
-              FROM pim.variant_facet f
-             WHERE ${sql.join(
-               predicates.map((p) => sql`(${p})`),
-               sql` OR `,
-             )}
-             GROUP BY f.variant_id
-            HAVING count(DISTINCT CASE ${sql.join(
-              predicates.map((p, i) => sql`WHEN (${p}) THEN ${i}`),
-              sql` `,
-            )} END) = ${predicates.length}
-          `;
+  const matched = matchedVariants(options.criteria, plan, attributes, units);
 
   const result = await sql<{
     id: string;
@@ -296,17 +362,12 @@ export async function facetCounts(
   units: UnitRegistry,
   forAttributes: readonly string[],
 ): Promise<FacetCount[]> {
-  const predicates = options.criteria.map((c) => predicateFor(c, attributes, units));
-  const matched =
-    predicates.length === 0
-      ? sql`SELECT v.id AS variant_id FROM pim.variant v WHERE v.deleted_at IS NULL`
-      : sql.join(
-          predicates.map(
-            (predicate) =>
-              sql`SELECT f.variant_id FROM pim.variant_facet f WHERE ${predicate}`,
-          ),
-          sql` INTERSECT `,
-        );
+  const matched = matchedVariants(
+    options.criteria,
+    options.plan ?? DEFAULT_PLAN,
+    attributes,
+    units,
+  );
 
   const result = await sql<{
     attribute_key: string;
@@ -341,21 +402,12 @@ export async function explainSearch(
   attributes: AttributeRegistry,
   units: UnitRegistry,
 ): Promise<string> {
-  const predicates = options.criteria.map((c) => predicateFor(c, attributes, units));
-  const plan = options.plan ?? 'intersect';
-  const matched =
-    plan === 'intersect'
-      ? sql.join(
-          predicates.map(
-            (predicate) =>
-              sql`SELECT f.variant_id FROM pim.variant_facet f WHERE ${predicate}`,
-          ),
-          sql` INTERSECT `,
-        )
-      : sql`SELECT f.variant_id FROM pim.variant_facet f WHERE ${sql.join(
-          predicates.map((p) => sql`(${p})`),
-          sql` OR `,
-        )} GROUP BY f.variant_id HAVING count(*) >= ${predicates.length}`;
+  const matched = matchedVariants(
+    options.criteria,
+    options.plan ?? DEFAULT_PLAN,
+    attributes,
+    units,
+  );
 
   const result = await sql<{ 'QUERY PLAN': string }>`
     EXPLAIN (ANALYZE, BUFFERS, FORMAT TEXT)

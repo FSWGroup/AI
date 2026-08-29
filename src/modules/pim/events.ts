@@ -115,10 +115,55 @@ export const VariantQualityEvaluated = defineEvent({
   ),
 });
 
+export const ProductRelationshipAsserted = defineEvent({
+  type: 'fsw.pim.ProductRelationshipAsserted',
+  version: 1,
+  module: 'pim',
+  aggregateType: 'ProductRelationship',
+  description:
+    'A cross-reference, equivalent, alternate or supersession was asserted between two ' +
+    'products. `impliesInterchangeable` distinguishes a substitution claim from a ' +
+    'suggestion; a consumer that ignores it will offer the wrong valve.',
+  payload: Type.Object(
+    {
+      relationshipId: Type.String({ format: 'uuid' }),
+      relationshipType: Type.String(),
+      fromLevel: Type.Union([Type.Literal('PRODUCT'), Type.Literal('VARIANT')]),
+      fromId: Type.String({ format: 'uuid' }),
+      toLevel: Type.Union([Type.Literal('PRODUCT'), Type.Literal('VARIANT')]),
+      toId: Type.String({ format: 'uuid' }),
+      confidence: Type.Number({ minimum: 0, maximum: 1 }),
+      verified: Type.Boolean(),
+      impliesInterchangeable: Type.Boolean(),
+    },
+    { additionalProperties: false },
+  ),
+});
+
+export const ProductRelationshipVerified = defineEvent({
+  type: 'fsw.pim.ProductRelationshipVerified',
+  version: 1,
+  module: 'pim',
+  aggregateType: 'ProductRelationship',
+  description:
+    'A named person reviewed a relationship and stands behind it. Only a verified ' +
+    'interchangeability claim should drive an automatic substitution.',
+  payload: Type.Object(
+    {
+      relationshipId: Type.String({ format: 'uuid' }),
+      relationshipType: Type.String(),
+      verifiedBy: Type.String({ format: 'uuid' }),
+    },
+    { additionalProperties: false },
+  ),
+});
+
 export const pimEvents = [
   ProductCreated,
   VariantCreated,
   ProductAttributeValueChanged,
   VariantLifecycleChanged,
   VariantQualityEvaluated,
+  ProductRelationshipAsserted,
+  ProductRelationshipVerified,
 ] as const;

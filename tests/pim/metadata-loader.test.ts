@@ -220,17 +220,27 @@ terms:
     );
     await applyMetadata(testDb.db, await readMetadata(workDir), { actor: 'test' });
 
-    // Pretend values exist, which is what makes the change destructive rather than
-    // merely a redefinition. (pim.attribute_value arrives in the next phase; the
-    // loader consults it through to_regclass, so this stands in for it.)
+    // A real value now exists against the attribute, which is what makes redefining
+    // its type destructive rather than merely a redefinition. It needs an owner, so a
+    // minimal brand, product and variant come with it.
+    await sql`INSERT INTO pim.brand (key, name) VALUES ('reinterpret_brand', 'Brand')`.execute(
+      testDb.db,
+    );
     await sql`
-      CREATE TABLE IF NOT EXISTS pim.attribute_value (
-        id uuid PRIMARY KEY DEFAULT kernel.uuid_generate_v7(),
-        attribute_key text NOT NULL
-      )
+      INSERT INTO pim.product (key, brand_id, product_type_key, name)
+      SELECT 'reinterpret_product', id, 'ball_valve', 'Product'
+        FROM pim.brand WHERE key = 'reinterpret_brand'
     `.execute(testDb.db);
     await sql`
-      INSERT INTO pim.attribute_value (attribute_key) VALUES ('reinterpret_me')
+      INSERT INTO pim.variant (product_id, manufacturer_part_number)
+      SELECT id, 'REINTERPRET-1' FROM pim.product WHERE key = 'reinterpret_product'
+    `.execute(testDb.db);
+    await sql`
+      INSERT INTO pim.attribute_value
+        (attribute_key, value_type, cardinality, variant_id, value_text,
+         source_system_code, entered_raw)
+      SELECT 'reinterpret_me', 'TEXT', 'SINGLE', v.id, 'some text', 'MANUAL', 'some text'
+        FROM pim.variant v WHERE v.manufacturer_part_number = 'REINTERPRET-1'
     `.execute(testDb.db);
 
     await write(
@@ -255,19 +265,35 @@ terms:
     `.execute(testDb.db);
     expect(rows[0]!.value_type).toBe('TEXT');
 
-    // Explicit consent applies it and bumps the definition version.
+    // --allow-breaking is consent, not a bypass. The stored value holds a text column
+    // that a QUANTITY attribute does not use, so the database refuses the change even
+    // with consent -- the operator has to migrate the data first.
+    await expect(
+      applyMetadata(testDb.db, changed, { actor: 'test', allowBreaking: true }),
+    ).rejects.toThrow(/Migrate those values to the new shape first/);
+
+    const stillText = await sql<{ value_type: string }>`
+      SELECT value_type FROM pim.attribute WHERE key = 'reinterpret_me'
+    `.execute(testDb.db);
+    expect(stillText.rows[0]!.value_type).toBe('TEXT');
+
+    // Once the incompatible values are dealt with, the change applies and the
+    // definition version records that the attribute means something new.
+    await sql`
+      DELETE FROM pim.attribute_value WHERE attribute_key = 'reinterpret_me'
+    `.execute(testDb.db);
     const forced = await applyMetadata(testDb.db, changed, {
       actor: 'test',
       allowBreaking: true,
     });
-    expect(forced.breaking).toHaveLength(1);
+    expect(forced.applied).toBe(true);
     const after = await sql<{ value_type: string; definition_version: number }>`
       SELECT value_type, definition_version FROM pim.attribute WHERE key = 'reinterpret_me'
     `.execute(testDb.db);
     expect(after.rows[0]!.value_type).toBe('QUANTITY');
     expect(after.rows[0]!.definition_version).toBe(2);
 
-    await sql`DROP TABLE pim.attribute_value`.execute(testDb.db);
+    // Leave the attribute value in place: it is real data now, not a stand-in.
     await cleanup();
   });
 

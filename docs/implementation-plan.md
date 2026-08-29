@@ -139,7 +139,7 @@ SLO on the generated catalogue. AC5 — a product created through the API is imm
 discoverable by filter, with no projection wait. AC22 — a variant missing a required Cv
 is identified and excluded from the ValveMan publishable view.
 
-## Phase 5 — Relationships, certifications, assets
+## Phase 5 — Relationships and certifications ✅
 
 **Delivers.** Typed product relationships with confidence, evidence, verification and
 valid time; supersession chain resolution with cycle prevention; certifications as

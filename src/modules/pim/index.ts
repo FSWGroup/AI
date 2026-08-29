@@ -74,6 +74,7 @@ export {
   facetCounts,
   explainSearch,
   SearchCriterionError,
+  DEFAULT_PLAN,
 } from './products/search.js';
 export type {
   FilterCriterion,
@@ -107,10 +108,31 @@ export type {
 } from './products/catalog.js';
 
 export {
+  assertRelationship,
+  verifyRelationship,
+  relationshipsFor,
+  resolveSupersession,
+  recordCertification,
+  certificationsFor,
+} from './products/relationships.js';
+export type {
+  RelationshipSubject,
+  SubjectLevel,
+  AssertRelationshipInput,
+  RelationshipView,
+  SupersessionLink,
+  SupersessionResolution,
+  CertificationInput,
+  CertificationView,
+} from './products/relationships.js';
+
+export {
   ProductCreated,
   VariantCreated,
   ProductAttributeValueChanged,
   VariantLifecycleChanged,
   VariantQualityEvaluated,
+  ProductRelationshipAsserted,
+  ProductRelationshipVerified,
   pimEvents,
 } from './events.js';
