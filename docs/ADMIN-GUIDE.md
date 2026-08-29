@@ -25,6 +25,12 @@ in the append-only Audit Log.
 4. Confirm object storage and HTTPS. **In production, webcam invitations
    stay disabled until notice + recording retention + storage + HTTPS are
    configured.**
+5. Decide on the two **Fairness and candidate experience** switches, both
+   off by default: voluntary self-identification (feeds the benchmark
+   impact preview) and the candidate summary. Review the candidate-facing
+   wording with counsel before turning either on —
+   `docs/FAIRNESS-AND-FEEDBACK.md` explains what each one shows and what it
+   deliberately withholds.
 
 ## Day-to-day flow
 
@@ -76,8 +82,16 @@ in the append-only Audit Log.
   autosave with an offline queue; a resume link can be re-emailed from the
   invitation page and restores the exact session (same questions, answers,
   and remaining time). Completed timed sections never reopen.
-- On completion candidates see a thank-you page only — no scores, no
-  pass/fail.
+- On completion candidates see a thank-you page. No scores and no pass/fail
+  are shown to them anywhere, under any setting.
+- If the **candidate summary** is enabled, the completion screen offers each
+  candidate a developmental summary of their own results. It carries no
+  scores, no benchmark comparison, no validity indicators, and nothing about
+  the hiring outcome. It lives in their browser session, so it tells them to
+  save a copy.
+- If **voluntary self-identification** is enabled, they are asked for
+  optional demographic information after they submit. Every question can be
+  declined and the whole form skipped. It never reaches a report.
 
 ## Data & compliance
 
@@ -85,6 +99,10 @@ in the append-only Audit Log.
   `CANDIDATE:<id>`, or `ATTEMPT:<id>`.
 - The retention job deletes database rows and storage objects together and
   logs a per-type summary to the audit trail.
+- The benchmark editor's **impact preview** shows how a proposed set of
+  ranges would screen the candidates already assessed, and — once voluntary
+  self-identification is on and there is enough data — the four-fifths
+  selection-rate ratios. Use it before you save a benchmark, not after.
 - The admin-only disclaimer shown in Settings applies everywhere: FSW
   WorkFit is decision-support software and should not be the sole basis for
   an employment decision. See `docs/VALIDATION-ROADMAP.md` before relying

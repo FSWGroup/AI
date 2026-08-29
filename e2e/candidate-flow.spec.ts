@@ -5,6 +5,7 @@
  * admin sees the completed candidate and report.
  */
 
+import { createHash, randomUUID } from "node:crypto";
 import { expect, test, type Page } from "@playwright/test";
 import { adminApi, createInvitation, db, welsfordOpeningId } from "./helpers";
 
@@ -185,6 +186,68 @@ test("candidate completes the full assessment and HR sees the report", async ({
   expect(html).toContain("FSW WorkFit Assessment Report");
   expect(html).toContain("Targeted Interview Guide");
   expect(html).toContain("Sales Traits Analysis");
+
+  // ---- One-page manager brief renders from the same report ------------------------
+  const briefRes = await hr.get(`/admin/candidates/${attempt.id}/report/brief`);
+  expect(briefRes.ok()).toBe(true);
+  const briefHtml = await briefRes.text();
+  expect(briefHtml).toContain("Hiring manager brief");
+  expect(briefHtml).toContain("required dimensions fall inside range");
+  // The brief must never turn the count into a decision.
+  expect(briefHtml).not.toMatch(/\brecommend hiring\b|\bdo not hire\b|\bpass\/fail\b/i);
+});
+
+test("the candidate summary carries no scores, benchmarks, or validity data", async ({
+  page,
+  baseURL,
+}) => {
+  await db().orgSettings.update({
+    where: { id: "org" },
+    data: { candidateFeedbackEnabled: true },
+  });
+  const attempt = await db().attempt.findFirstOrThrow({
+    where: { status: "COMPLETED", reports: { some: { status: "READY" } } },
+    orderBy: { createdAt: "desc" },
+  });
+
+  // Mint the candidate's own resume token and open their session with it —
+  // the same credential their browser holds after submitting. Admins cannot
+  // issue a resume link for a completed attempt, so the test does it directly.
+  const token = `e2e-summary-${randomUUID()}`;
+  await db().attempt.update({
+    where: { id: attempt.id },
+    data: { resumeTokenHash: createHash("sha256").update(token).digest("hex") },
+  });
+
+  await page.goto(`${baseURL}/assessment/resume/${token}`);
+  await page.getByRole("button", { name: /View my summary/i }).click();
+  await expect(page.getByText(/Thanks for completing this/)).toBeVisible({
+    timeout: 20_000,
+  });
+
+  const text = await page.locator("body").innerText();
+  expect(text).toContain("There are no pass or fail results.");
+  // None of the employer-only material may appear. Phrases, not bare words:
+  // the development advice legitimately says things like "benchmark peer",
+  // and flagging that would be a false positive, not a leak.
+  for (const forbidden of [
+    "Distortion",
+    "Equivocation",
+    "Areas of Concern",
+    "target range",
+    "desired range",
+    "within range",
+    "below the range",
+    "above the range",
+    "stanine",
+    "response quality",
+    "integrity log",
+    "decision-support",
+  ]) {
+    expect(text.toLowerCase()).not.toContain(forbidden.toLowerCase());
+  }
+  // No 1-9 band presented as a score.
+  expect(text).not.toMatch(/\bBand [1-9]\b/);
 });
 
 test("an invalid assessment link shows a plain-English error", async ({ page }) => {

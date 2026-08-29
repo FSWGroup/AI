@@ -195,12 +195,21 @@ export default async function CandidateDetailPage({
             <Card className="p-6">
               <p className="text-sm text-navy-600">
                 Report v{attempt.reports[0].version} generated{" "}
-                {fmt(attempt.reports[0].generatedAt)}.
+                {fmt(attempt.reports[0].generatedAt)}. The brief is the
+                one-page version for the hiring manager; the full report has
+                every dimension, the validity analysis, and the complete
+                interview guide.
               </p>
-              <div className="mt-4 flex gap-3">
+              <div className="mt-4 flex flex-wrap gap-3">
+                <Link
+                  href={`/admin/candidates/${attempt.id}/report/brief`}
+                  className="rounded-lg bg-fsw-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-fsw-700"
+                >
+                  Hiring manager brief
+                </Link>
                 <Link
                   href={`/admin/candidates/${attempt.id}/report`}
-                  className="rounded-lg bg-fsw-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-fsw-700"
+                  className="rounded-lg border border-navy-200 bg-white px-4 py-2.5 text-sm font-semibold text-navy-800 hover:bg-navy-50"
                 >
                   Open web report
                 </Link>

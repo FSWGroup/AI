@@ -30,6 +30,8 @@ export function SettingsForm({
     privacyNoticeConfigured: boolean;
     storageConfigured: boolean;
     httpsConfirmed: boolean;
+    eeoModuleEnabled: boolean;
+    candidateFeedbackEnabled: boolean;
     recordingAccessRoles: string[];
   };
   retention: { recordType: string; retentionDays: number | null }[];
@@ -163,6 +165,65 @@ export function SettingsForm({
         </div>
         <Button className="mt-5" disabled={busy} onClick={() => void post({ action: "org", ...org })}>
           Save organization settings
+        </Button>
+      </Card>
+
+      <Card className="p-6">
+        <h3 className="text-sm font-bold text-navy-900">Fairness and candidate experience</h3>
+        <p className="mt-1 text-xs leading-relaxed text-navy-500">
+          Both are off by default. Turn them on deliberately, and review the
+          candidate-facing wording with counsel before you do.
+        </p>
+        <div className="mt-4 space-y-4">
+          <label className="flex gap-3">
+            <input
+              type="checkbox"
+              className="mt-0.5 h-4 w-4 shrink-0 accent-fsw-600"
+              checked={org.eeoModuleEnabled}
+              onChange={(e) =>
+                setOrg({ ...org, eeoModuleEnabled: e.target.checked })
+              }
+            />
+            <span className="text-sm">
+              <span className="font-semibold text-navy-900">
+                Collect voluntary self-identification
+              </span>
+              <span className="mt-0.5 block text-xs leading-relaxed text-navy-500">
+                Asks candidates, after they submit, for optional demographic
+                information. Stored apart from results, never shown on any
+                report or candidate record, and readable only by the aggregate
+                adverse-impact analysis. Without it, that analysis has no data
+                to work from.
+              </span>
+            </span>
+          </label>
+          <label className="flex gap-3">
+            <input
+              type="checkbox"
+              className="mt-0.5 h-4 w-4 shrink-0 accent-fsw-600"
+              checked={org.candidateFeedbackEnabled}
+              onChange={(e) =>
+                setOrg({ ...org, candidateFeedbackEnabled: e.target.checked })
+              }
+            />
+            <span className="text-sm">
+              <span className="font-semibold text-navy-900">
+                Offer candidates a summary of their own results
+              </span>
+              <span className="mt-0.5 block text-xs leading-relaxed text-navy-500">
+                A developmental, strengths-first summary shown after
+                submission. It contains no scores, no benchmark comparison, no
+                validity indicators, and nothing about the hiring decision.
+              </span>
+            </span>
+          </label>
+        </div>
+        <Button
+          className="mt-5"
+          disabled={busy}
+          onClick={() => void post({ action: "org", ...org })}
+        >
+          Save
         </Button>
       </Card>
 

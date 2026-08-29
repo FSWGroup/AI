@@ -117,6 +117,9 @@ model OrgSettings {
   currentAwarenessEnabled   Boolean  @default(false)
   /// EEO/adverse-impact module is disabled unless explicitly configured.
   eeoModuleEnabled          Boolean  @default(false)
+  /// When on, candidates may view a strengths-and-development report about
+  /// their own results. Never shows benchmarks, validity, or integrity data.
+  candidateFeedbackEnabled  Boolean  @default(false)
   privacyNoticeVersion      String   @default("1.0")
   privacyNoticeConfigured   Boolean  @default(false)
   /// Roles allowed to view webcam recordings. Least privilege by default.
@@ -962,13 +965,18 @@ model EmailMessage {
 
 model EeoRecord {
   id        String   @id @default(cuid())
-  /// Deliberately NOT a foreign key to Candidate — linkage only through
-  /// this opaque reference, resolved solely by the compliance module.
+  /// Deliberately NOT foreign keys — linkage only through these opaque
+  /// references, resolved solely by the compliance module. Keeping them
+  /// unrelated means no ordinary candidate query can ever join to them.
   candidateRef String
+  attemptRef   String  @unique
+  jobProfileRef String?
   jobOpeningId String?
   /// Self-reported, voluntary, categorical data as configured by compliance.
+  /// A declined question is stored as "DECLINE" and excluded from analysis.
   data      Json
   createdAt DateTime @default(now())
 
   @@index([jobOpeningId])
+  @@index([jobProfileRef])
 }

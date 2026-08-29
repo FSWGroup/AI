@@ -40,6 +40,8 @@ export default async function SettingsPage() {
           privacyNoticeConfigured: settings?.privacyNoticeConfigured ?? false,
           storageConfigured: settings?.storageConfigured ?? false,
           httpsConfirmed: settings?.httpsConfirmed ?? false,
+          eeoModuleEnabled: settings?.eeoModuleEnabled ?? false,
+          candidateFeedbackEnabled: settings?.candidateFeedbackEnabled ?? false,
           recordingAccessRoles: settings?.recordingAccessRoles ?? [
             "SUPER_ADMIN",
             "HR_ADMIN",

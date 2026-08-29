@@ -15,6 +15,7 @@ import {
   JobDescriptionPanel,
   type ProposedDimension,
 } from "@/components/admin/JobDescriptionPanel";
+import { ImpactPreview } from "@/components/admin/ImpactPreview";
 
 interface BenchmarkRow {
   construct: string;
@@ -148,6 +149,17 @@ export function BenchmarkEditor({
         readOnly={readOnly}
         tailoredFormName={tailoredFormName}
         onApplyProposal={applyProposal}
+      />
+
+      <ImpactPreview
+        jobProfileId={jobProfileId}
+        rules={rows.map((r) => ({
+          construct: r.construct,
+          minScore: r.minScore,
+          maxScore: r.maxScore,
+          enabled: r.enabled,
+          required: r.required,
+        }))}
       />
 
       {message && (

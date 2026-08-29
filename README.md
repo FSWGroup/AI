@@ -201,6 +201,8 @@ Netlify Blobs; PDFs via the report's Print button there).
 - `docs/RECORDING-PRIVACY.md` — recording architecture and protections.
 - `docs/VALIDATION-ROADMAP.md` — what FSW must do before treating results
   as validated predictors.
+- `docs/FAIRNESS-AND-FEEDBACK.md` — the benchmark impact preview, voluntary
+  self-identification, the candidate summary, and the one-page manager brief.
 - `docs/ADMIN-GUIDE.md` — operating the system day to day.
 
 ## Known limitations
@@ -209,6 +211,10 @@ Netlify Blobs; PDFs via the report's Print button there).
 - Norm tables must be imported from actual calibration data; until then all
   bands are provisional and labeled as such.
 - PDF rendering requires a Chromium binary at runtime.
-- The EEO/adverse-impact module is architecture-only and disabled until FSW
-  configures it (voluntary data is stored separately and never shown on
-  candidate pages).
+- The EEO/adverse-impact module is off by default and collects nothing until
+  FSW switches it on in Settings. Once on, the four-fifths table still needs
+  30+ scored candidates with 5+ per group before it reports a ratio; below
+  that it says so rather than showing a number.
+- The candidate summary is reachable only from the candidate's own browser
+  session, so it must be saved at the time. See
+  `docs/FAIRNESS-AND-FEEDBACK.md`.

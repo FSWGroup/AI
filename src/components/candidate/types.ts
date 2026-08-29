@@ -34,6 +34,9 @@ export interface AttemptState {
   recordingNoticeVersion: string;
   accommodationContactEmail: string | null;
   privacyContactEmail: string | null;
+  eeoModuleEnabled: boolean;
+  candidateFeedbackEnabled: boolean;
+  eeoSubmitted: boolean;
 }
 
 export interface QuestionPayload {

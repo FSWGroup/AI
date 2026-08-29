@@ -39,6 +39,11 @@ export interface CandidateAttemptState {
   recordingNoticeVersion: string;
   accommodationContactEmail: string | null;
   privacyContactEmail: string | null;
+  eeoModuleEnabled: boolean;
+  candidateFeedbackEnabled: boolean;
+  /** Whether this attempt already has a voluntary self-identification on
+   *  file, so a returning candidate is not asked the same questions twice. */
+  eeoSubmitted: boolean;
 }
 
 export async function getCandidateState(
@@ -64,6 +69,9 @@ export async function getCandidateState(
       prisma.consentRecord.findMany({ where: { attemptId: attempt.id } }),
       prisma.orgSettings.findUnique({ where: { id: "org" } }),
     ]);
+
+  const eeoSubmitted =
+    (await prisma.eeoRecord.count({ where: { attemptRef: attempt.id } })) > 0;
 
   const answeredBySection = await prisma.attemptQuestion.groupBy({
     by: ["sectionKey"],
@@ -129,6 +137,9 @@ export async function getCandidateState(
     recordingNoticeVersion: settings?.privacyNoticeVersion ?? "1.0",
     accommodationContactEmail: settings?.accommodationContactEmail ?? null,
     privacyContactEmail: settings?.privacyContactEmail ?? null,
+    eeoModuleEnabled: settings?.eeoModuleEnabled ?? false,
+    candidateFeedbackEnabled: settings?.candidateFeedbackEnabled ?? false,
+    eeoSubmitted,
   };
 }
 

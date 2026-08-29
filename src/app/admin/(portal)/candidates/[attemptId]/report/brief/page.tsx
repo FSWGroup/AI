@@ -5,13 +5,19 @@ import { getCurrentUser } from "@/lib/auth/session";
 import { can } from "@/lib/auth/rbac";
 import { scopedJobProfileIds } from "@/lib/auth/scope";
 import { audit, AUDIT_ACTIONS } from "@/lib/audit";
-import { ReportView } from "@/components/report/ReportView";
+import { ManagerBrief } from "@/components/report/ManagerBrief";
 import { PrintButton } from "@/components/admin/PrintButton";
+import { buildManagerBrief } from "@/lib/report/manager-brief";
 import type { ReportPayload } from "@/lib/report/generate";
 
 export const dynamic = "force-dynamic";
 
-export default async function AdminReportPage({
+/**
+ * The condensed brief carries the same permission gate and the same audit
+ * entry as the full report — it is the same data, so it gets the same
+ * controls.
+ */
+export default async function ManagerBriefPage({
   params,
 }: {
   params: Promise<{ attemptId: string }>;
@@ -41,7 +47,10 @@ export default async function AdminReportPage({
     action: AUDIT_ACTIONS.REPORT_VIEWED,
     entityType: "Report",
     entityId: report.id,
+    newValue: { view: "manager_brief" },
   });
+
+  const brief = buildManagerBrief(report.payload as unknown as ReportPayload);
 
   return (
     <div className="mx-auto max-w-4xl">
@@ -52,23 +61,17 @@ export default async function AdminReportPage({
         >
           ← Back to candidate
         </Link>
-        <div className="flex flex-wrap gap-2">
-          <Link
-            href={`/admin/candidates/${attemptId}/report/brief`}
-            className="rounded-lg border border-navy-200 bg-white px-4 py-2.5 text-sm font-semibold text-navy-800 hover:bg-navy-50"
-          >
-            One-page brief
-          </Link>
+        <div className="flex gap-2">
           <PrintButton />
-          <a
-            href={`/api/admin/attempts/${attemptId}/pdf`}
+          <Link
+            href={`/admin/candidates/${attemptId}/report`}
             className="rounded-lg bg-navy-900 px-4 py-2.5 text-sm font-semibold text-white hover:bg-navy-800"
           >
-            Download PDF
-          </a>
+            Full report
+          </Link>
         </div>
       </div>
-      <ReportView payload={report.payload as unknown as ReportPayload} />
+      <ManagerBrief brief={brief} />
     </div>
   );
 }

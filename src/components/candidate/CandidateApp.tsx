@@ -13,7 +13,6 @@ import { Button, Card } from "@/components/ui";
 import {
   AccommodationScreen,
   CameraTestScreen,
-  CompletionScreen,
   IdentifyScreen,
   InstructionsScreen,
   MobileBlockScreen,
@@ -24,13 +23,13 @@ import {
   WelcomeScreen,
 } from "./EntryScreens";
 import { SectionRunner } from "./SectionRunner";
+import { CompletionFlow } from "./CompletionFlow";
 import type { AttemptState, QuestionPayload, SectionState } from "./types";
 
 type Phase =
   | { kind: "loading" }
   | { kind: "error"; message: string }
   | { kind: "resume_required"; recordId: string }
-  | { kind: "already_completed" }
   | { kind: "entry"; state: AttemptState }
   | { kind: "section_intro"; state: AttemptState; section: SectionState }
   | {
@@ -41,7 +40,7 @@ type Phase =
       remainingSeconds: number | null;
     }
   | { kind: "submitting"; state: AttemptState }
-  | { kind: "completed" };
+  | { kind: "completed"; state: AttemptState | null };
 
 const ENTRY_ORDER = [
   "welcome",
@@ -127,8 +126,18 @@ export function CandidateApp({
             recordId?: string;
             alreadyCompleted?: boolean;
           }>("/api/candidate/open", { body: { token: invitationToken } });
-          if (res.alreadyCompleted) setPhase({ kind: "already_completed" });
-          else if (res.resumeRequired) {
+          if (res.alreadyCompleted) {
+            // Same browser → the attempt cookie still resolves, which lets us
+            // offer the optional post-submission steps. A different browser
+            // just gets the confirmation.
+            const state = await api<{ state: AttemptState }>(
+              "/api/candidate/state",
+              { method: "GET" },
+            )
+              .then((r) => r.state)
+              .catch(() => null);
+            setPhase({ kind: "completed", state });
+          } else if (res.resumeRequired) {
             setPhase({ kind: "resume_required", recordId: res.recordId ?? "" });
           } else if (res.state) routeFromState(res.state, false);
         } else {
@@ -149,7 +158,7 @@ export function CandidateApp({
 
   const routeFromState = useCallback((state: AttemptState, isResume: boolean) => {
     if (state.status === "COMPLETED") {
-      setPhase({ kind: "completed" });
+      setPhase({ kind: "completed", state });
       return;
     }
     if (state.status === "IN_PROGRESS") {
@@ -321,7 +330,7 @@ export function CandidateApp({
         await recorderRef.current!.stop("completed");
       }
       await api("/api/candidate/complete", { body: {} });
-      setPhase({ kind: "completed" });
+      setPhase({ kind: "completed", state });
     } catch (err) {
       setPhase({
         kind: "error",
@@ -357,14 +366,6 @@ export function CandidateApp({
     );
   }
 
-  if (phase.kind === "already_completed") {
-    return (
-      <ScreenFrame step={1} totalSteps={1}>
-        <CompletionScreen />
-      </ScreenFrame>
-    );
-  }
-
   if (phase.kind === "resume_required") {
     return (
       <ResumeRequired invitationToken={invitationToken} recordId={phase.recordId} />
@@ -374,7 +375,7 @@ export function CandidateApp({
   if (phase.kind === "completed") {
     return (
       <ScreenFrame step={1} totalSteps={1}>
-        <CompletionScreen />
+        <CompletionFlow state={phase.state} />
       </ScreenFrame>
     );
   }
