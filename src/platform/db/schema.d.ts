@@ -454,6 +454,67 @@ export interface PartyMasteredField {
   value_type: string;
 }
 
+export interface PartyMatchCandidate {
+  blocking_keys: Generated<string[]>;
+  created_at: Generated<Timestamp>;
+  decided_at: Timestamp | null;
+  decided_by: string | null;
+  decision_reason: string | null;
+  deterministic_rule: string | null;
+  entity_type: string;
+  /**
+   * Hash of the evidence. A pair a steward rejected returns only when the evidence materially changes, which is what keeps the queue worth reading.
+   */
+  evidence_fingerprint: string;
+  features: Json;
+  id: Generated<string>;
+  left_entity_id: string;
+  match_config_version: number | null;
+  merge_id: string | null;
+  method: string;
+  normalization_version: Generated<number>;
+  right_entity_id: string;
+  score: Numeric;
+  status: Generated<string>;
+}
+
+export interface PartyMatchConfig {
+  auto_link_threshold: Generated<Numeric>;
+  created_at: Generated<Timestamp>;
+  created_by: string | null;
+  entity_type: string;
+  id: Generated<string>;
+  is_active: Generated<boolean>;
+  normalization_version: Generated<number>;
+  note: string | null;
+  review_threshold: Generated<Numeric>;
+  version: number;
+  weights: Json;
+}
+
+export interface PartyMergeLinkMove {
+  column_name: string;
+  entity_table: string;
+  from_value: string;
+  id: Generated<string>;
+  merge_id: string;
+  moved_at: Generated<Timestamp>;
+  reversed_at: Timestamp | null;
+  row_id: string;
+  to_value: string;
+}
+
+export interface PartyMergeManifest {
+  apply_order: Generated<number>;
+  column_name: string;
+  entity_table: string;
+  note: string | null;
+  /**
+   * MOVE re-points the row at the survivor. NEVER_MOVE marks a reference that must stay where it is — merge bookkeeping, which a later merge must not rewrite.
+   */
+  strategy: Generated<string>;
+}
+
 export interface PartyOrganization {
   confidence: Generated<string>;
   created_at: Generated<Timestamp>;
@@ -477,6 +538,35 @@ export interface PartyOrganization {
   updated_by: string | null;
   version: Generated<number>;
   website_url: string | null;
+}
+
+export interface PartyOrganizationAlias {
+  alias: string;
+  alias_type: Generated<string>;
+  created_at: Generated<Timestamp>;
+  created_by: string | null;
+  id: Generated<string>;
+  normalization_version: Generated<number>;
+  normalized_alias: string;
+  organization_id: string;
+  source_system_code: string | null;
+}
+
+export interface PartyOrganizationMerge {
+  correlation_id: string | null;
+  evidence: Json | null;
+  id: Generated<string>;
+  match_candidate_id: string | null;
+  merged_at: Generated<Timestamp>;
+  merged_by: string | null;
+  merged_organization_id: string;
+  method: string;
+  reason: string;
+  reversal_reason: string | null;
+  reversed_at: Timestamp | null;
+  reversed_by: string | null;
+  score: Numeric | null;
+  surviving_organization_id: string;
 }
 
 export interface PartyOrganizationRelationship {
@@ -1105,7 +1195,13 @@ export interface DB {
   "party.field_ownership": PartyFieldOwnership;
   "party.location": PartyLocation;
   "party.mastered_field": PartyMasteredField;
+  "party.match_candidate": PartyMatchCandidate;
+  "party.match_config": PartyMatchConfig;
+  "party.merge_link_move": PartyMergeLinkMove;
+  "party.merge_manifest": PartyMergeManifest;
   "party.organization": PartyOrganization;
+  "party.organization_alias": PartyOrganizationAlias;
+  "party.organization_merge": PartyOrganizationMerge;
   "party.organization_relationship": PartyOrganizationRelationship;
   "party.organization_role": PartyOrganizationRole;
   "party.organization_role_type": PartyOrganizationRoleType;
