@@ -73,3 +73,57 @@ export {
   PersonAffiliationEnded,
   partyEvents,
 } from './events.js';
+
+export {
+  mergeOrganizations,
+  unmergeOrganizations,
+  resolveOrganizationId,
+} from './merge.js';
+export type { MergeInput, MergeResult, UnmergeInput, UnmergeResult } from './merge.js';
+
+export {
+  NAME_NORMALIZATION_VERSION,
+  normalizeName,
+  normalizeDomain,
+  normalizePhone,
+  foldText,
+  tokenOverlap,
+  tokenContainment,
+} from './matching/normalize.js';
+export type { NormalizedName } from './matching/normalize.js';
+
+export {
+  scorePair,
+  deterministicMatch,
+  trigramSimilarity,
+  DETERMINISTIC_NAME_FLOOR,
+} from './matching/score.js';
+export type {
+  Feature,
+  MatchSubject,
+  MatchWeights,
+  ScoreResult,
+  SignalName,
+  DeterministicRule,
+} from './matching/score.js';
+
+export {
+  loadMatchConfig,
+  blockingKeys,
+  loadSubject,
+  findBlockedCandidates,
+  resolveOrganization,
+  decideCandidate,
+} from './matching/resolve.js';
+export type {
+  MatchConfig,
+  ResolutionOutcome,
+  ReviewDecision,
+} from './matching/resolve.js';
+
+export {
+  OrganizationsMerged,
+  OrganizationMergeReversed,
+  MatchCandidateRaised,
+  MatchCandidateDecided,
+} from './events.js';

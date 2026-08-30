@@ -466,34 +466,31 @@ export async function evaluateFields(
       previous?.assertsAbsence === true ? null : (previous?.valueText ?? null);
     const value = winner?.assertsAbsence === true ? null : (winner?.valueText ?? null);
 
-    if (previous?.id !== winner?.id || previous?.valueText !== winner?.valueText) {
-      // Clear first, then set: the partial unique index allows only one selected
-      // candidate per field, and a bug here should fail rather than corrupt.
-      await sql`
-        UPDATE party.field_candidate
-           SET is_selected = false, selected_reason = NULL
-         WHERE entity_type = ${entityType} AND entity_id = ${entityId}::uuid
-           AND field_key = ${fieldKey} AND is_selected
-      `.execute(uow.tx);
+    // Clear every selection for this field, then set the winner — unconditionally,
+    // even when the winner has not changed. The partial unique index allows one
+    // selected candidate per field, so an unconditional clear makes "two rows somehow
+    // selected" self-healing rather than a state the next write trips over. It also
+    // costs nothing: the same-winner path had to write anyway, to refresh the reason,
+    // because a rule change that does not change the outcome still changed WHY the
+    // outcome holds.
+    await sql`
+      UPDATE party.field_candidate
+         SET is_selected = false, selected_reason = NULL
+       WHERE entity_type = ${entityType} AND entity_id = ${entityId}::uuid
+         AND field_key = ${fieldKey} AND is_selected
+    `.execute(uow.tx);
 
-      if (winner !== undefined) {
-        await sql`
-          UPDATE party.field_candidate
-             SET is_selected = true, selected_reason = ${reason},
-                 evaluated_at = now(), rule_version = ${rule.version}
-           WHERE id = ${winner.id}::uuid
-        `.execute(uow.tx);
-      }
-      updates.set(field, value);
-    } else if (winner !== undefined) {
-      // Same winner: refresh the reason and rule version, because a rule change that
-      // does not change the outcome still changed why the outcome holds.
+    if (winner !== undefined) {
       await sql`
         UPDATE party.field_candidate
-           SET selected_reason = ${reason}, evaluated_at = now(),
-               rule_version = ${rule.version}
+           SET is_selected = true, selected_reason = ${reason},
+               evaluated_at = now(), rule_version = ${rule.version}
          WHERE id = ${winner.id}::uuid
       `.execute(uow.tx);
+    }
+
+    if (previous?.id !== winner?.id || previousValue !== value) {
+      updates.set(field, value);
     }
 
     results.push({

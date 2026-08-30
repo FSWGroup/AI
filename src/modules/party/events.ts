@@ -165,6 +165,90 @@ export const PersonAffiliationEnded = defineEvent({
   ),
 });
 
+export const OrganizationsMerged = defineEvent({
+  type: 'fsw.party.OrganizationsMerged',
+  version: 1,
+  module: 'party',
+  aggregateType: 'Organization',
+  description:
+    'Two organizations were judged to be one. Consumers holding the merged identifier ' +
+    'must follow it to the survivor — the old identifier keeps resolving and is never ' +
+    'reused, so nothing breaks, but a consumer that stores it will accumulate ' +
+    'redirects until it updates.',
+  payload: Type.Object(
+    {
+      ...EntityRef,
+      mergedOrganizationId: Type.String({ format: 'uuid' }),
+      mergeId: Type.String({ format: 'uuid' }),
+      method: Type.String(),
+      movedRows: Type.Integer({ minimum: 0 }),
+      changedFieldKeys: Type.Array(Type.String()),
+    },
+    { additionalProperties: false },
+  ),
+});
+
+export const OrganizationMergeReversed = defineEvent({
+  type: 'fsw.party.OrganizationMergeReversed',
+  version: 1,
+  module: 'party',
+  aggregateType: 'Organization',
+  description:
+    'A merge was undone and both organizations are live again. Their field values were ' +
+    'recomputed rather than restored, so each says what it should say now — which is ' +
+    'not necessarily what it said before the merge.',
+  payload: Type.Object(
+    {
+      ...EntityRef,
+      restoredOrganizationId: Type.String({ format: 'uuid' }),
+      mergeId: Type.String({ format: 'uuid' }),
+      restoredRows: Type.Integer({ minimum: 0 }),
+    },
+    { additionalProperties: false },
+  ),
+});
+
+export const MatchCandidateRaised = defineEvent({
+  type: 'fsw.party.MatchCandidateRaised',
+  version: 1,
+  module: 'party',
+  aggregateType: 'MatchCandidate',
+  description:
+    'Two records may be the same thing and a person needs to decide. Carries the score ' +
+    'and the identifiers; the feature vector that explains the score is read through ' +
+    'the API, where it can be shown properly.',
+  payload: Type.Object(
+    {
+      matchCandidateId: Type.String({ format: 'uuid' }),
+      entityType: Type.String(),
+      leftEntityId: Type.String({ format: 'uuid' }),
+      rightEntityId: Type.String({ format: 'uuid' }),
+      score: Type.Number({ minimum: 0, maximum: 1 }),
+      method: Type.String(),
+    },
+    { additionalProperties: false },
+  ),
+});
+
+export const MatchCandidateDecided = defineEvent({
+  type: 'fsw.party.MatchCandidateDecided',
+  version: 1,
+  module: 'party',
+  aggregateType: 'MatchCandidate',
+  description:
+    'A steward decided a pair. A rejection is as valuable as an approval: it is what ' +
+    'stops the pair resurfacing until the evidence actually changes.',
+  payload: Type.Object(
+    {
+      matchCandidateId: Type.String({ format: 'uuid' }),
+      entityType: Type.String(),
+      status: Type.String(),
+      mergeId: Type.Union([Type.String({ format: 'uuid' }), Type.Null()]),
+    },
+    { additionalProperties: false },
+  ),
+});
+
 export const partyEvents = [
   OrganizationCreated,
   OrganizationFieldValueChanged,
@@ -174,4 +258,8 @@ export const partyEvents = [
   CommercialAccountLinked,
   PersonAffiliationStarted,
   PersonAffiliationEnded,
+  OrganizationsMerged,
+  OrganizationMergeReversed,
+  MatchCandidateRaised,
+  MatchCandidateDecided,
 ] as const;
