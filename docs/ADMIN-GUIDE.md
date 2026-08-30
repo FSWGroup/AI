@@ -93,6 +93,19 @@ in the append-only Audit Log.
   optional demographic information after they submit. Every question can be
   declined and the whole form skipped. It never reaches a report.
 
+## Sending results to a colleague
+
+The candidate's **Download PDF** tab exports the complete assessment as a
+single file — executive summary and score sheet first, then every section
+through to the integrity log and a plain-English guide to reading it. The
+tab lists exactly what the file contains before you download it.
+
+Two things are never in it: the webcam recording (who may view one is a
+separate audited permission that a PDF cannot carry) and the candidate's
+résumé (their document, not ours to forward). Your name and the export time
+are stamped on the cover and the download is audited, so a forwarded copy
+can be traced back.
+
 ## Data & compliance
 
 - Legal holds (Settings) block deletion by scope: `GLOBAL`,

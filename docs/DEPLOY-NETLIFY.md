@@ -91,11 +91,14 @@ interview guide, integrity log, and the recording (HR/Super Admin only,
 audited). The Report tab also offers the **hiring manager brief** — the
 same data condensed onto one page for whoever is running the interview.
 
-For a PDF of any of them, open the view and use **Print / Save as PDF**.
-Netlify Functions don't ship a Chromium runtime, so the full report's
-server-side `Download PDF` button responds with that guidance there
-instead; the print output is the same paginated, footered document. The
-brief prints to exactly one sheet, and the candidate's own summary (if you
+To send results to someone without an account, use the candidate's
+**Download PDF** tab: it exports the whole assessment as one file, summary
+and score sheet first. It is generated in pure JavaScript, so it works on
+Netlify with no Chromium and no extra configuration, and each download is
+recorded in the audit log. See `docs/PDF-EXPORT.md`.
+
+Any of the on-screen views also print cleanly with **Print / Save as PDF** —
+the manager brief to exactly one sheet, the candidate's own summary (if you
 enable it) to about four.
 
 ## Platform notes and limits

@@ -47,6 +47,7 @@ export const AUDIT_ACTIONS = {
   REPORT_GENERATED: "report.generated",
   REPORT_VIEWED: "report.viewed",
   REPORT_PDF_DOWNLOADED: "report.pdf_downloaded",
+  REPORT_EXPORTED: "report.exported",
   RECORDING_VIEWED: "recording.viewed",
   RECORDING_DELETED: "recording.deleted",
   NOTE_CREATED: "candidate_note.created",

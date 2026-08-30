@@ -33,6 +33,7 @@
     "bcryptjs": "^3.0.2",
     "mammoth": "^1.12.2",
     "next": "^15.5.23",
+    "pdf-lib": "^1.17.1",
     "playwright-core": "~1.56.0",
     "react": "19.1.0",
     "react-dom": "19.1.0",

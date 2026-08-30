@@ -10,6 +10,7 @@ import { AdminActions } from "@/components/admin/AdminActions";
 import { AiAnalysisPanel } from "@/components/admin/AiAnalysisPanel";
 import { RecordingViewer } from "@/components/admin/RecordingViewer";
 import { ScoreTable } from "@/components/admin/ScoreTable";
+import { ExportPanel } from "@/components/admin/ExportPanel";
 import { summarizeIntegrity, INTEGRITY_LABELS } from "@/lib/scoring/integrity";
 
 export const dynamic = "force-dynamic";
@@ -21,6 +22,7 @@ const TABS = [
   { key: "ai", label: "Résumé & AI Brief" },
   { key: "integrity", label: "Integrity" },
   { key: "recording", label: "Recording" },
+  { key: "export", label: "Download PDF" },
   { key: "admin", label: "Administration" },
 ];
 
@@ -65,6 +67,10 @@ export default async function CandidateDetailPage({
     settings?.recordingAccessRoles ?? ["SUPER_ADMIN", "HR_ADMIN"],
   );
   const manageAllowed = can(user.role, "MANAGE_ATTEMPTS");
+  const hasAiBrief =
+    (await prisma.aiAnalysis.count({
+      where: { attemptId: attempt.id, kind: "CANDIDATE_FIT", status: "READY" },
+    })) > 0;
 
   const counts = new Map<string, number>();
   for (const e of attempt.integrityEvents) {
@@ -213,12 +219,12 @@ export default async function CandidateDetailPage({
                 >
                   Open web report
                 </Link>
-                <a
-                  href={`/api/admin/attempts/${attempt.id}/pdf`}
+                <Link
+                  href={`/admin/candidates/${attempt.id}?tab=export`}
                   className="rounded-lg border border-navy-200 bg-white px-4 py-2.5 text-sm font-semibold text-navy-800 hover:bg-navy-50"
                 >
-                  Download PDF
-                </a>
+                  Download complete PDF
+                </Link>
               </div>
             </Card>
           ) : (
@@ -300,6 +306,15 @@ export default async function CandidateDetailPage({
 
         {tab === "recording" && recordingAllowed && (
           <RecordingViewer attemptId={attempt.id} />
+        )}
+
+        {tab === "export" && (
+          <ExportPanel
+            attemptId={attempt.id}
+            ready={attempt.reports.length > 0}
+            hasAiBrief={hasAiBrief}
+            integrityEventCount={attempt.integrityEvents.length}
+          />
         )}
 
         {tab === "admin" && manageAllowed && (

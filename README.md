@@ -201,6 +201,8 @@ Netlify Blobs; PDFs via the report's Print button there).
 - `docs/RECORDING-PRIVACY.md` — recording architecture and protections.
 - `docs/VALIDATION-ROADMAP.md` — what FSW must do before treating results
   as validated predictors.
+- `docs/PDF-EXPORT.md` — the complete assessment export: what is in it, what
+  is deliberately left out, and how it is rendered.
 - `docs/FAIRNESS-AND-FEEDBACK.md` — the benchmark impact preview, voluntary
   self-identification, the candidate summary, and the one-page manager brief.
 - `docs/ADMIN-GUIDE.md` — operating the system day to day.
@@ -210,14 +212,17 @@ Netlify Blobs; PDFs via the report's Print button there).
 - Real email delivery requires wiring a provider (`src/lib/email/index.ts`).
 - Norm tables must be imported from actual calibration data; until then all
   bands are provisional and labeled as such.
-- **Getting results as a PDF.** Every report view — the full report, the
-  one-page manager brief, and the candidate's own summary — is print-styled
-  and produces a clean PDF through the browser's **Print / Save as PDF**
-  (admin navigation, buttons, and toolbars are suppressed). The full
-  report's server-side *Download PDF* button additionally needs a Chromium
-  binary at runtime; serverless hosts such as Netlify Functions do not ship
-  one, so there it returns a 501 pointing at Print / Save as PDF, which
-  produces the same document.
+- **Getting results as a PDF.** A candidate's **Download PDF** tab exports
+  the complete assessment as one file — summary and score sheet first, then
+  every section including the interview guide, session record, and integrity
+  log. It is generated with `pdf-lib` (pure JavaScript), so it works on every
+  host including serverless functions with no Chromium, and the download is
+  audited. See `docs/PDF-EXPORT.md`.
+- The report views are also print-styled, so **Print / Save as PDF** produces
+  a clean document from any of them (the manager brief prints to exactly one
+  sheet). The older server-side renderer at `/api/admin/attempts/:id/pdf`
+  prints the web report through headless Chromium and still needs a browser
+  binary at runtime; the complete export above replaced it in the UI.
 - The EEO/adverse-impact module is off by default and collects nothing until
   FSW switches it on in Settings. Once on, the four-fifths table still needs
   30+ scored candidates with 5+ per group before it reports a ratio; below

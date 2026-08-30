@@ -195,6 +195,16 @@ test("candidate completes the full assessment and HR sees the report", async ({
   expect(briefHtml).toContain("required dimensions fall inside this role");
   // The brief must never turn the count into a decision.
   expect(briefHtml).not.toMatch(/\brecommend hiring\b|\bdo not hire\b|\bpass\/fail\b/i);
+
+  // ---- The complete export downloads as a real PDF --------------------------------
+  const exportRes = await hr.get(`/api/admin/attempts/${attempt.id}/export`);
+  expect(exportRes.ok()).toBe(true);
+  expect(exportRes.headers()["content-type"]).toBe("application/pdf");
+  expect(exportRes.headers()["content-disposition"]).toContain("attachment");
+  expect(exportRes.headers()["content-disposition"]).toContain(".pdf");
+  const pdfBytes = await exportRes.body();
+  expect(pdfBytes.subarray(0, 5).toString()).toBe("%PDF-");
+  expect(pdfBytes.byteLength).toBeGreaterThan(10_000);
 });
 
 test("the candidate summary carries no scores, benchmarks, or validity data", async ({
