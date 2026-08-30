@@ -69,8 +69,8 @@ Rows fill in as phases land.
 | 5   | A product is filterable immediately after commit                                | `pim/catalog.test.ts`                                                | ✅                                                        |
 | 6   | Enter bar, preserve it, return PSI, match a PSI range                           | `pim/units.test.ts`, `pim/catalog.test.ts`                           | ✅                                                        |
 | 7   | Class 150 is not 150 PSI; NPS 1 is not 25.4 mm                                  | `pim/engineering-semantics.test.ts`, `pim/catalog.test.ts`           | ✅                                                        |
-| 8   | Two sources, explainable match, approve, both records preserved                 | `party/entity-resolution.test.ts`                                    | ⬜                                                        |
-| 9   | Undo the merge, restore relationships, lose nothing                             | `party/unmerge.test.ts`                                              | ⬜                                                        |
+| 8   | Two sources, explainable match, approve, both records preserved                 | `party/merge.test.ts`, `party/matching.test.ts`                      | ✅                                                        |
+| 9   | Undo the merge, restore relationships, lose nothing                             | `party/merge.test.ts`                                                | ✅                                                        |
 | 10  | Two sources disagree: both values, winner, reason, origin                       | `pim/catalog.test.ts` (PIM); `party/survivorship.test.ts` (accounts) | ✅                                                        |
 | 11  | Interrupted Pipedrive backfill restarts without duplicates                      | `ingest/pipedrive-backfill.test.ts`                                  | ⬜                                                        |
 | 12  | The same webhook twice is harmless                                              | `ingest/pipedrive-webhook.test.ts`                                   | ⬜                                                        |
@@ -165,6 +165,27 @@ observed structure so a reviewer has something to approve`.
   which client drivers do not recognise, so every consumer would have received
   `'{P21,PIPEDRIVE}'` rather than a list. Caught by asserting on the parsed value
   instead of on the column's presence; fixed by casting to `text[]` in the view.
+- **Merging two organizations put two selected values on one field.** Candidate
+  selection is a derived flag, and both records had a winner per field; moving the
+  loser's candidates across left two rows flagged as selected, which the partial unique
+  index correctly refused. Fixed by clearing the flags immediately before the move and
+  re-deriving afterwards — and the evaluator now clears unconditionally rather than
+  only when the winner changes, so "two rows somehow selected" is self-healing instead
+  of a state the next write trips over.
+- **The evidence fingerprint was not symmetric.** It hashed the two identifiers in the
+  order the caller happened to supply them, so resolving A produced a different
+  fingerprint from resolving B for the same pair. A pair a steward had rejected came
+  straight back the next time the other side was processed — the exact failure the
+  fingerprint exists to prevent. Fixed by ordering the identifiers; caught by a test
+  that resolves from both directions rather than only one.
+- **Two merge-ledger columns were unregistered in the merge manifest.**
+  `party.organization_merge` references `party.organization` twice, and a later merge
+  would have re-pointed those references — rewriting the record of an earlier merge, so
+  that reversing it would restore rows to the wrong place. Only reachable through a
+  chain (merge, merge again, reverse the first), which is the case least likely to be
+  tried by hand. Found by the ADR-0012 tripwire test on its first run; fixed by
+  registering them `NEVER_MOVE` with a note, because an omission is indistinguishable
+  from an oversight.
 
 ## What the benchmark actually measures
 

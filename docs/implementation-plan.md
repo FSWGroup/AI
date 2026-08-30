@@ -248,10 +248,35 @@ unmerge by exact reversal; merged-ID redirect semantics; the child-table registr
 test that fails when a new organization-owned table is not registered in the merge
 manifest.
 
-**Migrations.** `0026`–`0028`.
+**Migrations.** `0017` (resolution and merge) and `0018` (manifest exclusions).
 
 **Events.** `fsw.party.MatchCandidateRaised`, `MatchDecided`, `OrganizationsMerged`,
 `OrganizationMergeReversed`.
+
+**Status: delivered for organizations.** Three-stage resolution — deterministic rules,
+explainable weighted scoring, human review — with the feature vector persisted on every
+candidate; merge and unmerge by link movement; the merge manifest and its tripwire test.
+Person and site resolution reuse the same scorer and queue and follow when those
+services acquire callers.
+
+Automatic linking ships **disabled**: the default `auto_link_threshold` is 1.010, above
+any achievable score. A bad automatic merge is expensive to notice and cheap to avoid,
+and no threshold chosen before seeing real FSW data is worth the risk. Turning it on is
+a configuration change once precision has been measured against a labelled set.
+
+Two notes on how the stages interact, both learned from the tests:
+
+- **The deterministic name floor is high (0.85 trigram) and that makes the composite
+  rules fire rarely.** "Acme Pharma" against "Acme Pharmaceutical" scores 0.52, so the
+  domain-and-name rule does not fire even though both records share a website — the
+  weighted stage catches it at 0.76 and sends it to a person. This is the intended
+  behaviour: a deterministic rule bypasses scoring entirely, so it must not fire on a
+  plausible coincidence. Two subsidiaries can share a corporate website.
+- **The trigram implementation is duplicated, deliberately.** Scoring is a pure
+  function so the combinatorial rule behaviour can be tested without a fixture per case,
+  which means reimplementing `pg_trgm`'s definition in TypeScript. A test compares the
+  two against a corpus, because a silent drift would let a pair block in SQL and score
+  differently in the application.
 
 **Exit criteria.** AC8 — records for the same plant from two independent sources
 produce an explainable candidate, which is approved, creating the canonical relationship
