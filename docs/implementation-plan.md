@@ -77,15 +77,36 @@ service accounts with Argon2id credentials and overlapping rotation; roles, perm
 scopes and assignments as data; the central authorization decision point; the mandatory
 scope predicate in the repository layer; `/v1/me`; `POST /v1/authz/check`.
 
-**Migrations.** `0006`–`0008`.
+**Migrations.** `0019`.
 
 **Events.** `fsw.iam.PersonRegistered`, `IdentityLinked`, `PrincipalRoleAssigned`,
 `PrincipalRoleRevoked`, `ServiceAccountCreated`, `CredentialRotated`.
 
-**APIs.** `GET /v1/me`, `POST /v1/authz/check`, principal and role administration.
+**APIs.** `GET /v1/me`, `POST /v1/authz/check`, principal and role administration —
+**deferred to Phase 11 with the rest of the HTTP layer.** `describePrincipal` is the
+whole of what `/v1/me` returns and is tested; the route that serves it is not written,
+because there is no Fastify application yet and building one for two endpoints would
+front-run the API decisions in ADR-0028.
 
 **Security.** Default deny; a route without a declared permission fails at startup;
 authorization denials are audited; credentials are never returned after creation.
+
+**Status: the domain is delivered.** Multi-issuer OIDC with real JWKS verification,
+identity as `(issuer, subject)`, JIT provisioning behind domain allow-lists, pending
+link requests, service accounts, Argon2id credentials with overlapping rotation, the
+data-driven permission catalogue, the single decision point, the mandatory scope
+predicate, and the denial record.
+
+Two notes:
+
+- **`jose` and `@node-rs/argon2` are new dependencies** (ADR-0034 requires that to be a
+  deliberate act). Hand-rolling JWT verification is the wrong call at any size, and
+  Node has no built-in Argon2. Both are exact-pinned and both ship prebuilt, so
+  neither adds a compiler to the build.
+- **Argon2id is used for machine credentials that are already 256 bits of CSPRNG
+  output**, so the memory hardness is defence in depth rather than the primary control.
+  It is kept because the cost of being wrong about that assumption is total and the
+  cost of being right anyway is a few milliseconds per authentication.
 
 **Exit criteria.** AC1 — one identity recognised by two API audiences without a
 second person ID. AC2 — a ValveMan-only principal is denied a Welsford-only resource,

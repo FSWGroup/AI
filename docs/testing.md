@@ -62,8 +62,8 @@ Rows fill in as phases land.
 | 18  | Wipe a read model, replay from zero, reconstruct it                             | `datacore/projection.test.ts`                                        | ✅                                                        |
 | 19  | Duplicate event delivery leaves consumer state correct                          | `datacore/projection.test.ts`                                        | ✅                                                        |
 | 24  | Every write traces to actor, operation, time, entity, correlation, before/after | `datacore/unit-of-work.test.ts`                                      | ✅                                                        |
-| 1   | One identity, two API contexts, one person ID                                   | `iam/identity.test.ts`                                               | ⬜                                                        |
-| 2   | ValveMan-only principal denied a Welsford-only resource                         | `iam/object-level-authz.test.ts`                                     | ⬜                                                        |
+| 1   | One identity, two API contexts, one person ID                                   | `iam/identity.test.ts`                                               | ✅                                                        |
+| 2   | ValveMan-only principal denied a Welsford-only resource                         | `iam/object-level-authz.test.ts`                                     | ✅                                                        |
 | 3   | New product type and attributes, no code change, no migration                   | `pim/metadata-loader.test.ts`, `pim/catalog.test.ts`                 | ✅                                                        |
 | 4   | Combination filter meets the SLO                                                | `perf/product-filter.perf.ts`                                        | ◐ met at 25k; not met at the provisional 250k — see below |
 | 5   | A product is filterable immediately after commit                                | `pim/catalog.test.ts`                                                | ✅                                                        |
@@ -85,6 +85,22 @@ Rows fill in as phases land.
 | 25  | A stale write is rejected, not silently applied                                 | `pim/catalog.test.ts`, `party/organizations.test.ts`                 | ◐ domain proven; the HTTP layer is Phase 11               |
 | 26  | Canonical services depend on the abstract ingestion contract                    | `ingest/adapter-independence.test.ts`                                | ✅                                                        |
 | 27  | Clean environment restored from backup and verified                             | `docs/runbooks/restore.md` drill                                     | ⬜                                                        |
+
+## What this suite cannot check here
+
+`iam.access_denial` and `ingest.source_record_version` are append-only for the
+application role, enforced by a `REVOKE` in their migrations. That only takes effect
+where the `fsw_app` role exists, and creating it needs `CREATEROLE` — which a managed
+instance or a developer sandbox may not grant, and does not grant in the environment
+this suite currently runs in.
+
+So the test checks the live grants where the role is present and falls back to asserting
+that the migration still carries the `REVOKE` where it is not. The weaker check is
+stated in the failure message rather than skipped: a security test that quietly does
+nothing is worse than one that is absent, because its name appears in the passing list.
+
+**Before production, run the suite once against a database where `fsw_app` exists.**
+That is the only run that proves the grant rather than the intent.
 
 ## Determinism
 
@@ -186,6 +202,18 @@ observed structure so a reviewer has something to approve`.
   tried by hand. Found by the ADR-0012 tripwire test on its first run; fixed by
   registering them `NEVER_MOVE` with a note, because an omission is indistinguishable
   from an oversight.
+- **A credential's expiry preceded its own creation.** `created_at` came from the
+  database's `DEFAULT now()` while `expires_at` was computed from the injected clock,
+  and under a fixed test clock set in the past those are not the same instant. The
+  CHECK constraint caught it on the first insert, which is the argument for having
+  written the constraint. Fixed by taking both from the injected clock — a
+  `DEFAULT now()` on a column that participates in domain logic quietly opts out of the
+  clock-injection rule.
+- **`expiringCredentials` read the database clock while its data was written from
+  another one.** It reported a credential with 200 days left as expiring within 30,
+  because the rows were dated from the fixed clock and the comparison was against real
+  time. Fixed by taking `now` as a parameter. The general shape is worth remembering:
+  a helper that mixes two clocks answers a question about neither.
 
 ## What the benchmark actually measures
 
