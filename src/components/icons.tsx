@@ -41,6 +41,8 @@ const PATHS: Record<IconName, string> = {
   media: "M4 5.5h16v13H4zM4 14l4-4 3.5 3.5 3-2.5L20 15M15.5 9.5a1.25 1.25 0 1 0 0-2.5 1.25 1.25 0 0 0 0 2.5Z",
   announcement:
     "M5 10.5v3l3 .5 2 5h2l-1.5-4.75L19 16V8l-8.5 2.25L5 10.5ZM19 10.5a2 2 0 0 1 0 3",
+  // Something falling, stopped before it landed.
+  nearmiss: "M12 3v8.5M8.75 8.25 12 11.5l3.25-3.25M4 15h16M7 18.5h4.5M14 18.5h3",
 };
 
 export function Icon({

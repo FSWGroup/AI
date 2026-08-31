@@ -11,7 +11,7 @@ import { Glyph, Icon } from "@/components/icons";
 import { cn } from "@/lib/utils";
 
 export interface AskCitation {
-  entityType: "SOP" | "COURSE";
+  entityType: "SOP" | "COURSE" | "NEAR_MISS";
   entityId: string;
   title: string;
   sectionPath: string | null;
@@ -233,7 +233,8 @@ export function AskChat({
               <div>
                 <p className="text-[0.9375rem] font-semibold text-[var(--text-primary)]">Hi {actorName.split(" ")[0]}, what do you need to know?</p>
                 <p className="mt-1 text-[0.8125rem] text-[var(--text-muted)]">
-                  Answers are grounded in published FSW SOPs and courses, with citations.
+                  Answers are grounded in published FSW SOPs, courses and near-miss case
+                  studies, with citations.
                 </p>
               </div>
               <div className="flex flex-col gap-2">

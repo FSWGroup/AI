@@ -45,6 +45,17 @@ export const AUDIT_ACTIONS = {
   EXEMPTION_CREATED: "compliance.exemption_created",
   COMPLIANCE_RULE_CHANGED: "compliance.rule_changed",
 
+  /*
+   * Near misses. NEAR_MISS_REPORTED is recorded with a null actor when the
+   * reporter asked for anonymity: the platform records that a report was filed
+   * and when, never who filed it. Anonymity that leaks through the audit log to
+   * anyone holding audit.view is not anonymity.
+   */
+  NEAR_MISS_REPORTED: "nearmiss.reported",
+  NEAR_MISS_REVIEWED: "nearmiss.reviewed",
+  NEAR_MISS_PUBLISHED: "nearmiss.published",
+  NEAR_MISS_ARCHIVED: "nearmiss.archived",
+
   AI_CONTENT_PUBLISHED: "ai.content_published",
   AI_GENERATION_REQUESTED: "ai.generation_requested",
 

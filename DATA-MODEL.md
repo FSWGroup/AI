@@ -314,6 +314,47 @@ with a reason, a granting actor, and an expiry.
 
 ---
 
+## Near misses
+
+```
+NearMiss
+├── reference               "NM-014" — the human handle, unique
+├── title, category, severity, status
+├── departmentId, businessUnitId, locationId, occurredOn   ← where, never who
+├── whatHappened, howItWasCaught, whyItHappened, whatChanged
+├── reportedById            NULL for an anonymous report; never published
+├── publishedById, publishedAt
+└── preventingSopId, teachingCourseId                      ← both nullable
+```
+
+**There is no column for whose fault it was, at any point in the lifecycle.**
+That is the design, not an omission: a schema that cannot record fault cannot
+later be queried for it, and a reporting channel people believe is safe is worth
+more than one that is merely promised to be.
+
+Three properties are structural rather than procedural:
+
+- **Anonymity.** `reportedById` is null for an anonymous report, and the
+  `nearmiss.reported` audit row is written with a null actor. Anonymity that
+  leaks to anyone holding `audit.view` is not anonymity. Every published read
+  path uses one select shape that does not name the column at all, so it cannot
+  escape through a spread, a JSON response, or a future API route.
+- **Where, not who.** A named report inherits the reporter's department and
+  business unit so the library is pattern-spottable. An anonymous one does not:
+  a silent department stamp on a two-person department identifies the reporter
+  as surely as their name.
+- **Publication is gated.** `status` moves REPORTED → UNDER_REVIEW → PUBLISHED
+  only through a human act, and only when the narrative carries a cause and a
+  recorded change and passes the identifying-detail scan (see
+  `src/lib/services/near-miss-redaction.ts`). Nothing unpublished is readable
+  through `nearmiss.view`, searchable, or in the AI corpus.
+
+`preventingSopId` being nullable carries information: a case study no procedure
+covers is the strongest signal the library produces for what to write next, and
+the library surfaces exactly that.
+
+---
+
 ## AI and retrieval
 
 ```
@@ -329,6 +370,12 @@ The ACL columns are the security boundary. Retrieval filters on them **inside th
 SQL query**, so content the asking user cannot open is never fetched and cannot
 appear in a prompt. `sectionPath` is why a citation can address a section rather
 than a document.
+
+Near-miss chunks are written with `requiredPermission = "nearmiss.view"`, and
+the retrieval query joins `NearMiss` on `status = 'PUBLISHED'` exactly as it
+joins `Sop` and `Course` — so a report in the review queue is unreachable, and a
+contractor (who holds `nearmiss.report` but not `nearmiss.view`) never retrieves
+a case study even though the chunk exists.
 
 `embedding` is nullable by design: without an embedding provider the system falls
 back to keyword and trigram retrieval, with identical permission filtering.

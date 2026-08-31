@@ -52,6 +52,11 @@ export const PERMISSIONS = {
   "compliance.view": "View compliance status and rules",
   "compliance.manage": "Manage compliance rules and exemptions",
 
+  // Near misses (blameless learning library)
+  "nearmiss.report": "File a near-miss report",
+  "nearmiss.view": "Read the published near-miss library",
+  "nearmiss.review": "Review, sanitize, publish, and archive near-miss reports",
+
   // Reports
   "reports.view": "View reports and dashboards beyond your own record",
   "reports.export": "Export report data to CSV/XLSX/PDF",
@@ -118,6 +123,10 @@ const LEARNER_BASE: Permission[] = [
   "org.view",
   "media.view",
   "ai.ask",
+  // Reporting a near miss is a baseline capability on purpose: a reporting
+  // channel that only some people hold is a reporting channel that fails.
+  "nearmiss.report",
+  "nearmiss.view",
 ];
 
 /**
@@ -177,6 +186,7 @@ export const DEFAULT_ROLE_PERMISSIONS: Record<RoleKey, Permission[]> = {
     "announcements.manage",
     "team.view",
     "compliance.view",
+    "nearmiss.review",
   ],
 
   [ROLE_KEYS.COMPLIANCE_ADMIN]: [
@@ -184,6 +194,7 @@ export const DEFAULT_ROLE_PERMISSIONS: Record<RoleKey, Permission[]> = {
     "people.view_all",
     "compliance.view",
     "compliance.manage",
+    "nearmiss.review",
     "training.assign",
     "reports.view",
     "reports.export",
@@ -229,7 +240,14 @@ export const DEFAULT_ROLE_PERMISSIONS: Record<RoleKey, Permission[]> = {
   [ROLE_KEYS.LEARNER]: [...LEARNER_BASE],
 
   // Contractors get a deliberately narrower directory/knowledge surface.
-  [ROLE_KEYS.CONTRACTOR]: ["training.view", "sop.view", "skills.view", "ai.ask"],
+  [ROLE_KEYS.CONTRACTOR]: [
+    "training.view",
+    "sop.view",
+    "skills.view",
+    "ai.ask",
+    // Contractors can raise a near miss but do not get the internal library.
+    "nearmiss.report",
+  ],
 
   [ROLE_KEYS.AUDITOR]: [
     "training.view",
@@ -241,6 +259,7 @@ export const DEFAULT_ROLE_PERMISSIONS: Record<RoleKey, Permission[]> = {
     "reports.view",
     "reports.export",
     "compliance.view",
+    "nearmiss.view",
     "audit.view",
   ],
 };
@@ -286,6 +305,7 @@ export const PERMISSION_GROUPS: { label: string; prefix: string }[] = [
   { label: "Learning Paths", prefix: "path." },
   { label: "Skills", prefix: "skills." },
   { label: "Compliance", prefix: "compliance." },
+  { label: "Near Misses", prefix: "nearmiss." },
   { label: "Reports", prefix: "reports." },
   { label: "Team", prefix: "team." },
   { label: "Content", prefix: "content." },

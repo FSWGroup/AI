@@ -85,7 +85,10 @@ export function lessonContentToText(type: string, content: unknown): string {
   }
 }
 
-async function deleteChunks(entityType: "SOP" | "COURSE", entityId: string): Promise<void> {
+/** Entity types this file writes chunks for. */
+type IndexableEntityType = "SOP" | "COURSE" | "NEAR_MISS";
+
+async function deleteChunks(entityType: IndexableEntityType, entityId: string): Promise<void> {
   await prisma.knowledgeChunk.deleteMany({ where: { entityType, entityId } });
 }
 
@@ -122,7 +125,7 @@ async function embedAndStore(
 }
 
 export interface IndexResult {
-  entityType: "SOP" | "COURSE";
+  entityType: IndexableEntityType;
   entityId: string;
   chunkCount: number;
   embedded: boolean;
@@ -332,20 +335,106 @@ function chunkPlainText(text: string, sectionPath: string, maxChars = 1400): { s
 
 /** Remove all chunks for one entity, e.g. when it is archived or deleted. */
 export async function removeFromIndex(
-  entityType: "SOP" | "COURSE",
+  entityType: IndexableEntityType,
   entityId: string,
 ): Promise<void> {
   await deleteChunks(entityType, entityId);
 }
 
-/** Full corpus rebuild: every published SOP and course. Safe to run repeatedly. */
-export async function indexAll(): Promise<{ sops: number; courses: number; totalChunks: number }> {
-  const [sops, courses] = await Promise.all([
+/**
+ * Index one published near miss as a single chunk.
+ *
+ * Two differences from SOPs and courses, both deliberate:
+ *
+ *  - `requiredPermission` is set to "nearmiss.view", so retrieval can never
+ *    hand a case study to someone without the capability — contractors hold
+ *    "nearmiss.report" but not "nearmiss.view", and the ACL clause in rag.ts
+ *    enforces that inside the same WHERE as every other rule.
+ *  - The reporter is never read, let alone indexed. The narrative is the only
+ *    text that reaches the corpus, and it has already been checked for
+ *    identifying detail as a condition of publication.
+ *
+ * One chunk rather than many: a case study is short and only makes sense whole
+ * — "what changed" is meaningless without "what happened".
+ */
+export async function indexNearMiss(nearMissId: string): Promise<IndexResult | null> {
+  const nearMiss = await prisma.nearMiss.findUnique({
+    where: { id: nearMissId },
+    select: {
+      id: true,
+      reference: true,
+      title: true,
+      status: true,
+      isDeleted: true,
+      businessUnitId: true,
+      departmentId: true,
+      whatHappened: true,
+      howItWasCaught: true,
+      whyItHappened: true,
+      whatChanged: true,
+      occurredOn: true,
+    },
+  });
+
+  await deleteChunks("NEAR_MISS", nearMissId);
+
+  if (!nearMiss || nearMiss.isDeleted || nearMiss.status !== "PUBLISHED") return null;
+
+  const content = [
+    `What happened: ${nearMiss.whatHappened}`,
+    nearMiss.howItWasCaught ? `How it was caught: ${nearMiss.howItWasCaught}` : null,
+    nearMiss.whyItHappened ? `Why it happened: ${nearMiss.whyItHappened}` : null,
+    nearMiss.whatChanged ? `What changed: ${nearMiss.whatChanged}` : null,
+  ]
+    .filter((line): line is string => line !== null)
+    .join("\n\n");
+
+  const created = await prisma.knowledgeChunk.create({
+    data: {
+      entityType: "NEAR_MISS",
+      entityId: nearMiss.id,
+      versionLabel: nearMiss.reference,
+      title: nearMiss.title,
+      sectionPath: "Near miss",
+      content,
+      language: "en",
+      businessUnitId: nearMiss.businessUnitId,
+      departmentId: nearMiss.departmentId,
+      requiredPermission: "nearmiss.view",
+    },
+    select: { id: true, content: true },
+  });
+
+  await embedAndStore([created]);
+
+  return {
+    entityType: "NEAR_MISS",
+    entityId: nearMissId,
+    chunkCount: 1,
+    embedded: getEmbeddingProvider() !== null,
+  };
+}
+
+/**
+ * Full corpus rebuild: every published SOP, course and near miss. Safe to run
+ * repeatedly — each index call clears its own entity's chunks first.
+ */
+export async function indexAll(): Promise<{
+  sops: number;
+  courses: number;
+  nearMisses: number;
+  totalChunks: number;
+}> {
+  const [sops, courses, nearMisses] = await Promise.all([
     prisma.sop.findMany({
       where: { status: "PUBLISHED", isDeleted: false },
       select: { id: true },
     }),
     prisma.course.findMany({
+      where: { status: "PUBLISHED", isDeleted: false },
+      select: { id: true },
+    }),
+    prisma.nearMiss.findMany({
       where: { status: "PUBLISHED", isDeleted: false },
       select: { id: true },
     }),
@@ -360,12 +449,21 @@ export async function indexAll(): Promise<{ sops: number; courses: number; total
     const result = await indexCourse(course.id);
     totalChunks += result?.chunkCount ?? 0;
   }
+  for (const nearMiss of nearMisses) {
+    const result = await indexNearMiss(nearMiss.id);
+    totalChunks += result?.chunkCount ?? 0;
+  }
 
-  return { sops: sops.length, courses: courses.length, totalChunks };
+  return {
+    sops: sops.length,
+    courses: courses.length,
+    nearMisses: nearMisses.length,
+    totalChunks,
+  };
 }
 
 export interface IndexContentJobPayload {
-  entityType: "SOP" | "COURSE";
+  entityType: IndexableEntityType;
   entityId: string;
   /** When true, remove the entity's chunks instead of indexing (archive/delete). */
   remove?: boolean;
@@ -375,7 +473,8 @@ export interface IndexContentJobPayload {
 export async function handleIndexContentJob(payload: Record<string, unknown>): Promise<void> {
   const entityType = payload.entityType;
   const entityId = payload.entityId;
-  if ((entityType !== "SOP" && entityType !== "COURSE") || typeof entityId !== "string") {
+  const known = entityType === "SOP" || entityType === "COURSE" || entityType === "NEAR_MISS";
+  if (!known || typeof entityId !== "string") {
     throw new Error(`index_content job received an invalid payload: ${JSON.stringify(payload)}`);
   }
 
@@ -386,7 +485,9 @@ export async function handleIndexContentJob(payload: Record<string, unknown>): P
 
   if (entityType === "SOP") {
     await indexSop(entityId);
-  } else {
+  } else if (entityType === "COURSE") {
     await indexCourse(entityId);
+  } else {
+    await indexNearMiss(entityId);
   }
 }

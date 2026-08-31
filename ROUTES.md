@@ -32,6 +32,9 @@ Permission keys are defined in [`src/lib/permissions.ts`](src/lib/permissions.ts
 | `/paths` · `/paths/[id]` | authenticated | Learning paths as a timeline with milestones |
 | `/sops` · `/sops/[id]` | `sop.view` | SOP library and reader |
 | `/sops/[id]/versions` | `sop.view` | Version history and block-level comparison |
+| `/near-misses` | `nearmiss.view` | The published near-miss library, with the categories no procedure covers |
+| `/near-misses/[reference]` | `nearmiss.view` | One case study by its reference ("NM-004") |
+| `/near-misses/report` | `nearmiss.report` | File a report, anonymously if chosen |
 | `/certificates` | authenticated | Earned certificates with PDF download |
 | `/transcript` | authenticated | Full chronological training transcript |
 | `/skills` · `/skills/[id]` | `skills.view` | Skills library and personal proficiency |
@@ -44,6 +47,11 @@ Permission keys are defined in [`src/lib/permissions.ts`](src/lib/permissions.ts
 | `/media/[id]` | authenticated | Media detail with captions and transcript |
 | `/help` | authenticated | Getting started, how to find things, keyboard shortcuts |
 
+`/near-misses` and `/near-misses/[reference]` redirect to `/near-misses/report`
+for an actor holding `nearmiss.report` without `nearmiss.view` — the reporting
+channel is deliberately wider than the library, and a contractor clicking the
+nav item should land on the thing they can do rather than on a permission error.
+
 ---
 
 ## Manager
@@ -54,6 +62,8 @@ Permission keys are defined in [`src/lib/permissions.ts`](src/lib/permissions.ts
 | `/team/status` | `team.view` | Per-person training status with CSV export |
 | `/team/assignments` | `team.assign` or `training.assign` | Assign training to reports |
 | `/team/skills` | `team.view` + `skills.view` | Team skills matrix and gaps |
+| `/team/brief` | `team.view` | This week with your team: named people, evidence, one conversation each |
+| `/team/knowledge-risk` | `team.view` + `skills.view` | Skills held by too few people |
 | `/team/approvals` | `team.approve` or `content.review` | Pending sign-offs and practical assessments |
 | `/reports` | `reports.view` | Report catalog |
 
@@ -107,6 +117,8 @@ Permission keys are defined in [`src/lib/permissions.ts`](src/lib/permissions.ts
 |---|---|---|
 | `/admin/compliance` | `compliance.view` | Compliance Center with the advisor disclaimer |
 | `/admin/compliance/matrix` | `compliance.view` | Training requirements matrix with CSV export |
+| `/admin/near-misses` | `nearmiss.review` | Near-miss review queue: needs review, published, archived |
+| `/admin/near-misses/[id]` | `nearmiss.review` | Review one report; publication is refused while it identifies a person |
 | `/admin/reports` | `reports.view` | Report catalog |
 | `/admin/reports/[key]` | per report | One runner serving all 24 reports, with CSV/XLSX/PDF export |
 | `/admin` | `reports.view` or `settings.view` | Admin dashboard |

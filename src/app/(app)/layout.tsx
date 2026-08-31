@@ -33,6 +33,24 @@ export default async function AppLayout({ children }: { children: React.ReactNod
     { label: "My certificates", href: "/certificates", keywords: "certificate proof completion" },
     { label: "My transcript", href: "/transcript", keywords: "transcript history record" },
     { label: "Training calendar", href: "/calendar", keywords: "calendar dates deadlines sessions" },
+    ...(actor.permissions.has("nearmiss.report")
+      ? [
+          {
+            label: "Report a near miss",
+            href: "/near-misses/report",
+            keywords: "near miss incident mistake caught safety report anonymous",
+          },
+        ]
+      : []),
+    ...(actor.permissions.has("nearmiss.view")
+      ? [
+          {
+            label: "Near-miss library",
+            href: "/near-misses",
+            keywords: "near miss case study lessons learned what went wrong",
+          },
+        ]
+      : []),
     ...(actor.permissions.has("team.view")
       ? [
           { label: "This week with your team", href: "/team/brief", keywords: "brief coaching manager week" },
@@ -51,6 +69,15 @@ export default async function AppLayout({ children }: { children: React.ReactNod
       : []),
     ...(actor.permissions.has("training.assign")
       ? [{ label: "Assign training", href: "/admin/training/assign", keywords: "assign bulk people" }]
+      : []),
+    ...(actor.permissions.has("nearmiss.review")
+      ? [
+          {
+            label: "Review near-miss reports",
+            href: "/admin/near-misses",
+            keywords: "near miss queue review publish case study",
+          },
+        ]
       : []),
     ...(actor.permissions.has("reports.view")
       ? [{ label: "Open reports", href: "/reports", keywords: "report export data" }]

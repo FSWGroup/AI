@@ -51,7 +51,8 @@ export type IconName =
   | "audit"
   | "calendar"
   | "media"
-  | "announcement";
+  | "announcement"
+  | "nearmiss";
 
 export const LEARNER_NAV: NavSection = {
   id: "learner",
@@ -62,6 +63,17 @@ export const LEARNER_NAV: NavSection = {
     { label: "Learning Paths", href: "/paths", icon: "path" },
     { label: "Catalog", href: "/catalog", icon: "knowledge" },
     { label: "SOP Library", href: "/sops", icon: "sop", permissions: ["sop.view"] },
+    {
+      /*
+       * Visible to anyone who can read the library or file a report — a
+       * contractor holds only "nearmiss.report", and /near-misses sends them
+       * straight to the form rather than to a page they cannot read.
+       */
+      label: "Near Misses",
+      href: "/near-misses",
+      icon: "nearmiss",
+      permissions: ["nearmiss.view", "nearmiss.report"],
+    },
     { label: "Certificates", href: "/certificates", icon: "certificate" },
     { label: "Skills", href: "/skills", icon: "skill", permissions: ["skills.view"] },
     { label: "People", href: "/people", icon: "people", permissions: ["people.view"] },
@@ -147,6 +159,12 @@ export const ADMIN_NAV: NavSection = {
       icon: "compliance",
       permissions: ["compliance.view"],
     },
+    {
+      label: "Near Misses",
+      href: "/admin/near-misses",
+      icon: "nearmiss",
+      permissions: ["nearmiss.review"],
+    },
     { label: "Skills", href: "/admin/skills", icon: "skill", permissions: ["skills.manage"] },
     {
       label: "Content Health",
@@ -200,6 +218,7 @@ export const QUICK_CREATE: { label: string; href: string; permission: Permission
   { label: "Learning Path", href: "/admin/paths/new", permission: "path.create" },
   { label: "AI Video", href: "/admin/video-studio/new", permission: "ai.video" },
   { label: "Announcement", href: "/admin/announcements/new", permission: "announcements.manage" },
+  { label: "Near Miss Report", href: "/near-misses/report", permission: "nearmiss.report" },
   { label: "Person", href: "/admin/people/new", permission: "people.edit" },
   { label: "Skill", href: "/admin/skills/new", permission: "skills.manage" },
 ];

@@ -46,6 +46,17 @@ a **video**, and an **assessment** — without maintaining five separate copies.
 - Learning paths with relative due dates ("Day 1", "Week 1", "Day 30")
 - Certificates as generated PDFs, with recertification cycles
 
+**Learning from what nearly went wrong**
+- Blameless near-miss library: report in four fields, anonymously if you choose,
+  and a reviewer turns it into a published case study
+- No field anywhere in the model records whose fault it was; publication is
+  refused while the narrative still names a person, carries an email address or
+  a phone number, and blame language is flagged for the reviewer
+- Case studies appear on the procedure they would have prevented and on the
+  course that teaches it, and are cited by Ask FSW AI
+- Recurring categories with no procedure covering them are surfaced as the
+  strongest available signal for what to write next
+
 **People and compliance**
 - People directory, org chart, positions with required training and skills
 - Automatic assignment engine driven by combinable rules
@@ -55,7 +66,8 @@ a **video**, and an **assessment** — without maintaining five separate copies.
 
 **AI**
 - Ask FSW AI: retrieval-augmented answers with clickable citations, filtered by
-  the asking user's permissions *before* retrieval
+  the asking user's permissions *before* retrieval — over published SOPs,
+  courses and near-miss case studies
 - AI drafting of SOPs, courses, and quiz questions — always as drafts for review
 - AI Video Studio: SOP → objectives → script → storyboard → narration →
   FSW-branded MP4, with source-version tracking
@@ -214,6 +226,12 @@ same state rather than duplicating it.
 Because rule-driven assignment depends on start dates and due dates relative to
 today, the exact overdue/due-soon split shifts with the clock.
 
+It also seeds seven near-miss case studies — five published, one in review and
+one newly reported, two of them filed anonymously — so the library, the review
+queue and the "why this procedure exists" panel on an SOP all have real state.
+**These are illustrative examples written for the seed, not real FSW events and
+not FSW policy.** Replace them before any rollout.
+
 ---
 
 ## Commands
@@ -296,9 +314,9 @@ npm run test:e2e          # end-to-end — real browser
 
 | Layer | Count | Covers |
 |---|---|---|
-| Unit | 169 | Permission catalog invariants, assignment criteria evaluation, quiz grading for all eleven question types, timezone-aware due dates, content transforms, field encryption |
-| Integration | 172 | Authorization boundaries and data scope, evidence immutability, AI retrieval filtering, video progress anti-scrub, certificate PDFs, the job queue, SOP lifecycle, assignment idempotency, knowledge risk, the manager brief, application-question scoring |
-| End-to-end | 108 across 9 specs | Authentication and permission-filtered navigation, security boundaries, the learner journey, the authoring workflow, application questions, insight surfaces, the administrator journey, mobile, accessibility |
+| Unit | 203 | Permission catalog invariants, assignment criteria evaluation, quiz grading for all eleven question types, the blameless near-miss checks (identifying detail, blame language, and what must *not* trigger), timezone-aware due dates, content transforms, field encryption |
+| Integration | 206 | Authorization boundaries and data scope, evidence immutability, AI retrieval filtering, near-miss anonymity and publication rules, video progress anti-scrub, certificate PDFs, the job queue, SOP lifecycle, assignment idempotency, knowledge risk, the manager brief, application-question scoring |
+| End-to-end | 126 across 10 specs | Authentication and permission-filtered navigation, security boundaries, the learner journey, the authoring workflow, application questions, insight surfaces, the near-miss library, the administrator journey, mobile, accessibility |
 
 Notable: `npm run test:e2e` frees the port first, because the harness
 deliberately refuses to reuse an existing server — a leftover process serves a

@@ -890,6 +890,11 @@ async function main() {
   await seedRulesAndCompliance(prisma, userIds, courseIds, positionIds, sopIds);
   await seedAnnouncements(prisma, userIds);
 
+  // Demonstration near-miss case studies, including one still in the review
+  // queue and two filed anonymously.
+  const { seedNearMisses } = await import("./seed-near-misses");
+  await seedNearMisses(prisma, userIds, org.departments, org.locations, sopIds, courseIds);
+
   // Rules and content alone leave every learner surface empty. This runs the
   // real assignment engine and the real completion path so a fresh install has
   // truthful, demonstrable state on every screen.

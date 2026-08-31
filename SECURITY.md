@@ -16,6 +16,9 @@ The platform holds:
   acknowledgements; used to demonstrate that training happened
 - **Company knowledge** — procedures, pricing authority, policies; commercially
   sensitive and, in aggregate, a map of how the business operates
+- **Near-miss reports** — accounts of work that nearly went wrong, some filed
+  anonymously; harmless as published case studies, harmful if traceable to the
+  person who filed one
 
 The adversaries we design against:
 
@@ -26,6 +29,7 @@ The adversaries we design against:
 | Malicious uploaded content | Script execution, package escape | Type validation, sandboxed delivery, CSP isolation |
 | Prompt injection in content | Making the AI leak or misbehave | Pre-retrieval authorization, untrusted-content framing, no tool access |
 | Evidence tampering | Altering training history to pass an audit | Append-only evidence tables, immutable version snapshots |
+| Insider tracing an anonymous report | Identifying who filed a near miss, through the record, the audit log, or an inferred department | Null reporter and null audit actor, no inherited placement, published shape that never selects the column |
 | External attacker | Credential stuffing, enumeration, scraping | Rate limiting, uniform auth failures, no public surface by default |
 
 ---
@@ -145,6 +149,42 @@ defines it as a sensitive custom field. Those values are:
 > unrecoverable — the database backup alone is not sufficient. Store it in a
 > secrets manager, back it up independently, and note that rotation requires
 > re-encrypting existing values.
+
+---
+
+## Reporter anonymity in the near-miss library
+
+A near-miss report can be filed anonymously. Anonymity here is a security
+property with a specific meaning, so it is worth being precise about what is and
+is not promised.
+
+**What is guaranteed.** For a report filed anonymously:
+
+- `NearMiss.reportedById` is null. There is no other column, table, or join that
+  records who filed it.
+- The `nearmiss.reported` audit row is written with a **null actor and null
+  actor email**. This is deliberate and is the one place in the platform where an
+  audited write does not name its actor: an identity readable by every
+  `audit.view` holder would make the anonymity channel worthless. The audit row
+  still records that a report exists, its reference, category, severity, and
+  when — everything needed to show the channel is being used.
+- No narrative text enters the audit log, so an unreviewed report is not
+  readable by an auditor who has no business reading it.
+- The report inherits **no** department, business unit or location from the
+  reporter. A silent department stamp on a small department identifies the
+  reporter as effectively as a name. (A *named* report does inherit them, because
+  that is what makes the library pattern-spottable.)
+
+**What is not guaranteed.** Anonymity is not un-attributability: someone who
+already knows the event can often infer who filed it from the narrative, and no
+software can prevent that. The report form says so rather than over-promising,
+and the reviewer is told there is nobody to ask a follow-up question.
+
+**For every report, anonymous or not**, the reporter's identity is never in a
+published read path, never in the AI corpus, and never in global search: the
+published shape does not select the column. Publication is refused while the
+narrative contains a name, an email address or a phone number, so the identity
+of anyone *described* in a report is also not published.
 
 ---
 

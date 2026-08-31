@@ -321,7 +321,7 @@ describe("sensitive and administrative data is never in the corpus", () => {
     expect(result.chunks).toHaveLength(0);
   });
 
-  it("only ever returns SOP and COURSE chunks", async () => {
+  it("only ever returns chunks of a known indexable type", async () => {
     const author = await createUser({
       email: "author9@test.local",
       roles: [ROLE_KEYS.CONTENT_AUTHOR],
@@ -344,7 +344,7 @@ describe("sensitive and administrative data is never in the corpus", () => {
     const result = await retrieve(actor, "indexed");
     expect(result.chunks.length).toBeGreaterThan(0);
     for (const chunk of result.chunks) {
-      expect(["SOP", "COURSE"]).toContain(chunk.entityType);
+      expect(["SOP", "COURSE", "NEAR_MISS"]).toContain(chunk.entityType);
     }
   });
 });

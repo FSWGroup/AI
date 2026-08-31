@@ -9,6 +9,9 @@ import { getVisibleUserIds } from "@/lib/auth/guard";
  * Permission filtering happens inside the queries, not after them. A person can
  * only ever match content they are entitled to see:
  *  - SOPs and courses: PUBLISHED only, unless the actor can author.
+ *  - Near misses: PUBLISHED only, and only for nearmiss.view holders. A report
+ *    still in the review queue is never searchable, at any permission level —
+ *    reviewers reach it through their queue, not through search.
  *  - People: only those inside the actor's visibility scope.
  *  - Sensitive profile fields: never searchable, at any permission level.
  *
@@ -23,7 +26,8 @@ export type SearchEntityType =
   | "LEARNING_PATH"
   | "PERSON"
   | "SKILL"
-  | "VIDEO";
+  | "VIDEO"
+  | "NEAR_MISS";
 
 export interface SearchResult {
   entityType: SearchEntityType;
@@ -248,6 +252,53 @@ export async function search(
         snippet: excerpt(row.description, term),
         href: `/skills/${row.id}`,
         score: 0.5,
+      });
+    }
+  }
+
+  /*
+   * --- Near misses (published case studies only) ---
+   *
+   * Deliberately never widened for reviewers the way SOPs and courses are
+   * widened for authors: an unpublished report has not yet had identifying
+   * detail removed, so it must not be reachable by a text search that a
+   * reviewer might run for an unrelated reason.
+   */
+  if (wants("NEAR_MISS") && actor.permissions.has("nearmiss.view")) {
+    const rows = await prisma.nearMiss.findMany({
+      where: {
+        isDeleted: false,
+        status: "PUBLISHED",
+        OR: [
+          { title: { contains: term, mode: "insensitive" } },
+          { reference: { contains: term, mode: "insensitive" } },
+          { whatHappened: { contains: term, mode: "insensitive" } },
+          { howItWasCaught: { contains: term, mode: "insensitive" } },
+          { whyItHappened: { contains: term, mode: "insensitive" } },
+          { whatChanged: { contains: term, mode: "insensitive" } },
+        ],
+      },
+      // No reporter column: the published shape cannot leak who filed it.
+      select: {
+        id: true,
+        reference: true,
+        title: true,
+        whatChanged: true,
+        whatHappened: true,
+      },
+      orderBy: { publishedAt: "desc" },
+      take: Math.min(limit, 8),
+    });
+
+    for (const row of rows) {
+      results.push({
+        entityType: "NEAR_MISS",
+        id: row.id,
+        title: row.title,
+        subtitle: `Near miss · ${row.reference}`,
+        snippet: excerpt(row.whatChanged ?? row.whatHappened, term),
+        href: `/near-misses/${row.reference}`,
+        score: 0.55,
       });
     }
   }

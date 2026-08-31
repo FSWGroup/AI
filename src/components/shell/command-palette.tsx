@@ -28,6 +28,7 @@ const ENTITY_LABELS: Record<string, string> = {
   PERSON: "Person",
   SKILL: "Skill",
   VIDEO: "Video",
+  NEAR_MISS: "Near miss",
 };
 
 export function CommandPalette({ quickActions }: { quickActions: QuickAction[] }) {

@@ -158,6 +158,26 @@ and re-run the navigation probe described in `KNOWN-ISSUES.md` before merging.
 - AI never auto-publishes. Everything lands as `DRAFT` for human review.
 - AI-generated content is visibly marked (`aiGenerated` flag, "AI-generated" badge).
 - Every substantive Ask FSW AI answer carries clickable citations.
+- A new retrievable entity type needs three things or it is a leak: a
+  `requiredPermission` on its chunks at index time, a capability check in
+  `retrieve()` so the pass is never issued, and a join in the SQL that pins the
+  source row to its published state. `NEAR_MISS` is the worked example.
+
+## Near misses — blameless by construction
+
+- **Never add a field that records fault**, on `NearMiss` or anywhere adjacent.
+  Not a "responsible person", not a "root cause owner", not a comment thread
+  attributable to an individual. The absence is the feature.
+- **Never select `reportedById` in a read path an ordinary reader can reach.**
+  The published shape (`PUBLISHED_SELECT` in
+  `src/lib/services/near-miss.ts`) is the only shape those paths use, and it does
+  not name the column — so anonymity survives a careless spread or a new route.
+- **Anonymous means anonymous in the audit log too.** `recordAudit` is called
+  with a null actor for an anonymous report. Do not "improve" this by recording
+  the actor for traceability.
+- Anything published passes `findIdentifiers` first. Put new detection rules in
+  `near-miss-redaction.ts` (pure, no DB, no clock) with unit tests for both what
+  fires and what must not.
 
 ## Provider capabilities
 

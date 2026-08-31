@@ -207,7 +207,23 @@ engine exhaustively unit-testable. Assignments record a human-readable `reason`,
 so mandatory training always explains why it was assigned. Recommendations may be
 inferred; requirements are never opaque.
 
-### 8. Dark mode architected, not shipped
+### 8. Blamelessness enforced in code, not policy
+
+The near-miss library asks people to write down the day they nearly got it
+wrong, which they will only do if the software cannot be turned against them.
+Three mechanisms carry that rather than a policy page: the schema has no column
+for fault at any point in the lifecycle; an anonymous report stores a null
+reporter *and* a null audit actor, because a log readable by every `audit.view`
+holder is not a safe place to keep an identity; and publication is refused while
+the narrative still contains a name, an email address or a phone number, checked
+by a pure function (`near-miss-redaction.ts`) with no database or clock, so the
+rules are exhaustively unit-testable including the cases that must *not* fire.
+
+Blame language ("careless", "should have known") warns rather than blocks. A
+warning a reviewer can override with a reason is a nudge; an unoverridable one
+just teaches people to route around the tool.
+
+### 9. Dark mode architected, not shipped
 
 Every color is a semantic token with a complete `[data-theme="dark"]` set. The
 light theme ships; the dark theme is behind the `darkMode` feature flag. Adding
@@ -243,7 +259,7 @@ Targets: comfortable at 100 users, correct at 5,000.
 
 | Layer | Location | Covers |
 |---|---|---|
-| Unit | `src/**/*.test.ts` | Pure logic, no database: permission catalog invariants, criteria evaluation, quiz grading, due-date computation, version numbering, content transforms, crypto |
+| Unit | `src/**/*.test.ts` | Pure logic, no database: permission catalog invariants, criteria evaluation, quiz grading, the blameless near-miss checks, due-date computation, version numbering, content transforms, crypto |
 | Integration | `tests/integration/*.test.ts` | Real database: publishing, assignment, completion, acknowledgement, certificates, and authorization boundaries with real `Actor` objects built from real rows |
 | End-to-end | `e2e/*.spec.ts` | Real browser: the flows an administrator, manager, and learner actually perform |
 | Security | `tests/integration/security.test.ts` | Role escalation, IDOR, unauthorized file access, AI retrieval leakage, API authorization |

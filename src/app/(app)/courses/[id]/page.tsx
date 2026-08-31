@@ -5,6 +5,7 @@ import { formatInTimeZone } from "date-fns-tz";
 import { requirePermission } from "@/lib/auth/guard";
 import { prisma } from "@/lib/db";
 import { getCourseForLearner } from "@/lib/services/course";
+import { getNearMissesForCourse, SEVERITY_LABELS } from "@/lib/services/near-miss";
 import { PageHeader, PageBody, SectionHeading } from "@/components/page-header";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -35,6 +36,9 @@ export default async function CourseOverviewPage({ params }: { params: Promise<{
 
   const data = await getCourseForLearner(actor, courseId).catch(() => null);
   if (!data) notFound();
+
+  // [] rather than an error for a reader without nearmiss.view.
+  const nearMisses = await getNearMissesForCourse(actor, courseId);
 
   const { course, assignment, prerequisites, blocked, overallPercent, nextLessonId, certificate } = data;
   const started = course.sections.some((s) => s.lessons.some((l) => l.progress && l.progress.status !== "NOT_STARTED"));
@@ -129,6 +133,39 @@ export default async function CourseOverviewPage({ params }: { params: Promise<{
                     {skill.name}
                   </Badge>
                 ))}
+              </CardContent>
+            </Card>
+          )}
+
+          {/*
+            Why this course is worth the hour: real events it exists to prevent.
+            Motivation is the scarcest resource in mandatory training.
+          */}
+          {nearMisses.length > 0 && (
+            <Card>
+              <CardHeader>
+                <CardTitle>What this course exists to prevent</CardTitle>
+              </CardHeader>
+              <CardContent className="flex flex-col gap-2.5">
+                <p className="text-[0.8125rem] text-[var(--text-muted)]">
+                  Near misses from the library. Nobody is named in any of them.
+                </p>
+                <ul aria-label="Near misses this course teaches" className="flex flex-col gap-2">
+                  {nearMisses.map((item) => (
+                    <li key={item.id} className="flex flex-wrap items-center gap-2">
+                      <Badge tone="navy">{item.reference}</Badge>
+                      <Link
+                        href={`/near-misses/${item.reference}`}
+                        className="rounded-sm text-[0.875rem] font-medium text-[var(--text-primary)] hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--focus-ring)]"
+                      >
+                        {item.title}
+                      </Link>
+                      <span className="text-[0.75rem] text-[var(--text-muted)]">
+                        {SEVERITY_LABELS[item.severity]}
+                      </span>
+                    </li>
+                  ))}
+                </ul>
               </CardContent>
             </Card>
           )}

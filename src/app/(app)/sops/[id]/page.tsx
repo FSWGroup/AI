@@ -2,6 +2,7 @@ import Link from "next/link";
 import { requirePermission } from "@/lib/auth/guard";
 import { prisma } from "@/lib/db";
 import { getSopForReader } from "@/lib/services/sop";
+import { getNearMissesForSop, SEVERITY_LABELS } from "@/lib/services/near-miss";
 import { BlockRenderer } from "@/lib/content/render";
 import { PageHeader, PageBody, SectionHeading } from "@/components/page-header";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -49,7 +50,7 @@ export default async function SopReaderPage({ params }: { params: Promise<{ id: 
     );
   }
 
-  const [favorite, relatedSops, relatedCourses] = await Promise.all([
+  const [favorite, relatedSops, relatedCourses, nearMisses] = await Promise.all([
     prisma.favorite.findUnique({ where: { userId_entityType_entityId: { userId: actor.id, entityType: "SOP", entityId: id } } }),
     sop.meta.relatedSopIds.length > 0
       ? prisma.sop.findMany({ where: { id: { in: sop.meta.relatedSopIds }, isDeleted: false }, select: { id: true, title: true, sopCode: true } })
@@ -57,6 +58,9 @@ export default async function SopReaderPage({ params }: { params: Promise<{ id: 
     sop.meta.relatedCourseIds.length > 0
       ? prisma.course.findMany({ where: { id: { in: sop.meta.relatedCourseIds }, isDeleted: false }, select: { id: true, title: true } })
       : Promise.resolve([]),
+    // Returns [] rather than throwing for a reader without nearmiss.view, so
+    // the SOP still renders for a contractor.
+    getNearMissesForSop(actor, id),
   ]);
 
   const canEdit = actor.permissions.has("sop.create");
@@ -207,6 +211,44 @@ export default async function SopReaderPage({ params }: { params: Promise<{ id: 
                     <p className="text-[0.875rem] leading-relaxed text-[var(--text-primary)]">{sop.meta.exceptions}</p>
                   </section>
                 )}
+              </CardContent>
+            </Card>
+          )}
+
+          {/*
+            Why this procedure exists. A step that reads like bureaucracy is far
+            easier to follow when the day it would have saved is next to it.
+          */}
+          {nearMisses.length > 0 && (
+            <Card>
+              <CardHeader>
+                <CardTitle>Why this procedure exists</CardTitle>
+              </CardHeader>
+              <CardContent className="flex flex-col gap-3">
+                <p className="text-[0.8125rem] text-[var(--text-muted)]">
+                  Near misses this procedure is meant to prevent. Nobody is named in any of them.
+                </p>
+                <ul aria-label="Near misses this procedure prevents" className="flex flex-col gap-2.5">
+                  {nearMisses.map((item) => (
+                    <li key={item.id} className="flex flex-col gap-1">
+                      <div className="flex flex-wrap items-center gap-1.5">
+                        <Badge tone="navy">{item.reference}</Badge>
+                        <Badge tone="neutral">{SEVERITY_LABELS[item.severity]}</Badge>
+                      </div>
+                      <Link
+                        href={`/near-misses/${item.reference}`}
+                        className="rounded-sm text-[0.875rem] font-medium text-[var(--text-primary)] hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--focus-ring)]"
+                      >
+                        {item.title}
+                      </Link>
+                      {item.whatChanged && (
+                        <p className="line-clamp-2 text-[0.8125rem] text-[var(--text-muted)]">
+                          {item.whatChanged}
+                        </p>
+                      )}
+                    </li>
+                  ))}
+                </ul>
               </CardContent>
             </Card>
           )}

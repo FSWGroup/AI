@@ -21,15 +21,42 @@ refactor. **Verify against the live site before any external release.**
 
 ## 2. Demonstration content is illustrative, not approved policy
 
-Seeded SOPs, courses and compliance rules exist to make the platform
-demonstrable. They are labelled as examples in the seed data and must not be
+Seeded SOPs, courses, compliance rules and near-miss case studies exist to make
+the platform demonstrable. They are labelled as examples in the seed data and must not be
 treated as FSW policy. Where a screen touches a regulatory question it shows
 "Verify requirement with qualified legal/safety advisor." Replace the seeded
 content before any real rollout.
 
 ---
 
-## 3. Areas with the thinnest verification
+## 3. The blameless check is a safety net, not a guarantee
+
+Publication of a near-miss case study is refused while the narrative contains a
+colleague's name, an email address or a phone number
+(`src/lib/services/near-miss-redaction.ts`). It catches what it is asked to
+catch, exhaustively tested, but it is pattern matching and it will not catch
+everything:
+
+- **A description can identify without naming.** "The only person who runs the
+  Saturday shift" is a name in a small department. No text scan can find that;
+  the reviewer has to.
+- **Full names are matched as first + last adjacent**, optionally with a middle
+  name or initial. "Pace, Jordan" and a nickname not in the directory are not
+  matched. A lone first name warns rather than blocks, and common-word first
+  names ("Mark", "Bill") are deliberately excluded to keep the warning credible.
+- **A bare ten-digit number only warns**, because in this business it is at
+  least as likely to be a part or order number as a phone number.
+- **The department stamp is coarse anonymity.** A named report inherits the
+  reporter's department; an anonymous one deliberately does not. But an
+  anonymous reporter who *chooses* to name a two-person department has largely
+  identified themselves, and the form says so rather than pretending otherwise.
+
+The reviewer is the control. The scan exists so the reviewer's attention goes to
+judgment rather than to proofreading.
+
+---
+
+## 4. Areas with the thinnest verification
 
 Not defects, but where to look first if something is wrong.
 
@@ -43,7 +70,10 @@ Not defects, but where to look first if something is wrong.
   create real content and archive it, but nothing hard-deletes, so archived test
   content accumulates and a failed run can leave a draft. Everything is prefixed
   `E2E`. Pointing the harness at a disposable database would remove the need to
-  tidy up by hand.
+  tidy up by hand. The near-miss suite files its own report, reviews it,
+  publishes it and archives it rather than consuming a seeded record, so it is
+  repeatable — but a run that fails mid-test leaves a published `E2E review …`
+  case study in the library.
 - **Load and concurrency.** Nothing has been run against realistic concurrency or
   a five-thousand-person organization. Size the Prisma connection pool before you
   find out the hard way — see the note in `DEPLOYMENT.md`.

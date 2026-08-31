@@ -79,12 +79,20 @@ Each row carries ACL columns copied from the source: `businessUnitId`,
 `departmentId`, `requiredPermission`.
 
 **Never indexed:** drafts, archived content, sensitive profile fields, audit
-events, API keys, integration configuration, personal HR data, notifications, or
-anything a person wrote in an author-only comment thread.
+events, API keys, integration configuration, personal HR data, notifications,
+near-miss reports that have not been published, the identity of anyone who filed
+one, or anything a person wrote in an author-only comment thread.
 
 Indexing runs as a background job (`INDEX_CONTENT`), enqueued on publish. On
 republish, prior chunks for that entity are deleted before the new set is
 inserted, so retrieval never mixes versions.
+
+Published near-miss case studies are in the corpus as one chunk each — a case
+study only makes sense whole, since "what changed" is meaningless without "what
+happened" — carrying the reference ("NM-004") as the version label so a citation
+names it. This is what makes *"has this happened before?"* answerable. Archiving
+or reopening a case study deletes its chunk in the same operation, so a
+withdrawn lesson leaves the corpus with it.
 
 ### The authorization boundary
 
@@ -102,7 +110,9 @@ second. The filter is applied **inside the SQL statement** in
 
 - only chunks whose source entity is `PUBLISHED`
 - SOP chunks require the actor to hold `sop.view`; course chunks require
-  `training.view`
+  `training.view`; near-miss chunks require `nearmiss.view`, both as a
+  capability check that stops the pass being issued at all and as the
+  `requiredPermission` stamped on every chunk at index time
 - when `requiredPermission` is set, the actor must hold it
 - **contractors** are additionally limited to their own business unit's content
   or content with no business unit — cross-business-unit leakage is structurally
@@ -213,13 +223,13 @@ questions, generate video, answer with citations, coach a learner, flag quality
 issues, detect probable duplicates.
 
 **May not, without explicit authorized human action:** publish a policy or
-course, change a compliance requirement, override an employee score, change
-training history, approve a certification, modify a historic record, or alter
-permissions.
+course, publish a near-miss case study, change a compliance requirement,
+override an employee score, change training history, approve a certification,
+modify a historic record, or alter permissions.
 
 These are enforced structurally, not by prompt instruction: generation paths
 write `DRAFT` rows, and the publish paths require a human actor holding
-`sop.publish` or `training.publish`. There is no code path from a model response
+`sop.publish`, `training.publish` or `nearmiss.review`. There is no code path from a model response
 to a published version.
 
 Publishing AI-generated content is audited as `ai.content_published`, so the

@@ -20,11 +20,12 @@ import { truncate } from "@/lib/utils";
  * bug downstream of it) can see content the actor is not entitled to.
  *
  * Rules enforced in SQL, every time, with no exceptions:
- *   1. The chunk's source entity (Sop / Course) must currently be PUBLISHED
- *      and not deleted. A draft never leaks through retrieval.
- *   2. The actor must hold sop.view (for SOP chunks) or training.view (for
- *      COURSE chunks). Chunks of a type the actor cannot view are never
- *      queried at all.
+ *   1. The chunk's source entity (Sop / Course / NearMiss) must currently be
+ *      PUBLISHED and not deleted. A draft, or a near miss still sitting in the
+ *      review queue, never leaks through retrieval.
+ *   2. The actor must hold sop.view (for SOP chunks), training.view (for
+ *      COURSE chunks) or nearmiss.view (for NEAR_MISS chunks). Chunks of a
+ *      type the actor cannot view are never queried at all.
  *   3. Chunk.requiredPermission, when set, must be one of the actor's held
  *      permissions.
  *   4. Contractors (role key "contractor") only ever see a chunk whose
@@ -41,7 +42,7 @@ import { truncate } from "@/lib/utils";
  * clauses below.
  */
 
-export type RetrievableEntityType = "SOP" | "COURSE";
+export type RetrievableEntityType = "SOP" | "COURSE" | "NEAR_MISS";
 
 export interface RetrievedChunk {
   id: string;
@@ -105,7 +106,9 @@ async function queryChunks(
   // Fixed, non-user-controlled identifier — entityType is a hardcoded TS
   // union ("SOP" | "COURSE"), never actor input, so splicing it as a raw
   // identifier here carries no injection risk.
-  const joinTable = Prisma.raw(entityType === "SOP" ? `"Sop"` : `"Course"`);
+  const joinTable = Prisma.raw(
+    entityType === "SOP" ? `"Sop"` : entityType === "COURSE" ? `"Course"` : `"NearMiss"`,
+  );
 
   // Identical ACL predicate for both passes — only the ORDER BY / score differ.
   const vector = vectorLiteral
@@ -166,7 +169,8 @@ async function queryChunks(
 }
 
 function toRetrievedChunk(row: ChunkRow, entityType: RetrievableEntityType): RetrievedChunk {
-  const hrefBase = entityType === "SOP" ? "/sops" : "/courses";
+  const hrefBase =
+    entityType === "SOP" ? "/sops" : entityType === "COURSE" ? "/courses" : "/near-misses";
   return {
     id: row.id,
     entityType,
@@ -194,11 +198,20 @@ export async function retrieve(
   const term = query.trim().slice(0, 500);
   const limit = Math.min(Math.max(opts.limit ?? 6, 1), 20);
 
-  const wantSop = !opts.entityTypes || opts.entityTypes.includes("SOP");
-  const wantCourse = !opts.entityTypes || opts.entityTypes.includes("COURSE");
+  const wanted = (type: RetrievableEntityType): boolean =>
+    !opts.entityTypes || opts.entityTypes.includes(type);
   const allowedTypes: RetrievableEntityType[] = [];
-  if (wantSop && actor.permissions.has("sop.view")) allowedTypes.push("SOP");
-  if (wantCourse && actor.permissions.has("training.view")) allowedTypes.push("COURSE");
+  if (wanted("SOP") && actor.permissions.has("sop.view")) allowedTypes.push("SOP");
+  if (wanted("COURSE") && actor.permissions.has("training.view")) allowedTypes.push("COURSE");
+  /*
+   * Near misses carry a second gate: every chunk is written with
+   * requiredPermission = "nearmiss.view" (see indexer.ts), so the ACL clause
+   * would exclude them anyway. Checking the capability here as well means a
+   * contractor's query never even issues the near-miss pass.
+   */
+  if (wanted("NEAR_MISS") && actor.permissions.has("nearmiss.view")) {
+    allowedTypes.push("NEAR_MISS");
+  }
 
   if (term.length < 2 || allowedTypes.length === 0) {
     return { chunks: [], mode: "keyword_only" };
