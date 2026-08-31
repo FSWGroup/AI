@@ -134,6 +134,155 @@ export interface EventsSubscription {
   signing_secret_ref: string | null;
 }
 
+export interface IamAccessDenial {
+  attempted_subject: string | null;
+  client_ip: string | null;
+  correlation_id: string | null;
+  id: Generated<string>;
+  interface: string;
+  occurred_at: Generated<Timestamp>;
+  permission_key: string | null;
+  principal_id: string | null;
+  reason: string;
+  resource_id: string | null;
+  resource_kind: string | null;
+  scope_id: string | null;
+  scope_type: string | null;
+}
+
+export interface IamApiCredential {
+  created_at: Generated<Timestamp>;
+  created_by: string | null;
+  credential_id: string;
+  expires_at: Timestamp;
+  hash_algorithm: Generated<string>;
+  id: Generated<string>;
+  label: string;
+  last_used_at: Timestamp | null;
+  principal_id: string;
+  revoked_at: Timestamp | null;
+  revoked_reason: string | null;
+  rotated_from_id: string | null;
+  secret_hash: string;
+}
+
+export interface IamIdentity {
+  disabled_at: Timestamp | null;
+  disabled_reason: string | null;
+  display_name_at_link: string | null;
+  /**
+   * What the token said when this identity was linked. A human-readable hint only: nothing looks a person up by email, because email is not identity (§12).
+   */
+  email_at_link: string | null;
+  id: Generated<string>;
+  issuer_id: string;
+  last_seen_at: Timestamp | null;
+  linked_at: Generated<Timestamp>;
+  linked_by: string | null;
+  person_id: string;
+  subject: string;
+  tenant_id: string | null;
+}
+
+export interface IamIssuer {
+  allowed_tenant_ids: Generated<string[]>;
+  audiences: string[];
+  clock_skew_seconds: Generated<number>;
+  created_at: Generated<Timestamp>;
+  default_operating_company: string | null;
+  id: Generated<string>;
+  is_active: Generated<boolean>;
+  issuer_url: string;
+  jit_email_domains: Generated<string[]>;
+  /**
+   * Just-in-time provisioning. Off by default, and constrained by jit_email_domains: a misconfigured issuer that could mint people is the main risk this feature carries.
+   */
+  jit_enabled: Generated<boolean>;
+  jwks_uri: string;
+  name: string;
+  updated_at: Generated<Timestamp>;
+}
+
+export interface IamPendingLinkRequest {
+  attempt_count: Generated<number>;
+  display_name_claimed: string | null;
+  email_claimed: string | null;
+  email_verified: Generated<boolean>;
+  first_seen_at: Generated<Timestamp>;
+  id: Generated<string>;
+  issuer_id: string;
+  last_seen_at: Generated<Timestamp>;
+  linked_person_id: string | null;
+  reason: string;
+  resolved_at: Timestamp | null;
+  resolved_by: string | null;
+  status: Generated<string>;
+  subject: string;
+  tenant_id: string | null;
+}
+
+export interface IamPermission {
+  action: string;
+  created_at: Generated<Timestamp>;
+  description: string;
+  is_active: Generated<boolean>;
+  is_sensitive: Generated<boolean>;
+  key: string;
+  owning_component: Generated<string>;
+  resource: string;
+}
+
+export interface IamPrincipal {
+  created_at: Generated<Timestamp>;
+  created_by: string | null;
+  deactivated_at: Timestamp | null;
+  deactivated_reason: string | null;
+  id: Generated<string>;
+  is_active: Generated<boolean>;
+  label: string;
+  person_id: string | null;
+  principal_type: string;
+  updated_at: Generated<Timestamp>;
+}
+
+export interface IamPrincipalRoleAssignment {
+  expires_at: Timestamp | null;
+  granted_at: Generated<Timestamp>;
+  granted_by: string | null;
+  granted_reason: string | null;
+  id: Generated<string>;
+  principal_id: string;
+  revoked_at: Timestamp | null;
+  revoked_by: string | null;
+  revoked_reason: string | null;
+  role_key: string;
+  scope_id: string | null;
+  scope_type: string;
+}
+
+export interface IamRole {
+  created_at: Generated<Timestamp>;
+  description: string;
+  is_active: Generated<boolean>;
+  is_company_scoped: Generated<boolean>;
+  key: string;
+  name: string;
+}
+
+export interface IamRolePermission {
+  permission_key: string;
+  role_key: string;
+}
+
+export interface IamServiceAccount {
+  created_at: Generated<Timestamp>;
+  description: string;
+  id: Generated<string>;
+  key: string;
+  owner_note: string;
+  principal_id: string;
+}
+
 export interface IngestConnector {
   created_at: Generated<Timestamp>;
   description: string;
@@ -1175,6 +1324,17 @@ export interface DB {
   "events.event_delivery": EventsEventDelivery;
   "events.event_type_version": EventsEventTypeVersion;
   "events.subscription": EventsSubscription;
+  "iam.access_denial": IamAccessDenial;
+  "iam.api_credential": IamApiCredential;
+  "iam.identity": IamIdentity;
+  "iam.issuer": IamIssuer;
+  "iam.pending_link_request": IamPendingLinkRequest;
+  "iam.permission": IamPermission;
+  "iam.principal": IamPrincipal;
+  "iam.principal_role_assignment": IamPrincipalRoleAssignment;
+  "iam.role": IamRole;
+  "iam.role_permission": IamRolePermission;
+  "iam.service_account": IamServiceAccount;
   "ingest.connector": IngestConnector;
   "ingest.landed_file": IngestLandedFile;
   "ingest.quarantine": IngestQuarantine;
