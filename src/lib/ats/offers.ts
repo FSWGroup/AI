@@ -142,6 +142,29 @@ export function formatMoney(
   }).format(amount);
 }
 
+/**
+ * Where each merge field is filled in, so a blocker tells the recruiter what
+ * to go and do rather than just naming a variable at them.
+ */
+const FIELD_SOURCE: Partial<Record<MergeField, string>> = {
+  hiringManagerName:
+    "assign a hiring manager on the requisition's Team tab, or remove the field from the template",
+  departmentName: "set a department on the requisition",
+  locationName: "set a location on the requisition",
+  startDate: "set a start date on this offer",
+  offerExpiryDate: "set a response deadline on this offer",
+  benefitsSummary: "add a benefits summary to this offer or the requisition",
+  variablePay: "add variable pay to this offer, or remove the field from the template",
+  signingBonus: "add a signing bonus, or remove the field from the template",
+};
+
+export function whereToFill(field: string): string {
+  return (
+    FIELD_SOURCE[field as MergeField] ??
+    "fill this in on the offer, or remove the field from the template"
+  );
+}
+
 export interface OfferReadiness {
   ready: boolean;
   blockers: string[];
@@ -165,7 +188,9 @@ export function checkReadyToSend(params: {
   if (!params.hasTemplate) blockers.push("Choose an offer letter template.");
   if (params.unresolved.length > 0) {
     blockers.push(
-      `The letter still has unfilled placeholders: ${params.unresolved.join(", ")}.`,
+      `The letter still has unfilled placeholders. ${params.unresolved
+        .map((f) => `${f} — ${whereToFill(f)}`)
+        .join("; ")}.`,
     );
   }
   if (!params.candidateEmail) blockers.push("The candidate has no email address on file.");

@@ -16,7 +16,11 @@ export interface EmailPayload {
     | "reminder"
     | "completed_notification"
     | "interruption_notification"
-    | "retest_invitation";
+    | "retest_invitation"
+    | "application_received"
+    | "rejection"
+    | "interview_invitation"
+    | "offer_sent";
   subject: string;
   bodyText: string;
 }
@@ -76,4 +80,9 @@ export function getEmailProvider(): EmailProvider {
         : new ExternalEmailProvider();
   }
   return provider;
+}
+
+/** Convenience wrapper so call sites do not each resolve the provider. */
+export async function sendEmail(payload: EmailPayload): Promise<void> {
+  await getEmailProvider().send(payload);
 }
