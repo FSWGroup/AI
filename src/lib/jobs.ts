@@ -5,6 +5,7 @@ import { retryFailedEmails } from '@/lib/email';
 import { runAccrualsForAll } from '@/lib/pto';
 import { startOfUTCDay, isoDate, addDays } from '@/lib/format';
 import { drainWebhooks } from '@/lib/webhooks';
+import { requestsAwaitingStorage, storeSignedArtifacts } from '@/lib/signatures';
 
 /**
  * Scheduled maintenance sweep. Invoked by:
@@ -147,7 +148,32 @@ export async function runMaintenance(): Promise<Record<string, number>> {
     bump('certificationsExpiring');
   }
 
-  // 10. Deliver queued webhooks. Last, so a slow endpoint cannot delay the
+  // 10. Retry signatures the provider says are done but whose bytes we do not
+  //     yet hold. Until the file and certificate are in our own storage, the
+  //     evidence lives only at the vendor.
+  const awaitingStorage = await requestsAwaitingStorage();
+  for (const request of awaitingStorage) {
+    const result = await storeSignedArtifacts(request.id);
+    bump(result.stored ? 'signaturesStored' : 'signatureStoreFailures');
+  }
+
+  // 11. Signature requests past their due date, so a chase is prompted rather
+  //     than forgotten.
+  const overdueSignatures = await db.signatureRequest.findMany({
+    where: { status: { in: ['SENT', 'VIEWED'] }, dueAt: { lt: today } },
+    select: { id: true, workerId: true, dueAt: true, documentVersion: { select: { document: { select: { title: true } } } } },
+  });
+  for (const request of overdueSignatures) {
+    await emitEvent({
+      type: 'DOCUMENT_EXPIRING',
+      workerId: request.workerId,
+      dedupeKey: `sig:${request.id}:${todayKey}`,
+      data: { detail: `Signature overdue: ${request.documentVersion.document.title}` },
+    });
+    bump('signaturesOverdue');
+  }
+
+  // 12. Deliver queued webhooks. Last, so a slow endpoint cannot delay the
   //     rest of the sweep.
   const webhooks = await drainWebhooks();
   bump('webhooksDelivered', webhooks.delivered);

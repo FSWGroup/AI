@@ -453,6 +453,74 @@ mechanism, and the exception report is what catches whatever slipped.
 
 ---
 
+## Certified e-signature
+
+The existing `DocumentSignature` is an internal acknowledgment — a typed name,
+an IP, a timestamp, append-only. `SignatureRequest` is the certified kind,
+where the ceremony happens at a specialist provider.
+
+**Three systems hold state, and ownership is explicit** so they cannot drift:
+FSW People owns *status*, our own storage owns the *bytes*, and the provider
+owns the *evidence* — which we copy at completion rather than leave with them.
+If FSW leaves the vendor, the proof of who signed what comes too.
+
+- **SIGNED and STORED are separate states.** SIGNED is the provider's claim;
+  STORED means we hold the signed PDF and the audit certificate ourselves.
+  Collapsing them would let a failed download present as a completed
+  signature. Requests stuck between the two are surfaced on the dashboard and
+  retried by the maintenance sweep.
+- **Status never moves backwards.** Providers deliver webhooks out of order
+  routinely; a stale VIEWED arriving after SIGNED is recorded as an event but
+  changes nothing. The transition table is unit-tested against this directly.
+- **Only the signer can open a signing session.** `getSigningLinkAction`
+  refuses anyone whose `workerId` is not the request's — not their manager, not
+  HR. A link somebody else could obtain would let them sign in the worker's
+  name, which is the one thing a signature must never permit.
+- **The webhook verifies HMAC over the raw bytes** before parsing, refuses
+  redelivery through a unique index on the provider event id, and records every
+  delivery including the ones it rejects. An event it cannot parse is logged
+  rather than silently dropped, so an unhandled provider event gets noticed.
+- **`SignatureEvent` is append-only** at the database level. It is the trail a
+  dispute is settled from months later, when nobody trusts a mutable status
+  column.
+- **The audit certificate has its own download route** with the same four
+  checks as any document: valid session, valid HMAC token bound to that user,
+  a fresh `canAccessDocument()` call, and an audit entry per download.
+
+**What this does not establish.** Whether a signature is legally enforceable
+depends on the whole process — consent to transact electronically,
+demonstrable intent, attribution, record retention — not on the presence of a
+vendor. And Form I-9 has its own electronic signature requirements that generic
+e-signature does not satisfy; it remains an explicit non-goal.
+
+---
+
+## SharePoint document storage
+
+With `STORAGE_DRIVER=graph`, documents live in SharePoint via Microsoft Graph.
+The security of this rests on one configuration decision, not on the code:
+
+**The target site must have no human members.** It is granted to the FSW
+People app registration with `Sites.Selected` and to nobody else.
+
+SharePoint permissions are an entirely separate system from this application's
+RBAC. If people can browse the library, `canAccessDocument()` and the download
+audit trail cease to be the real access control — a site member reads
+disciplinary files and I-9s directly, with no record. With an app-owned site,
+FSW People remains the only door and every security property of the local
+driver survives, while Purview retention, DLP and eDiscovery are gained.
+
+`scripts/verify-sharepoint.ts` round-trips files and then explicitly tells the
+operator to confirm the empty membership by eye, because that is the part no
+script can check.
+
+Storage keys are validated before becoming Graph paths — no traversal, no
+absolute paths, no characters SharePoint silently mangles — even though keys
+are generated internally, because this is a boundary into another system's
+namespace.
+
+---
+
 ## Deployment responsibilities
 
 1. Set all secrets from a secrets manager. Never commit `.env`.

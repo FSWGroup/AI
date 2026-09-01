@@ -25,6 +25,8 @@ For HR administrators and system administrators running FSW People day to day.
 - [The HR assistant](#the-hr-assistant)
 - [Access profiles and the exception report](#access-profiles-and-the-exception-report)
 - [API keys and webhooks](#api-keys-and-webhooks)
+- [Certified e-signature](#certified-e-signature)
+- [Storing documents in SharePoint](#storing-documents-in-sharepoint)
 - [Performance](#performance)
 - [Compensation and benefits](#compensation-and-benefits)
 - [Payroll hub](#payroll-hub)
@@ -593,6 +595,129 @@ receiver that needs detail calls the read API with its own key. Deliveries are
 queued and sent by the maintenance job, retried with backoff, then abandoned
 visibly in the delivery log rather than disappearing. An endpoint that fails 20
 times running is switched off.
+
+---
+
+## Certified e-signature
+
+There are **two different things** called signing in FSW People, and picking
+the wrong one wastes money or leaves you without evidence.
+
+**Internal acknowledgment** — the signer types their full name; FSW People
+records it with their IP, browser and a timestamp, bound to that exact document
+version, in a table nothing can edit afterwards. Free, instant, and right for
+handbook reads, policy acknowledgments and IT usage agreements.
+
+**Certified signature** — the document goes to SignNow, which runs the signing
+ceremony and produces a tamper-evident audit certificate. Right for offer
+letters, contractor agreements and anything you might later need to defend.
+
+### Sending one
+
+Open a document, then **Certified signatures → Request signature**. The
+document must be a PDF. Choose the signer, a due date and an optional message.
+
+The signer gets an email from SignNow and also sees a **Review & sign** button
+on the document in FSW People. Only the person being asked can open the signing
+session — not their manager, not HR. A signing link that somebody else could
+obtain would let them sign in the worker's name.
+
+### Following it
+
+**Documents → Signature Status** shows everything outstanding, with filters and
+a nudge. Reminders are limited to one a day, so "remind" cannot become
+harassment.
+
+Two statuses are deliberately separate:
+
+- **Signed — storing** means SignNow says it is done but the file is not yet in
+  our own storage.
+- **Signed & filed** means we hold both the signed PDF and the audit
+  certificate ourselves.
+
+Anything stuck between those two shows under **Needs attention**. The nightly
+maintenance sweep retries automatically, and there is a manual **Retry
+download** button. Until a request reaches "signed & filed", the only copy of
+your evidence is at the vendor.
+
+### Why we keep the certificate
+
+At completion FSW People downloads the signed PDF **and** SignNow's audit
+certificate, and stores both. If FSW ever leaves SignNow, the proof of who
+signed what comes too. The signed PDF becomes a new version of the original
+document, so it appears in that document's own history and downloads through
+the same audited link as everything else.
+
+### What this does not do
+
+- **It is not legal advice.** Whether an electronic signature is enforceable
+  depends on the whole process — consent to transact electronically,
+  demonstrable intent, attribution, record retention — not just on using a
+  vendor. Confirm your use with counsel.
+- **It does not make Form I-9 compliant.** I-9 has its own electronic
+  signature and retention requirements that go beyond generic e-signature.
+  Treat I-9 as a separate track with a specialist provider.
+
+### Setup
+
+`SIGNNOW_CLIENT_ID`, `SIGNNOW_CLIENT_SECRET`, `SIGNNOW_USERNAME`,
+`SIGNNOW_PASSWORD`, and `SIGNNOW_WEBHOOK_SECRET` (`openssl rand -hex 32`).
+Register the webhook in SignNow pointing at
+`https://your-host/api/esign/signnow`.
+
+**Test against `SIGNNOW_API_BASE="https://api-eval.signnow.com"` first.** A
+sandbox key pointed at the production host sends real invites to real people.
+
+Then run `npx tsx scripts/verify-signnow.ts you@yourcompany.com`. It exercises
+each call in order and names the exact endpoint to correct if one fails — the
+adapter was written from documentation rather than against a live account, so
+expect to fix a field name or two on first contact.
+
+---
+
+## Storing documents in SharePoint
+
+Set `STORAGE_DRIVER=graph` and documents live in SharePoint instead of on disk
+— which means Purview retention labels, DLP, eDiscovery and Microsoft's backup
+all apply to your HR documents.
+
+### The one decision that matters
+
+**The target site must have no human members.** Grant it to the FSW People app
+registration with `Sites.Selected` and to nobody else.
+
+SharePoint permissions are a completely separate system from FSW People's
+roles. If HR can browse the library directly, then `canAccessDocument()` and
+the download audit trail stop being the real access control — anyone with site
+access reads disciplinary files and I-9s with no record of having done so.
+With an app-owned site, FSW People stays the only door: the download route
+still checks the session, the signed link and the document rules, and only then
+fetches the bytes.
+
+**Do not point this at a Team's document library.** That is the version that
+quietly undoes the authorization model, and it is the obvious thing to do
+because it is convenient.
+
+### Setup
+
+1. **Entra ID → App registrations → New registration.** Free; this is not
+   Azure hosting and there is no bill.
+2. Add a client secret, note it.
+3. **API permissions → Microsoft Graph → Application permissions →
+   `Sites.Selected`**, then **Grant admin consent**. Admin consent is required
+   by design.
+4. Create a SharePoint site for HR documents. Remove every member.
+5. Grant the app write access to that one site (`Sites.Selected` grants nothing
+   until a site is assigned to it — a Graph call or the SharePoint admin
+   tooling does this).
+6. Set `MS_GRAPH_TENANT_ID`, `MS_GRAPH_CLIENT_ID`, `MS_GRAPH_CLIENT_SECRET`,
+   `MS_GRAPH_SITE_ID` and `STORAGE_DRIVER=graph`.
+7. Run `npx tsx scripts/verify-sharepoint.ts`. It round-trips a small file and
+   a 5 MB file (which exercises the chunked upload path), then reminds you to
+   confirm by eye that the site has no members — that part needs a human.
+
+Steps 3 and 5 need a tenant administrator. If an outside IT provider runs your
+M365, that ticket is usually where the calendar time goes.
 
 ---
 

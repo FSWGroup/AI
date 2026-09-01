@@ -3,12 +3,16 @@ import { mkdir, readFile, writeFile, unlink } from 'fs/promises';
 import { createHash, randomBytes } from 'crypto';
 import path from 'path';
 import { env } from '@/lib/env';
+import { GraphDriver } from '@/lib/storage-graph';
 
 /**
  * Private document storage behind a driver interface.
  *
  *  - local: files under STORAGE_LOCAL_DIR (dev / single node). Never inside
  *    /public — nothing is ever served directly.
+ *  - graph: SharePoint via Microsoft Graph, against an app-owned site with no
+ *    human members. Preferred where the tenant is already Microsoft 365 —
+ *    Purview retention, DLP and eDiscovery come for free.
  *  - s3: S3-compatible object storage (adapter stub wired to env; production
  *    deployments provide credentials).
  *
@@ -70,8 +74,24 @@ class S3Driver implements StorageDriver {
 
 let driver: StorageDriver | null = null;
 export function storage(): StorageDriver {
-  if (!driver) driver = env.STORAGE_DRIVER === 's3' ? new S3Driver() : new LocalDriver();
+  if (!driver) {
+    switch (env.STORAGE_DRIVER) {
+      case 'graph':
+        driver = new GraphDriver();
+        break;
+      case 's3':
+        driver = new S3Driver();
+        break;
+      default:
+        driver = new LocalDriver();
+    }
+  }
   return driver;
+}
+
+/** Test seam: drop the memoised driver. */
+export function resetStorageDriver(): void {
+  driver = null;
 }
 
 export function newFileKey(fileName: string): string {

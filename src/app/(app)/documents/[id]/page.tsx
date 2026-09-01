@@ -8,6 +8,11 @@ import { Badge, Card, CardBody, CardHeader, DescriptionList, PageHeader } from '
 import { canAccessDocument } from '../actions';
 import { DownloadButton, SignForm, DeleteDocButton } from './doc-ui';
 import { UploadForm } from '../new/upload-form';
+import { esignConfigured } from '@/lib/esign';
+import {
+  RequestSignatureButton, SignNowButton, CertificateButton,
+  StatusBadgeForSignature, CancelSignatureButton,
+} from '../signature-ui';
 
 export const metadata: Metadata = { title: 'Document' };
 
@@ -19,7 +24,16 @@ export default async function DocumentPage({ params }: { params: Promise<{ id: s
     where: { id },
     include: {
       worker: { select: { id: true, legalFirstName: true, preferredName: true, lastName: true } },
-      versions: { orderBy: { version: 'desc' }, include: { signatures: { include: { worker: { select: { legalFirstName: true, preferredName: true, lastName: true } } } } } },
+      versions: {
+        orderBy: { version: 'desc' },
+        include: {
+          signatures: { include: { worker: { select: { legalFirstName: true, preferredName: true, lastName: true } } } },
+          signatureRequests: {
+            include: { worker: { select: { id: true, legalFirstName: true, preferredName: true, lastName: true } } },
+            orderBy: { createdAt: 'desc' },
+          },
+        },
+      },
     },
   });
   if (!doc || doc.deletedAt) notFound();
@@ -29,6 +43,23 @@ export default async function DocumentPage({ params }: { params: Promise<{ id: s
   const isOwner = doc.workerId !== null && doc.workerId === ctx.workerId;
   const alreadySigned = latest?.signatures.some((s) => s.workerId === ctx.workerId);
   const canSign = isOwner && doc.requiresSignature && !alreadySigned;
+
+  // Certified signature requests across every version, newest first.
+  const signatureRequests = doc.versions.flatMap((v) => v.signatureRequests);
+  const myOpenRequest = signatureRequests.find(
+    (r) => r.workerId === ctx.workerId && ['SENT', 'VIEWED'].includes(r.status),
+  );
+  const canRequest = can(ctx, 'docs.write') && latest?.mimeType === 'application/pdf';
+  const signerCandidates = canRequest
+    ? await db.worker.findMany({
+        where: { status: { in: ['ACTIVE', 'ONBOARDING', 'ON_LEAVE'] }, deletedAt: null },
+        select: {
+          id: true, legalFirstName: true, preferredName: true, lastName: true,
+          workEmail: true, personalEmail: true,
+        },
+        orderBy: { lastName: 'asc' },
+      })
+    : [];
 
   return (
     <div className="mx-auto max-w-3xl">
@@ -99,6 +130,75 @@ export default async function DocumentPage({ params }: { params: Promise<{ id: s
             ))}
           </ul>
         </Card>
+
+        {myOpenRequest ? (
+          <Card>
+            <CardHeader
+              title="You have been asked to sign this"
+              description="Opens a signing session with the provider. The link is issued to you and expires shortly."
+            />
+            <CardBody>
+              <SignNowButton requestId={myOpenRequest.id} />
+              {myOpenRequest.dueAt ? (
+                <p className="mt-2 text-[12px] text-ink-500">Due by {fmtDate(myOpenRequest.dueAt)}.</p>
+              ) : null}
+            </CardBody>
+          </Card>
+        ) : null}
+
+        {can(ctx, 'docs.write') || signatureRequests.length > 0 ? (
+          <Card>
+            <CardHeader
+              title="Certified signatures"
+              description="A tamper-evident signature from the signing provider, with its audit certificate stored alongside."
+              actions={
+                canRequest ? (
+                  <RequestSignatureButton
+                    versionId={latest!.id}
+                    configured={esignConfigured()}
+                    workers={signerCandidates.map((w) => ({
+                      id: w.id,
+                      name: fullName(w),
+                      hasEmail: Boolean(w.workEmail ?? w.personalEmail),
+                    }))}
+                  />
+                ) : undefined
+              }
+            />
+            <CardBody>
+              {latest && latest.mimeType !== 'application/pdf' && can(ctx, 'docs.write') ? (
+                <p className="mb-3 text-[13px] text-ink-500">
+                  Certified signature needs a PDF. This version is {latest.mimeType}.
+                </p>
+              ) : null}
+              {signatureRequests.length === 0 ? (
+                <p className="text-[13px] text-ink-500">Nothing has been sent for certified signature.</p>
+              ) : (
+                <ul className="space-y-2">
+                  {signatureRequests.map((r) => (
+                    <li key={r.id} className="flex flex-wrap items-center justify-between gap-2 rounded-md border border-ink-100 px-3.5 py-2.5">
+                      <div>
+                        <span className="text-[13px] font-medium text-ink-900">{fullName(r.worker)}</span>
+                        <span className="ml-2"><StatusBadgeForSignature status={r.status} /></span>
+                        <span className="block text-[12px] text-ink-500">
+                          requested {fmtDate(r.createdAt)}
+                          {r.signedAt ? ` · signed ${fmtDate(r.signedAt)}` : ''}
+                          {r.declineReason ? ` · ${r.declineReason}` : ''}
+                        </span>
+                      </div>
+                      <div className="flex items-center gap-1">
+                        {r.certificateFileKey ? <CertificateButton requestId={r.id} /> : null}
+                        {can(ctx, 'docs.write') && ['SENT', 'VIEWED'].includes(r.status) ? (
+                          <CancelSignatureButton requestId={r.id} />
+                        ) : null}
+                      </div>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </CardBody>
+          </Card>
+        ) : null}
 
         {canSign && latest ? (
           <Card>

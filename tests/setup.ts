@@ -20,3 +20,12 @@ process.env.INDEED_FEED_TOKEN ??= 'test-feed-token-'.padEnd(40, '0');
 process.env.INDEED_APPLY_SECRET ??= 'test-apply-secret-'.padEnd(40, '0');
 process.env.INDEED_COMPANY_NAME ??= 'FSW Group';
 process.env.APP_BASE_URL ??= 'http://localhost:3000';
+
+// Certified e-signature: fixed test credentials so webhook signature
+// verification is deterministic. No real account is ever contacted.
+process.env.SIGNNOW_WEBHOOK_SECRET ??= 'test-signnow-webhook-'.padEnd(40, '0');
+process.env.SIGNNOW_CLIENT_ID ??= 'test-client-id';
+process.env.SIGNNOW_CLIENT_SECRET ??= 'test-client-secret';
+process.env.SIGNNOW_USERNAME ??= 'test@example.invalid';
+process.env.SIGNNOW_PASSWORD ??= 'test-password';
+process.env.SIGNNOW_API_BASE ??= 'https://api-eval.signnow.invalid';

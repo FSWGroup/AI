@@ -84,6 +84,7 @@ export const NAV_GROUPS: NavGroup[] = [
       { label: 'Onboarding', href: '/ops/onboarding', permission: 'onboarding.admin', managerOr: true },
       { label: 'Offboarding', href: '/ops/offboarding', permission: 'onboarding.admin' },
       { label: 'Documents', href: '/documents', permission: null },
+      { label: 'Signature Status', href: '/documents/signatures', permission: 'docs.read_all' },
       { label: 'Policies', href: '/policies', permission: null },
       { label: 'Announcements', href: '/announcements', permission: null },
       { label: 'Equipment', href: '/equipment', permission: 'equipment.admin' },

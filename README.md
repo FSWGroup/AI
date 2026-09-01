@@ -80,6 +80,9 @@ src/
     access.ts              Access profiles, provisioning loop, exception report
     kiosk.ts               Shared-tablet device auth and PIN clock-in
     api-keys.ts            Machine credentials, scopes, rate limit, webhook signing
+    signatures.ts          Signature lifecycle, ordering and idempotency rules
+    storage-graph.ts       SharePoint storage via Microsoft Graph
+    esign/                 types.ts (state machine), signnow.ts (adapter)
     webhooks.ts            Outbound delivery queue with backoff
     analytics/             retention.ts (job-related rules only), workforce.ts
     ai/                    The only place the app talks to an external model:
@@ -286,6 +289,17 @@ npx tsx scripts/verify-ai-questions.ts   # the AI panel reports an outcome, neve
 npx tsx scripts/verify-new-modules.ts    # skills, analytics, comp, funnel, schedule,
                                          # kiosk, assistant, access loop and the read API
 ```
+
+Two more need credentials you supply locally — they never leave your machine:
+
+```bash
+npx tsx scripts/verify-signnow.ts you@yourcompany.com   # against api-eval.signnow.com first
+npx tsx scripts/verify-sharepoint.ts
+```
+
+Both were written against documentation rather than a live service (network egress to the
+vendors' docs was blocked when they were built), so they name the exact endpoint constant
+to correct when a call fails.
 
 `verify-ai-questions.ts` checks the not-configured path by default. Give it a real
 `ANTHROPIC_API_KEY` to exercise a full generation, including that exactly five questions are

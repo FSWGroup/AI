@@ -14,7 +14,7 @@ const envSchema = z.object({
   DOCUMENT_URL_SIGNING_KEY: z.string().min(32, 'DOCUMENT_URL_SIGNING_KEY must be at least 32 chars'),
   APP_BASE_URL: z.string().url().default('http://localhost:3000'),
 
-  STORAGE_DRIVER: z.enum(['local', 's3']).default('local'),
+  STORAGE_DRIVER: z.enum(['local', 's3', 'graph']).default('local'),
   STORAGE_LOCAL_DIR: z.string().default('./.storage'),
   S3_ENDPOINT: z.string().optional(),
   S3_REGION: z.string().optional(),
@@ -46,6 +46,36 @@ const envSchema = z.object({
   // our own careers page instead of inside Indeed.
   INDEED_APPLY_API_TOKEN: z.string().optional(),
   INDEED_COMPANY_NAME: z.string().default('FSW Group'),
+
+  // ---------------------------------------------------------------------------
+  // Certified e-signature (SignNow). Optional: without it, documents still
+  // support the internal acknowledgment flow and the UI says the certified
+  // option is not configured.
+  // ---------------------------------------------------------------------------
+  ESIGN_PROVIDER: z.string().default('signnow'),
+  SIGNNOW_CLIENT_ID: z.string().optional(),
+  SIGNNOW_CLIENT_SECRET: z.string().optional(),
+  SIGNNOW_USERNAME: z.string().optional(),
+  SIGNNOW_PASSWORD: z.string().optional(),
+  // Point at https://api-eval.signnow.com while testing. A sandbox key against
+  // the production host would send real invites to real people.
+  SIGNNOW_API_BASE: z.string().url().optional(),
+  // Verifies the HMAC on inbound SignNow webhooks. Without it the webhook
+  // endpoint returns 404 rather than trusting unsigned callers.
+  SIGNNOW_WEBHOOK_SECRET: z.string().min(24, 'SIGNNOW_WEBHOOK_SECRET must be at least 24 chars').optional(),
+
+  // ---------------------------------------------------------------------------
+  // SharePoint document storage via Microsoft Graph (STORAGE_DRIVER=graph).
+  // The site must be granted to this app registration with Sites.Selected and
+  // have NO human members — FSW People stays the only door to HR documents.
+  // ---------------------------------------------------------------------------
+  MS_GRAPH_TENANT_ID: z.string().optional(),
+  MS_GRAPH_CLIENT_ID: z.string().optional(),
+  MS_GRAPH_CLIENT_SECRET: z.string().optional(),
+  /** The SharePoint site id Graph returns for the document site. */
+  MS_GRAPH_SITE_ID: z.string().optional(),
+  /** Folder inside the site's default drive. Everything is written below it. */
+  MS_GRAPH_ROOT_FOLDER: z.string().default('FSW People'),
 
   NODE_ENV: z.enum(['development', 'test', 'production']).default('development'),
 });

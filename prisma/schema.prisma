@@ -312,6 +312,7 @@ model Worker {
   shiftAssignments ShiftAssignment[]
   kioskPunches     KioskPunch[]
   accessEvents     AccessEvent[]
+  signatureRequests SignatureRequest[]
 }
 
 // Effective-dated employment. The "current" record has effectiveTo = null.
@@ -920,6 +921,7 @@ model DocumentVersion {
 
   document   Document            @relation(fields: [documentId], references: [id], onDelete: Cascade)
   signatures DocumentSignature[]
+  signatureRequests SignatureRequest[]
 
   @@unique([documentId, version])
 }
@@ -2227,4 +2229,104 @@ model WebhookDelivery {
 
   @@index([status, nextAttemptAt])
   @@index([endpointId, createdAt])
+}
+
+// ---------------------------------------------------------------------------
+// Certified e-signature (§ documents)
+//
+// DocumentSignature above is an *internal acknowledgment* — a typed name, an
+// IP and a timestamp. That is honest and sufficient for a handbook read.
+// A SignatureRequest is the certified kind: the ceremony happens at a
+// specialist provider that produces a tamper-evident audit certificate.
+//
+// Three systems hold state and they must not drift, so ownership is explicit:
+//   FSW People owns STATUS   — this table, and the dashboard reads only it
+//   Object storage owns BYTES — the signed PDF and its certificate
+//   The provider owns EVIDENCE — which we copy here at completion, so
+//                                leaving the vendor never costs us the proof
+// ---------------------------------------------------------------------------
+
+model SignatureRequest {
+  id                String   @id @default(cuid())
+  documentVersionId String
+  /** The FSW worker being asked to sign. */
+  workerId          String
+  /** Captured at send time: a later name change must not rewrite the record. */
+  signerName        String
+  signerEmail       String
+
+  provider           String  @default("SIGNNOW")
+  /** The provider's own identifiers, for reconciliation and support tickets. */
+  providerDocumentId String? @unique
+  providerInviteId   String?
+
+  // DRAFT | SENT | VIEWED | SIGNED | STORED | DECLINED | EXPIRED | CANCELED | FAILED
+  //
+  // SIGNED means the provider says it is done. STORED means we have the bytes
+  // and the certificate safely in our own storage. The gap between them is
+  // where a download can fail, so they are deliberately separate states.
+  status        String    @default("DRAFT")
+  message       String?
+  dueAt         DateTime?
+  sentAt        DateTime?
+  viewedAt      DateTime?
+  signedAt      DateTime?
+  storedAt      DateTime?
+  declinedAt    DateTime?
+  declineReason String?
+
+  /** Storage keys for the completed artifacts. */
+  signedFileKey      String?
+  certificateFileKey String?
+  /** Hash of the signed PDF as we received it — our own tamper check. */
+  signedSha256       String?
+  /** The DocumentVersion created from the signed PDF, so it joins the history. */
+  signedVersionId    String?
+
+  lastError     String?
+  remindersSent Int      @default(0)
+  lastReminderAt DateTime?
+  requestedById String?
+  canceledById  String?
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  // Deliberately NOT onDelete: Cascade, matching DocumentSignature above.
+  // Signature evidence protects its parent from deletion rather than being
+  // swept away with it — destroying it is an out-of-band act, never a
+  // side effect of tidying up a document or a worker record.
+  documentVersion DocumentVersion  @relation(fields: [documentVersionId], references: [id])
+  worker          Worker           @relation(fields: [workerId], references: [id])
+  events          SignatureEvent[]
+
+  @@index([status, dueAt])
+  @@index([workerId, status])
+  @@index([documentVersionId])
+}
+
+/**
+ * Append-only record of everything the provider told us, including deliveries
+ * we refused. This is the evidence trail for "when was this sent, when was it
+ * opened, when was it signed" — questions that get asked months later, in
+ * disputes, when nobody trusts a mutable status column.
+ */
+model SignatureEvent {
+  id        String @id @default(cuid())
+  requestId String
+  // CREATED | SENT | VIEWED | SIGNED | DECLINED | DOWNLOADED | STORED
+  // | REMINDED | CANCELED | ERROR | WEBHOOK_REJECTED
+  kind      String
+  detail    String?
+  /** The provider's event id. Unique, so a webhook redelivery is a no-op. */
+  providerEventId String? @unique
+  /** Shape of the payload, never a second copy of its contents. */
+  payloadDigest   Json?
+  at        DateTime @default(now())
+
+  // No cascade: the append-only trigger would refuse it anyway, and a
+  // declared cascade that can never fire is a lie in the schema.
+  request SignatureRequest @relation(fields: [requestId], references: [id])
+
+  @@index([requestId, at])
+  @@index([kind, at])
 }
