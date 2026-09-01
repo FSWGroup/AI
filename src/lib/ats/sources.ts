@@ -107,14 +107,22 @@ export function resolveAttribution(input: AttributionInput): Attribution {
   put("utm_content", input.utmContent);
   put("referrer", input.referrer);
 
+  // A canonical key must resolve to itself. trackedApplyUrl() publishes
+  // ?src=<channelKey>, so anything that fails to round-trip would silently
+  // misattribute traffic from our own posting URLs.
+  const canonical = new Set(SEED_CHANNELS.map((c) => c.key));
+  const resolve = (value: string): string | null => {
+    if (canonical.has(value)) return value;
+    return ALIASES[value] ?? null;
+  };
+
   const explicit = (input.src ?? "").trim().toLowerCase();
-  if (explicit && ALIASES[explicit]) {
-    return { channelKey: ALIASES[explicit], detail };
-  }
+  const fromExplicit = explicit ? resolve(explicit) : null;
+  if (fromExplicit) return { channelKey: fromExplicit, detail };
+
   const utm = (input.utmSource ?? "").trim().toLowerCase();
-  if (utm && ALIASES[utm]) {
-    return { channelKey: ALIASES[utm], detail };
-  }
+  const fromUtm = utm ? resolve(utm) : null;
+  if (fromUtm) return { channelKey: fromUtm, detail };
   if (input.referrer) {
     const host = hostOf(input.referrer);
     if (host) {

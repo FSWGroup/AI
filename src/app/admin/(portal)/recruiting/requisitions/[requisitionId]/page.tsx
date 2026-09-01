@@ -9,6 +9,7 @@ import { RequisitionActions } from "@/components/admin/RequisitionActions";
 import { chainStatus, describeChain, type ApprovalStep } from "@/lib/ats/approvals";
 import { summarizeScorecards } from "@/lib/ats/scorecards";
 import { buildFunnel, formatRate, timeInStages } from "@/lib/ats/analytics";
+import { analyzeFunnelImpact } from "@/lib/ats/stage-impact";
 
 export const dynamic = "force-dynamic";
 
@@ -69,6 +70,7 @@ export default async function RequisitionPage({
           ratings: true,
         },
       },
+      invitations: { select: { attempts: { select: { id: true } } } },
     },
     orderBy: { appliedAt: "desc" },
   });
@@ -135,6 +137,40 @@ export default async function RequisitionPage({
     });
 
   const closed = applications.filter((a) => a.status !== "ACTIVE");
+
+  // Funnel-wide adverse impact, only when the compliance module is on. The
+  // demographic rows are joined by opaque reference and never leave here as
+  // individual data.
+  const settings = await prisma.orgSettings.findUnique({ where: { id: "org" } });
+  let stageImpact: ReturnType<typeof analyzeFunnelImpact> | null = null;
+  if (settings?.eeoModuleEnabled && applications.length > 0) {
+    const attemptRefs = applications.flatMap((a) =>
+      a.invitations.flatMap((i) => i.attempts.map((t) => t.id)),
+    );
+    const eeo = await prisma.eeoRecord.findMany({
+      where: { attemptRef: { in: attemptRefs } },
+      select: { attemptRef: true, data: true },
+    });
+    const byAttempt = new Map(eeo.map((e) => [e.attemptRef, e.data as Record<string, string>]));
+    stageImpact = analyzeFunnelImpact({
+      orderedStages: requisition.stages.map((s) => ({ name: s.name, kind: s.kind })),
+      reach: stageEvents.map((e) => ({
+        applicationId: e.applicationId,
+        stageName: e.stageName,
+      })),
+      people: applications.map((a) => {
+        const ref = a.invitations.flatMap((i) => i.attempts.map((t) => t.id))[0];
+        return {
+          applicationId: a.id,
+          demographics: ref ? (byAttempt.get(ref) ?? null) : null,
+        };
+      }),
+      categories: [
+        { key: "sex", label: "Sex" },
+        { key: "raceEthnicity", label: "Race / ethnicity" },
+      ],
+    });
+  }
   const funnel = buildFunnel(
     requisition.stages.map((s) => ({ name: s.name, kind: s.kind })),
     stageEvents,
@@ -441,6 +477,69 @@ export default async function RequisitionPage({
 
         {tab === "insights" && (
           <>
+            {stageImpact && (
+              <Card className="p-6">
+                <h3 className="text-sm font-bold text-navy-900">
+                  Pass-through rates by group
+                </h3>
+                <p className="mt-1 text-xs leading-relaxed text-navy-500">
+                  The four-fifths screen applied at every stage, not only the
+                  assessment. Any step used as a basis for an employment
+                  decision is a selection procedure — and the larger disparity
+                  is usually at the least structured one. A ratio below 0.80 is
+                  a prompt to examine that stage, never a finding about it.
+                </p>
+                <div className="mt-4 space-y-4">
+                  {stageImpact.map((s) => (
+                    <div key={s.stageName} className="rounded-xl border border-navy-100 p-4">
+                      <p className="text-sm font-semibold text-navy-900">{s.stageName}</p>
+                      {s.insufficientReason ? (
+                        <p className="mt-1 text-xs text-navy-500">
+                          {s.insufficientReason}
+                        </p>
+                      ) : (
+                        s.categories.map((c) => (
+                          <div key={c.category} className="mt-3">
+                            <div className="flex items-center justify-between">
+                              <p className="text-xs font-semibold uppercase tracking-wide text-navy-500">
+                                {c.category}
+                              </p>
+                              {c.flagged && <Badge tone="red">Below four-fifths</Badge>}
+                            </div>
+                            <table className="mt-1.5 w-full text-left text-xs">
+                              <tbody className="divide-y divide-navy-50">
+                                {c.groups.map((g) => (
+                                  <tr key={g.group}>
+                                    <td className="py-1 text-navy-700">
+                                      {g.group.replace(/_/g, " ").toLowerCase()}
+                                    </td>
+                                    <td className="py-1 text-right text-navy-500">
+                                      {g.selected}/{g.applicants}
+                                    </td>
+                                    <td className="py-1 text-right font-semibold text-navy-800">
+                                      {g.status === "REFERENCE"
+                                        ? "reference"
+                                        : g.impactRatio == null
+                                          ? "—"
+                                          : g.impactRatio.toFixed(2)}
+                                    </td>
+                                  </tr>
+                                ))}
+                              </tbody>
+                            </table>
+                          </div>
+                        ))
+                      )}
+                    </div>
+                  ))}
+                </div>
+                <p className="mt-4 rounded-lg bg-amber-50 p-3 text-xs leading-relaxed text-amber-900">
+                  Discuss any flagged stage with counsel before acting on it.
+                  These ratios describe this one requisition&rsquo;s sample and
+                  are not a legal conclusion.
+                </p>
+              </Card>
+            )}
             <Card className="p-6">
               <h3 className="text-sm font-bold text-navy-900">Funnel</h3>
               <p className="mt-1 text-xs text-navy-500">

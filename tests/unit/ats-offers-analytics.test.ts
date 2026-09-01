@@ -17,7 +17,7 @@ import {
   type StageEventRow,
   type ApplicationRow,
 } from "@/lib/ats/analytics";
-import { resolveAttribution, trackedApplyUrl } from "@/lib/ats/sources";
+import { resolveAttribution, trackedApplyUrl, SEED_CHANNELS } from "@/lib/ats/sources";
 import { summarizeScorecards, validateSubmission } from "@/lib/ats/scorecards";
 
 describe("offer state machine", () => {
@@ -164,6 +164,17 @@ describe("source attribution", () => {
       referrer: "https://indeed.com",
     });
     expect(detail).toMatchObject({ src: "indeed", utm_campaign: "q1-sales" });
+  });
+
+  it("round-trips every channel key it publishes", () => {
+    // trackedApplyUrl puts a channel key in ?src=. Any key that fails to
+    // resolve back to itself misattributes traffic from our own posting URLs.
+    for (const channel of SEED_CHANNELS) {
+      const url = new URL(trackedApplyUrl("https://x.test", "REQ-1", channel.key));
+      expect(resolveAttribution({ src: url.searchParams.get("src") }).channelKey).toBe(
+        channel.key,
+      );
+    }
   });
 
   it("builds a tracked apply URL per channel", () => {

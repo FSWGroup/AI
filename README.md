@@ -201,6 +201,9 @@ Netlify Blobs; PDFs via the report's Print button there).
 - `docs/RECORDING-PRIVACY.md` — recording architecture and protections.
 - `docs/VALIDATION-ROADMAP.md` — what FSW must do before treating results
   as validated predictors.
+- `docs/RECRUITING.md` — the ATS: requisitions, job feeds and multi-source
+  intake, pipeline, structured interviewing, offers, and funnel-wide adverse
+  impact.
 - `docs/PDF-EXPORT.md` — the complete assessment export: what is in it, what
   is deliberately left out, and how it is rendered.
 - `docs/FAIRNESS-AND-FEEDBACK.md` — the benchmark impact preview, voluntary
