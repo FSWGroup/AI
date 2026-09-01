@@ -52,6 +52,23 @@ model User {
   questionsReviewed   QuestionVersion[]        @relation("QuestionReviewedBy")
   accommodationsGiven AccommodationOverride[]  @relation("AccommodationApprovedBy")
   notes               CandidateNote[]
+
+  // Recruiting
+  requisitionsCreated   Requisition[]           @relation("RequisitionCreatedBy")
+  requisitionApprovals  RequisitionApproval[]   @relation("RequisitionApprover")
+  hiringTeamMemberships HiringTeamMember[]
+  applicationsReferred  Application[]           @relation("ApplicationReferredBy")
+  stageEventsActed      ApplicationStageEvent[]
+  applicationNotes      ApplicationNote[]
+  interviewKitsCreated  InterviewKit[]
+  interviewsScheduled   Interview[]             @relation("InterviewScheduledBy")
+  interviewParticipation InterviewParticipant[]
+  scorecards            Scorecard[]
+  referenceChecks       ReferenceCheck[]
+  offersCreated         Offer[]                 @relation("OfferCreatedBy")
+  offerApprovals        OfferApproval[]         @relation("OfferApprover")
+  offerTemplates        OfferLetterTemplate[]
+  requisitionEvents     RequisitionEvent[]
 }
 
 model Session {
@@ -368,6 +385,7 @@ model JobProfile {
   assignments JobProfileAssignment[]
   concernRules AreaOfConcernRule[]
   aiAnalyses  AiAnalysis[]
+  requisitions Requisition[]
 }
 
 model JobDimensionBenchmark {
@@ -416,6 +434,7 @@ model JobOpening {
 
   invitations Invitation[]
   attempts    Attempt[]
+  requisition Requisition?
 }
 
 // ---------------------------------------------------------------------------
@@ -453,10 +472,11 @@ model Candidate {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  invitations Invitation[]
-  attempts    Attempt[]
-  notes       CandidateNote[]
-  documents   CandidateDocument[]
+  invitations  Invitation[]
+  attempts     Attempt[]
+  notes        CandidateNote[]
+  documents    CandidateDocument[]
+  applications Application[]
 
   @@index([email])
 }
@@ -496,6 +516,10 @@ model Invitation {
   expiresAt           DateTime
   invitedById         String?
   invitedBy           User?             @relation("InvitedBy", fields: [invitedById], references: [id], onDelete: SetNull)
+  /// Set when the assessment was issued from a recruiting pipeline stage
+  /// rather than invited directly.
+  applicationId       String?
+  application         Application?      @relation(fields: [applicationId], references: [id], onDelete: SetNull)
   createdAt           DateTime          @default(now())
 
   attempts Attempt[]
@@ -868,6 +892,8 @@ model CandidateDocument {
   candidate    Candidate    @relation(fields: [candidateId], references: [id], onDelete: Cascade)
   attemptId    String?
   attempt      Attempt?     @relation(fields: [attemptId], references: [id], onDelete: SetNull)
+  applicationId String?
+  application  Application? @relation(fields: [applicationId], references: [id], onDelete: SetNull)
   kind         DocumentKind @default(RESUME)
   fileName     String
   mimeType     String
@@ -979,4 +1005,752 @@ model EeoRecord {
 
   @@index([jobOpeningId])
   @@index([jobProfileRef])
+}
+
+// ===========================================================================
+// RECRUITING (ATS): requisition -> sourcing -> pipeline -> interviews -> offer
+//
+// Model shape follows the structured-hiring pattern the established tools use:
+// a Candidate is a person, and an Application is that person's participation
+// in one Requisition. A person applying to three roles is one Candidate with
+// three Applications, which is what makes duplicate detection, source
+// attribution, and cross-role reporting possible at all.
+//
+// Everything a human decides is recorded as an event with an actor, because
+// employment decisions have to be reconstructable years later.
+// ===========================================================================
+
+model Department {
+  id        String   @id @default(cuid())
+  name      String   @unique
+  active    Boolean  @default(true)
+  createdAt DateTime @default(now())
+
+  requisitions Requisition[]
+}
+
+model Location {
+  id        String   @id @default(cuid())
+  name      String
+  city      String?
+  region    String?
+  /// ISO 3166-1 alpha-2. Job boards require it on every posting.
+  country   String   @default("PH")
+  postalCode String?
+  /// Postings that are fully remote still need a nominal location for feeds.
+  remote    Boolean  @default(false)
+  active    Boolean  @default(true)
+  createdAt DateTime @default(now())
+
+  requisitions Requisition[]
+
+  @@unique([name, country])
+}
+
+enum EmploymentType {
+  FULL_TIME
+  PART_TIME
+  CONTRACT
+  TEMPORARY
+  INTERNSHIP
+}
+
+enum WorkArrangement {
+  ONSITE
+  HYBRID
+  REMOTE
+}
+
+enum RequisitionStatus {
+  DRAFT
+  PENDING_APPROVAL
+  APPROVED
+  OPEN
+  ON_HOLD
+  FILLED
+  CLOSED
+  REJECTED
+}
+
+model Requisition {
+  id             String            @id @default(cuid())
+  /// Human-readable reference used on postings and in conversation.
+  reference      String            @unique
+  title          String
+  status         RequisitionStatus @default(DRAFT)
+  departmentId   String?
+  department     Department?       @relation(fields: [departmentId], references: [id], onDelete: SetNull)
+  locationId     String?
+  location       Location?         @relation(fields: [locationId], references: [id], onDelete: SetNull)
+  employmentType EmploymentType    @default(FULL_TIME)
+  workArrangement WorkArrangement  @default(ONSITE)
+  openings       Int               @default(1)
+  /// Compensation range. Publishing it is required in a growing number of
+  /// jurisdictions and improves applicant quality everywhere else.
+  salaryMin      Int?
+  salaryMax      Int?
+  salaryCurrency String            @default("PHP")
+  salaryPeriod   String            @default("MONTH")
+  salaryPublish  Boolean           @default(false)
+  /// Public-facing copy.
+  summary        String?
+  description    String?
+  responsibilities String?
+  requirements   String?
+  benefits       String?
+  /// Internal-only context for the hiring team.
+  internalNotes  String?
+  /// Assessment linkage: the benchmark profile and the opening that
+  /// assessment invitations are issued against.
+  jobProfileId   String?
+  jobProfile     JobProfile?       @relation(fields: [jobProfileId], references: [id], onDelete: SetNull)
+  jobOpeningId   String?           @unique
+  jobOpening     JobOpening?       @relation(fields: [jobOpeningId], references: [id], onDelete: SetNull)
+  createdById    String?
+  createdBy      User?             @relation("RequisitionCreatedBy", fields: [createdById], references: [id], onDelete: SetNull)
+  openedAt       DateTime?
+  closedAt       DateTime?
+  targetStartDate DateTime?
+  createdAt      DateTime          @default(now())
+  updatedAt      DateTime          @updatedAt
+
+  approvals    RequisitionApproval[]
+  team         HiringTeamMember[]
+  stages       PipelineStage[]
+  postings     JobPosting[]
+  applications Application[]
+  screeningQuestions ScreeningQuestion[]
+  offers       Offer[]
+  events       RequisitionEvent[]
+
+  @@index([status])
+  @@index([departmentId])
+}
+
+enum ApprovalDecision {
+  PENDING
+  APPROVED
+  REJECTED
+  SKIPPED
+}
+
+/// One step in a requisition's approval chain. Steps are ordered; a rejection
+/// stops the chain and returns the requisition to draft.
+model RequisitionApproval {
+  id            String           @id @default(cuid())
+  requisitionId String
+  requisition   Requisition      @relation(fields: [requisitionId], references: [id], onDelete: Cascade)
+  stepIndex     Int
+  approverId    String
+  approver      User             @relation("RequisitionApprover", fields: [approverId], references: [id], onDelete: Cascade)
+  decision      ApprovalDecision @default(PENDING)
+  comment       String?
+  decidedAt     DateTime?
+  createdAt     DateTime         @default(now())
+
+  @@unique([requisitionId, stepIndex])
+  @@index([approverId, decision])
+}
+
+enum HiringTeamRole {
+  RECRUITER
+  HIRING_MANAGER
+  INTERVIEWER
+  COORDINATOR
+  APPROVER
+}
+
+model HiringTeamMember {
+  id            String         @id @default(cuid())
+  requisitionId String
+  requisition   Requisition    @relation(fields: [requisitionId], references: [id], onDelete: Cascade)
+  userId        String
+  user          User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  role          HiringTeamRole
+  createdAt     DateTime       @default(now())
+
+  @@unique([requisitionId, userId, role])
+  @@index([userId])
+}
+
+/// What a stage is FOR, which drives the behavior the app attaches to it.
+/// The label is free text; the kind is the contract.
+enum StageKind {
+  APPLIED
+  SCREEN
+  ASSESSMENT
+  INTERVIEW
+  REFERENCE
+  OFFER
+  HIRED
+}
+
+model PipelineStage {
+  id            String      @id @default(cuid())
+  requisitionId String
+  requisition   Requisition @relation(fields: [requisitionId], references: [id], onDelete: Cascade)
+  name          String
+  kind          StageKind
+  orderIndex    Int
+  /// Interview kit used when this stage is an INTERVIEW stage.
+  interviewKitId String?
+  interviewKit   InterviewKit? @relation(fields: [interviewKitId], references: [id], onDelete: SetNull)
+  createdAt     DateTime    @default(now())
+
+  applications      Application[]
+  stageHistory      ApplicationStageEvent[]
+  interviews        Interview[]
+
+  @@unique([requisitionId, orderIndex])
+  @@index([requisitionId])
+}
+
+/// Where an application came from. Kept as a table rather than an enum so an
+/// organization can add boards without a migration, and so source
+/// effectiveness reporting has a stable key to group by.
+model SourceChannel {
+  id          String   @id @default(cuid())
+  key         String   @unique
+  name        String
+  /// CAREERS_SITE, JOB_BOARD, REFERRAL, AGENCY, DIRECT, IMPORT, OTHER
+  category    String   @default("JOB_BOARD")
+  active      Boolean  @default(true)
+  /// SHA-256 of the inbound API token, when this channel POSTs applications.
+  tokenHash   String?  @unique
+  createdAt   DateTime @default(now())
+
+  postings     JobPosting[]
+  applications Application[]
+  inbound      InboundApplication[]
+}
+
+enum PostingStatus {
+  DRAFT
+  PUBLISHED
+  PAUSED
+  EXPIRED
+  REMOVED
+}
+
+/// A requisition published to one channel. Separate from the requisition so
+/// the same role can run on several boards with different lifecycles, and so
+/// per-board performance is measurable.
+model JobPosting {
+  id            String        @id @default(cuid())
+  requisitionId String
+  requisition   Requisition   @relation(fields: [requisitionId], references: [id], onDelete: Cascade)
+  channelId     String
+  channel       SourceChannel @relation(fields: [channelId], references: [id], onDelete: Cascade)
+  status        PostingStatus @default(DRAFT)
+  /// The board's own identifier, when it gives us one.
+  externalRef   String?
+  externalUrl   String?
+  publishedAt   DateTime?
+  expiresAt     DateTime?
+  removedAt     DateTime?
+  createdAt     DateTime      @default(now())
+  updatedAt     DateTime      @updatedAt
+
+  @@unique([requisitionId, channelId])
+  @@index([status])
+}
+
+enum ApplicationStatus {
+  ACTIVE
+  HIRED
+  REJECTED
+  WITHDRAWN
+  ON_HOLD
+}
+
+model Application {
+  id            String            @id @default(cuid())
+  /// Short human reference for support conversations. Not a secret.
+  reference     String            @unique
+  candidateId   String
+  candidate     Candidate         @relation(fields: [candidateId], references: [id], onDelete: Cascade)
+  requisitionId String
+  requisition   Requisition       @relation(fields: [requisitionId], references: [id], onDelete: Cascade)
+  stageId       String?
+  stage         PipelineStage?    @relation(fields: [stageId], references: [id], onDelete: SetNull)
+  status        ApplicationStatus @default(ACTIVE)
+  channelId     String?
+  channel       SourceChannel?    @relation(fields: [channelId], references: [id], onDelete: SetNull)
+  /// Free-form campaign attribution captured at apply time (utm_*, referrer).
+  sourceDetail  Json?
+  /// Set when a teammate referred this person.
+  referredById  String?
+  referredBy    User?             @relation("ApplicationReferredBy", fields: [referredById], references: [id], onDelete: SetNull)
+  /// Populated by knockout evaluation of the screening answers.
+  knockedOut    Boolean           @default(false)
+  knockoutReason String?
+  rejectionReasonId String?
+  rejectionReason   RejectionReason? @relation(fields: [rejectionReasonId], references: [id], onDelete: SetNull)
+  rejectionNote String?
+  rejectedAt    DateTime?
+  hiredAt       DateTime?
+  withdrawnAt   DateTime?
+  appliedAt     DateTime          @default(now())
+  /// Denormalized for "stale application" views without a subquery per row.
+  lastActivityAt DateTime         @default(now())
+  createdAt     DateTime          @default(now())
+  updatedAt     DateTime          @updatedAt
+
+  screeningAnswers ScreeningAnswer[]
+  stageEvents      ApplicationStageEvent[]
+  interviews       Interview[]
+  scorecards       Scorecard[]
+  offers           Offer[]
+  notes            ApplicationNote[]
+  documents        CandidateDocument[]
+  referenceChecks  ReferenceCheck[]
+  /// The assessment invitation issued for this application, if any.
+  invitations      Invitation[]
+
+  @@unique([candidateId, requisitionId])
+  @@index([requisitionId, status])
+  @@index([stageId])
+  @@index([candidateId])
+}
+
+/// Every stage transition, kept forever. Time-in-stage and funnel conversion
+/// are computed from these rows rather than from the application's current
+/// state, so history survives later edits.
+model ApplicationStageEvent {
+  id            String        @id @default(cuid())
+  applicationId String
+  application   Application   @relation(fields: [applicationId], references: [id], onDelete: Cascade)
+  stageId       String?
+  stage         PipelineStage? @relation(fields: [stageId], references: [id], onDelete: SetNull)
+  /// Snapshot: stages can be renamed or deleted, history cannot change.
+  stageName     String
+  stageKind     StageKind
+  fromStageName String?
+  actorId       String?
+  actor         User?         @relation(fields: [actorId], references: [id], onDelete: SetNull)
+  /// "SYSTEM" when the move was automatic (knockout, assessment completion).
+  actorLabel    String?
+  note          String?
+  occurredAt    DateTime      @default(now())
+
+  @@index([applicationId, occurredAt])
+  @@index([stageId])
+}
+
+model RejectionReason {
+  id        String   @id @default(cuid())
+  label     String   @unique
+  /// Groups reasons for reporting: QUALIFICATIONS, EXPERIENCE, PROCESS,
+  /// CANDIDATE_DRIVEN, COMPENSATION, OTHER.
+  category  String   @default("OTHER")
+  /// Whether a rejection for this reason should send the candidate an email.
+  notifyCandidate Boolean @default(true)
+  active    Boolean  @default(true)
+  orderIndex Int     @default(0)
+
+  applications Application[]
+}
+
+enum ScreeningQuestionKind {
+  SHORT_TEXT
+  LONG_TEXT
+  YES_NO
+  SINGLE_CHOICE
+  MULTI_CHOICE
+  NUMBER
+  FILE
+}
+
+/// A question asked on the application form. Knockout rules are deliberately
+/// simple and inspectable — a rule nobody can read is a rule nobody can
+/// defend when a rejected applicant asks why.
+model ScreeningQuestion {
+  id            String                @id @default(cuid())
+  requisitionId String
+  requisition   Requisition           @relation(fields: [requisitionId], references: [id], onDelete: Cascade)
+  prompt        String
+  kind          ScreeningQuestionKind
+  required      Boolean               @default(true)
+  orderIndex    Int
+  /// Choices for SINGLE_CHOICE / MULTI_CHOICE.
+  choices       String[]              @default([])
+  /// When set, an answer failing this rule marks the application knocked out
+  /// for human review. It never auto-rejects anybody.
+  knockout      Boolean               @default(false)
+  /// "EQUALS" | "NOT_EQUALS" | "MIN" | "MAX" | "INCLUDES"
+  knockoutOperator String?
+  knockoutValue    String?
+  helpText      String?
+  createdAt     DateTime              @default(now())
+
+  answers ScreeningAnswer[]
+
+  @@unique([requisitionId, orderIndex])
+}
+
+model ScreeningAnswer {
+  id            String            @id @default(cuid())
+  applicationId String
+  application   Application       @relation(fields: [applicationId], references: [id], onDelete: Cascade)
+  questionId    String
+  question      ScreeningQuestion @relation(fields: [questionId], references: [id], onDelete: Cascade)
+  /// Snapshot of the prompt so a later edit cannot rewrite history.
+  promptSnapshot String
+  valueText     String?
+  valueNumber   Float?
+  valueList     String[]          @default([])
+  createdAt     DateTime          @default(now())
+
+  @@unique([applicationId, questionId])
+}
+
+model ApplicationNote {
+  id            String      @id @default(cuid())
+  applicationId String
+  application   Application @relation(fields: [applicationId], references: [id], onDelete: Cascade)
+  authorId      String?
+  author        User?       @relation(fields: [authorId], references: [id], onDelete: SetNull)
+  body          String
+  createdAt     DateTime    @default(now())
+
+  @@index([applicationId])
+}
+
+// ---------------------------------------------------------------------------
+// Structured interviewing
+// ---------------------------------------------------------------------------
+
+/// A reusable interview plan. The point of a kit is that every candidate for
+/// a role is asked the same things and rated on the same attributes, which is
+/// what makes the ratings comparable and the process defensible.
+model InterviewKit {
+  id          String   @id @default(cuid())
+  name        String
+  description String?
+  /// Minutes the interview is scheduled for.
+  durationMinutes Int  @default(45)
+  active      Boolean  @default(true)
+  createdById String?
+  createdBy   User?    @relation(fields: [createdById], references: [id], onDelete: SetNull)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  competencies KitCompetency[]
+  questions    KitQuestion[]
+  stages       PipelineStage[]
+  interviews   Interview[]
+}
+
+model KitCompetency {
+  id          String       @id @default(cuid())
+  kitId       String
+  kit         InterviewKit @relation(fields: [kitId], references: [id], onDelete: Cascade)
+  name        String
+  /// What a strong answer looks like, so ratings mean the same thing to
+  /// different interviewers.
+  definition  String?
+  orderIndex  Int
+
+  ratings ScorecardRating[]
+
+  @@unique([kitId, orderIndex])
+}
+
+model KitQuestion {
+  id          String       @id @default(cuid())
+  kitId       String
+  kit         InterviewKit @relation(fields: [kitId], references: [id], onDelete: Cascade)
+  question    String
+  listenFor   String?
+  orderIndex  Int
+
+  @@unique([kitId, orderIndex])
+}
+
+enum InterviewStatus {
+  SCHEDULED
+  COMPLETED
+  CANCELLED
+  NO_SHOW
+}
+
+model Interview {
+  id            String          @id @default(cuid())
+  applicationId String
+  application   Application     @relation(fields: [applicationId], references: [id], onDelete: Cascade)
+  stageId       String?
+  stage         PipelineStage?  @relation(fields: [stageId], references: [id], onDelete: SetNull)
+  kitId         String?
+  kit           InterviewKit?   @relation(fields: [kitId], references: [id], onDelete: SetNull)
+  title         String
+  status        InterviewStatus @default(SCHEDULED)
+  scheduledAt   DateTime
+  durationMinutes Int           @default(45)
+  /// Video link, room name, or phone number — whatever the team uses.
+  meetingDetail String?
+  scheduledById String?
+  scheduledBy   User?           @relation("InterviewScheduledBy", fields: [scheduledById], references: [id], onDelete: SetNull)
+  cancelledReason String?
+  createdAt     DateTime        @default(now())
+  updatedAt     DateTime        @updatedAt
+
+  participants InterviewParticipant[]
+  scorecards   Scorecard[]
+
+  @@index([applicationId])
+  @@index([scheduledAt])
+}
+
+model InterviewParticipant {
+  id          String    @id @default(cuid())
+  interviewId String
+  interview   Interview @relation(fields: [interviewId], references: [id], onDelete: Cascade)
+  userId      String
+  user        User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  /// Whether this participant is expected to submit a scorecard.
+  scorecardRequired Boolean @default(true)
+
+  @@unique([interviewId, userId])
+  @@index([userId])
+}
+
+/// Deliberately a four-point scale with no neutral option. A midpoint lets an
+/// interviewer avoid committing, which is the single most common way
+/// structured interviewing degrades into unstructured interviewing.
+enum ScorecardRecommendation {
+  STRONG_NO
+  NO
+  YES
+  STRONG_YES
+}
+
+enum ScorecardStatus {
+  DRAFT
+  SUBMITTED
+}
+
+model Scorecard {
+  id            String                   @id @default(cuid())
+  applicationId String
+  application   Application              @relation(fields: [applicationId], references: [id], onDelete: Cascade)
+  interviewId   String?
+  interview     Interview?               @relation(fields: [interviewId], references: [id], onDelete: SetNull)
+  authorId      String
+  author        User                     @relation(fields: [authorId], references: [id], onDelete: Cascade)
+  status        ScorecardStatus          @default(DRAFT)
+  recommendation ScorecardRecommendation?
+  /// Evidence for the recommendation. Required on submit.
+  summary       String?
+  submittedAt   DateTime?
+  createdAt     DateTime                 @default(now())
+  updatedAt     DateTime                 @updatedAt
+
+  ratings ScorecardRating[]
+
+  @@unique([interviewId, authorId])
+  @@index([applicationId])
+}
+
+model ScorecardRating {
+  id           String        @id @default(cuid())
+  scorecardId  String
+  scorecard    Scorecard     @relation(fields: [scorecardId], references: [id], onDelete: Cascade)
+  competencyId String?
+  competency   KitCompetency? @relation(fields: [competencyId], references: [id], onDelete: SetNull)
+  /// Snapshot so a kit edit cannot rewrite a submitted scorecard.
+  competencyName String
+  /// 1-4, matching the recommendation scale. Null means "did not assess".
+  rating       Int?
+  note         String?
+
+  @@unique([scorecardId, competencyName])
+}
+
+enum ReferenceCheckStatus {
+  REQUESTED
+  COMPLETED
+  DECLINED
+  UNREACHABLE
+}
+
+model ReferenceCheck {
+  id            String               @id @default(cuid())
+  applicationId String
+  application   Application          @relation(fields: [applicationId], references: [id], onDelete: Cascade)
+  refereeName   String
+  refereeTitle  String?
+  refereeCompany String?
+  refereeEmail  String?
+  refereePhone  String?
+  relationship  String?
+  status        ReferenceCheckStatus @default(REQUESTED)
+  /// Structured notes from the call. Never a score.
+  notes         String?
+  conductedById String?
+  conductedBy   User?                @relation(fields: [conductedById], references: [id], onDelete: SetNull)
+  completedAt   DateTime?
+  createdAt     DateTime             @default(now())
+
+  @@index([applicationId])
+}
+
+// ---------------------------------------------------------------------------
+// Offers
+// ---------------------------------------------------------------------------
+
+enum OfferStatus {
+  DRAFT
+  PENDING_APPROVAL
+  APPROVED
+  SENT
+  ACCEPTED
+  DECLINED
+  RESCINDED
+  EXPIRED
+}
+
+model OfferLetterTemplate {
+  id        String   @id @default(cuid())
+  name      String   @unique
+  /// Body with {{merge_fields}}. Authored by the organization and reviewed by
+  /// their counsel — the platform supplies the mechanism, not the wording.
+  body      String
+  /// Text shown above the accept/decline buttons on the candidate page.
+  acceptanceStatement String @default("By accepting below I confirm I have read this offer and accept the terms described in it.")
+  active    Boolean  @default(true)
+  createdById String?
+  createdBy User?    @relation(fields: [createdById], references: [id], onDelete: SetNull)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  offers Offer[]
+}
+
+model Offer {
+  id            String      @id @default(cuid())
+  reference     String      @unique
+  applicationId String
+  application   Application @relation(fields: [applicationId], references: [id], onDelete: Cascade)
+  requisitionId String
+  requisition   Requisition @relation(fields: [requisitionId], references: [id], onDelete: Cascade)
+  status        OfferStatus @default(DRAFT)
+  jobTitle      String
+  departmentName String?
+  locationName  String?
+  employmentType EmploymentType @default(FULL_TIME)
+  workArrangement WorkArrangement @default(ONSITE)
+  baseSalary    Int
+  salaryCurrency String     @default("PHP")
+  salaryPeriod  String      @default("MONTH")
+  signingBonus  Int?
+  variablePay   String?
+  benefitsSummary String?
+  startDate     DateTime?
+  /// Deadline for the candidate to respond.
+  expiresAt     DateTime?
+  templateId    String?
+  template      OfferLetterTemplate? @relation(fields: [templateId], references: [id], onDelete: SetNull)
+  /// The letter as rendered when it was sent. Frozen: what the candidate saw
+  /// is what the record shows, whatever happens to the template afterwards.
+  letterBody    String?
+  letterPdfKey  String?
+  /// SHA-256 of the candidate's acceptance token.
+  acceptTokenHash String?   @unique
+  sentAt        DateTime?
+  respondedAt   DateTime?
+  declineReason String?
+  /// Typed name the candidate entered when accepting, with the metadata that
+  /// makes the acceptance evidentiary.
+  signatureName String?
+  signatureIp   String?
+  signatureUserAgent String?
+  createdById   String?
+  createdBy     User?       @relation("OfferCreatedBy", fields: [createdById], references: [id], onDelete: SetNull)
+  createdAt     DateTime    @default(now())
+  updatedAt     DateTime    @updatedAt
+
+  approvals OfferApproval[]
+
+  @@index([applicationId])
+  @@index([status])
+}
+
+model OfferApproval {
+  id         String           @id @default(cuid())
+  offerId    String
+  offer      Offer            @relation(fields: [offerId], references: [id], onDelete: Cascade)
+  stepIndex  Int
+  approverId String
+  approver   User             @relation("OfferApprover", fields: [approverId], references: [id], onDelete: Cascade)
+  decision   ApprovalDecision @default(PENDING)
+  comment    String?
+  decidedAt  DateTime?
+  createdAt  DateTime         @default(now())
+
+  @@unique([offerId, stepIndex])
+  @@index([approverId, decision])
+}
+
+// ---------------------------------------------------------------------------
+// Ingestion and communications
+// ---------------------------------------------------------------------------
+
+enum InboundStatus {
+  RECEIVED
+  PROCESSED
+  DUPLICATE
+  FAILED
+  IGNORED
+}
+
+/// Raw inbound application payloads, kept before and after parsing.
+///
+/// Boards change their formats without warning and applicants only apply
+/// once; when parsing fails the raw payload is the only way to recover the
+/// application rather than lose a real person's candidacy.
+model InboundApplication {
+  id          String        @id @default(cuid())
+  channelId   String?
+  channel     SourceChannel? @relation(fields: [channelId], references: [id], onDelete: SetNull)
+  /// "API" | "CSV" | "EMAIL" | "CAREERS_SITE"
+  transport   String
+  status      InboundStatus @default(RECEIVED)
+  payload     Json
+  /// Set once a candidate/application has been created from this payload.
+  applicationId String?
+  candidateId   String?
+  error       String?
+  receivedAt  DateTime      @default(now())
+  processedAt DateTime?
+
+  @@index([status])
+  @@index([receivedAt])
+}
+
+/// Candidate-facing email copy, editable without a deploy. Rendered with the
+/// same merge-field mechanism as offer letters.
+model RecruitingEmailTemplate {
+  id        String   @id @default(cuid())
+  key       String   @unique
+  name      String
+  subject   String
+  body      String
+  active    Boolean  @default(true)
+  updatedAt DateTime @updatedAt
+}
+
+/// Requisition-level activity feed, separate from the global audit log
+/// because the hiring team reads this one.
+model RequisitionEvent {
+  id            String      @id @default(cuid())
+  requisitionId String
+  requisition   Requisition @relation(fields: [requisitionId], references: [id], onDelete: Cascade)
+  type          String
+  summary       String
+  actorId       String?
+  actor         User?       @relation(fields: [actorId], references: [id], onDelete: SetNull)
+  meta          Json?
+  occurredAt    DateTime    @default(now())
+
+  @@index([requisitionId, occurredAt])
 }
