@@ -15,8 +15,13 @@ export default async function AdminPortalLayout({
   const nav: { href: string; label: string; show: boolean }[] = [
     { href: "/admin", label: "Dashboard", show: true },
     {
+      href: "/admin/recruiting",
+      label: "Recruiting",
+      show: can(user.role, "VIEW_REQUISITIONS"),
+    },
+    {
       href: "/admin/candidates",
-      label: "Candidates",
+      label: "Assessments",
       show: can(user.role, "VIEW_CANDIDATES"),
     },
     {

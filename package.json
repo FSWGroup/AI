@@ -2,7 +2,7 @@
   "name": "fsw-workfit",
   "version": "0.1.0",
   "private": true,
-  "description": "FSW WorkFit Assessment — FSW Group's independent pre-employment and employee-development assessment platform.",
+  "description": "FSW WorkFit Assessment \u2014 FSW Group's independent pre-employment and employee-development assessment platform.",
   "scripts": {
     "dev": "next dev -p 3000",
     "build": "next build",
@@ -19,7 +19,8 @@
     "db:seed": "tsx prisma/seed.ts",
     "db:reset": "prisma migrate reset --force",
     "retention:run": "tsx scripts/run-retention.ts",
-    "report:sample": "tsx scripts/generate-sample-report.ts"
+    "report:sample": "tsx scripts/generate-sample-report.ts",
+    "seed:ats": "tsx prisma/seed-ats.ts"
   },
   "prisma": {
     "seed": "tsx prisma/seed.ts"

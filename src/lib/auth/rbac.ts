@@ -27,6 +27,16 @@ export const PERMISSIONS = [
   "VIEW_QUALITY",
   "MANAGE_RETENTION",
   "VIEW_AUDIT",
+  // Recruiting
+  "VIEW_REQUISITIONS",
+  "MANAGE_REQUISITIONS",
+  "APPROVE_REQUISITIONS",
+  "MANAGE_PIPELINE",
+  "MANAGE_INTERVIEWS",
+  "SUBMIT_SCORECARD",
+  "MANAGE_OFFERS",
+  "APPROVE_OFFERS",
+  "VIEW_RECRUITING_ANALYTICS",
 ] as const;
 export type Permission = (typeof PERMISSIONS)[number];
 
@@ -41,15 +51,35 @@ const ROLE_PERMISSIONS: Record<UserRole, Permission[]> = {
     "VIEW_INTEGRITY",
     "MANAGE_BENCHMARKS",
     "VIEW_AUDIT",
+    "VIEW_REQUISITIONS",
+    "MANAGE_REQUISITIONS",
+    "MANAGE_PIPELINE",
+    "MANAGE_INTERVIEWS",
+    "SUBMIT_SCORECARD",
+    "MANAGE_OFFERS",
+    "VIEW_RECRUITING_ANALYTICS",
   ],
-  HIRING_MANAGER: ["VIEW_CANDIDATES", "VIEW_REPORTS"],
+  // A hiring manager runs their own roles: they move candidates, schedule
+  // and score interviews, and approve what they are named on. They do not
+  // create requisitions or send offers — those stay with the recruiter.
+  HIRING_MANAGER: [
+    "VIEW_CANDIDATES",
+    "VIEW_REPORTS",
+    "VIEW_REQUISITIONS",
+    "APPROVE_REQUISITIONS",
+    "MANAGE_PIPELINE",
+    "MANAGE_INTERVIEWS",
+    "SUBMIT_SCORECARD",
+    "APPROVE_OFFERS",
+    "VIEW_RECRUITING_ANALYTICS",
+  ],
   ASSESSMENT_ADMIN: [
     "MANAGE_QUESTIONS",
     "MANAGE_BENCHMARKS",
     "MANAGE_NORMS",
     "VIEW_QUALITY",
   ],
-  VIEWER: ["VIEW_CANDIDATES", "VIEW_REPORTS"],
+  VIEWER: ["VIEW_CANDIDATES", "VIEW_REPORTS", "VIEW_REQUISITIONS"],
 };
 
 export function can(role: UserRole, permission: Permission): boolean {
