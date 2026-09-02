@@ -1,5 +1,5 @@
 /**
- * FSW WorkFit — dimension descriptions written for the candidate.
+ * FSW Talent Scout — dimension descriptions written for the candidate.
  *
  * Original FSW Group content. The employer-facing `shortDefinition` in
  * dimension-meta.ts is written *about* a candidate ("Reflects the candidate's

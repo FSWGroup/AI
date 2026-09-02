@@ -1,4 +1,4 @@
-# FSW WorkFit — AI Decision-Support Features
+# FSW Talent Scout — AI Decision-Support Features
 
 Two AI features assist human judgment. Neither makes, influences, or records
 an employment decision.

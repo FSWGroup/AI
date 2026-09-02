@@ -600,8 +600,8 @@ export class PdfBuilder {
   async finish(docTitle: string): Promise<Uint8Array> {
     this.stampChrome();
     this.doc.setTitle(encodable(docTitle));
-    this.doc.setProducer("FSW WorkFit");
-    this.doc.setCreator("FSW WorkFit");
+    this.doc.setProducer("FSW Talent Scout");
+    this.doc.setCreator("FSW Talent Scout");
     return this.doc.save();
   }
 

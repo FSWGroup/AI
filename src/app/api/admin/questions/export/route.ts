@@ -36,7 +36,7 @@ export const GET = withErrorHandling(async (req) => {
   return new NextResponse(JSON.stringify(rows, null, 2), {
     headers: {
       "Content-Type": "application/json",
-      "Content-Disposition": `attachment; filename="fsw-workfit-questions${construct ? `-${construct}` : ""}.json"`,
+      "Content-Disposition": `attachment; filename="fsw-talentscout-questions${construct ? `-${construct}` : ""}.json"`,
       "Cache-Control": "private, no-store",
     },
   });

@@ -27,6 +27,9 @@ export class NetlifyBlobsStorage implements StorageProvider {
   readonly appRouted = true;
 
   private store(): Store {
+    // Deliberately still "fsw-workfit" after the Talent Scout rename: this is
+    // the name of a live blob store, and renaming it would orphan every
+    // recording already written to a deployed site.
     const name = process.env.NETLIFY_BLOBS_STORE ?? "fsw-workfit";
     const siteID = process.env.NETLIFY_BLOBS_SITE_ID;
     const token = process.env.NETLIFY_BLOBS_TOKEN;

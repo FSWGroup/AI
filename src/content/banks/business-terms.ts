@@ -1,5 +1,5 @@
 /**
- * FSW WorkFit — Business Terms aptitude bank.
+ * FSW Talent Scout — Business Terms aptitude bank.
  *
  * 110 original items measuring practical business literacy for
  * sales / operations / office candidates at an industrial distributor.

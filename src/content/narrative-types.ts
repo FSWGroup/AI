@@ -1,5 +1,5 @@
 /**
- * Types for the FSW WorkFit deterministic narrative engine.
+ * Types for the FSW Talent Scout deterministic narrative engine.
  *
  * Narratives are version-controlled template content, seeded into the
  * database with a version stamp. Reports record the narrative version they

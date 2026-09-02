@@ -1,4 +1,4 @@
-// FSW WorkFit Assessment — database schema.
+// FSW Talent Scout Assessment — database schema.
 //
 // Design principles:
 //  - Immutable history: candidates' attempts reference frozen QuestionVersion

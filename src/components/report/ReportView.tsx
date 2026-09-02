@@ -52,7 +52,7 @@ export function ReportView({
         <p className="text-xs font-bold uppercase tracking-[0.25em] text-fsw-300">
           {m.company}
         </p>
-        <h1 className="mt-2 text-3xl font-bold">FSW WorkFit Assessment Report</h1>
+        <h1 className="mt-2 text-3xl font-bold">FSW Talent Scout Assessment Report</h1>
         <div className="mt-6 grid grid-cols-2 gap-4 text-sm sm:grid-cols-4">
           <CoverItem label="Candidate" value={m.candidateName} />
           <CoverItem label="Position" value={m.position} />

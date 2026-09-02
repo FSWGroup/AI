@@ -1,4 +1,4 @@
-/** Small, consistent UI kit for FSW WorkFit (candidate + admin surfaces). */
+/** Small, consistent UI kit for FSW Talent Scout (candidate + admin surfaces). */
 
 import * as React from "react";
 

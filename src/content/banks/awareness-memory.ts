@@ -1,5 +1,5 @@
 /**
- * FSW WorkFit — Business & World Awareness / Memory bank.
+ * FSW Talent Scout — Business & World Awareness / Memory bank.
  *
  * All exercises, stimuli, questions, choices, and explanations in this file
  * are ORIGINAL FSW Group content authored for this assessment. Nothing here

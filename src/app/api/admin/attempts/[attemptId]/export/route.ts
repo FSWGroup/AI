@@ -33,7 +33,7 @@ function fileName(candidateName: string, recordId: string): string {
     .replace(/[^\w\s-]/g, "")
     .trim()
     .replace(/\s+/g, "-");
-  return `FSW-WorkFit-${slug || "Assessment"}-${recordId}.pdf`;
+  return `FSW-Talent Scout-${slug || "Assessment"}-${recordId}.pdf`;
 }
 
 export const GET = withErrorHandling(async (_req, ctx) => {

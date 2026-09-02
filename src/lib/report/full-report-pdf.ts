@@ -128,7 +128,7 @@ export async function buildFullReportPdf(
   const b = await PdfBuilder.create({
     header: `${m.candidateName} \u2014 ${m.position}`,
     headerRight: fmtDate(m.completedAt),
-    footer: "FSW WorkFit Assessment  \u00b7  Confidential \u2014 do not distribute externally",
+    footer: "FSW Talent Scout Assessment  \u00b7  Confidential \u2014 do not distribute externally",
   });
 
   drawCover(b, input);
@@ -489,7 +489,7 @@ export async function buildFullReportPdf(
   // ---- Contents (filled in now that page numbers are known) --------------------
   drawContents(b, contentsPage, m.candidateName);
 
-  return b.finish(`FSW WorkFit Assessment - ${m.candidateName}`);
+  return b.finish(`FSW Talent Scout Assessment - ${m.candidateName}`);
 }
 
 // ---------------------------------------------------------------------------

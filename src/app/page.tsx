@@ -8,7 +8,7 @@ export default function Home() {
           FSW Group
         </p>
         <h1 className="mt-2 text-3xl font-bold text-navy-900">
-          FSW WorkFit Assessment
+          FSW Talent Scout Assessment
         </h1>
         <p className="mt-4 text-navy-600">
           Candidates: please use the secure assessment link from your
@@ -23,7 +23,7 @@ export default function Home() {
           </Link>
         </div>
         <p className="mt-8 text-xs text-navy-400">
-          FSW WorkFit is decision-support software and is not the sole basis
+          FSW Talent Scout is decision-support software and is not the sole basis
           for any employment decision.
         </p>
       </div>

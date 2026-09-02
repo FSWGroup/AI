@@ -79,8 +79,8 @@ export async function completeAttempt(attemptId: string): Promise<void> {
         subject: `Assessment completed — ${attempt.candidate.firstName} ${attempt.candidate.lastName}`,
         bodyText:
           `${attempt.candidate.firstName} ${attempt.candidate.lastName} has completed the ` +
-          `FSW WorkFit assessment for ${attempt.jobOpening.title}.\n\n` +
-          `Sign in to the FSW WorkFit admin portal to review results.`,
+          `FSW Talent Scout assessment for ${attempt.jobOpening.title}.\n\n` +
+          `Sign in to the FSW Talent Scout admin portal to review results.`,
       });
     } catch {
       // Notification failure must never break candidate completion.

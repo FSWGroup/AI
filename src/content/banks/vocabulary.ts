@@ -1,5 +1,5 @@
 /**
- * FSW WorkFit — Vocabulary aptitude bank.
+ * FSW Talent Scout — Vocabulary aptitude bank.
  *
  * ORIGINAL FSW Group content. Nothing in this file is copied from, adapted
  * from, or paraphrased out of any third-party assessment instrument.

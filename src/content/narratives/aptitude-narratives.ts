@@ -1,5 +1,5 @@
 /**
- * FSW WorkFit — band narratives for the six aptitude dimensions.
+ * FSW Talent Scout — band narratives for the six aptitude dimensions.
  *
  * Original FSW Group content. Each dimension carries exactly nine band
  * narratives (index 0 = band 1 "very low" … index 8 = band 9 "very high")

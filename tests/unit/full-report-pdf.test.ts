@@ -30,7 +30,7 @@ function payload(over: Partial<ReportPayload> = {}): ReportPayload {
       position: "Inside Sales",
       company: "FSW Group",
       completedAt: "2026-01-05T10:00:00.000Z",
-      assessmentVersionName: "WorkFit v1",
+      assessmentVersionName: "Talent Scout v1",
       scoringVersion: "1.0",
       narrativeVersion: "1.0",
       reportVersion: 1,
@@ -46,7 +46,7 @@ function payload(over: Partial<ReportPayload> = {}): ReportPayload {
         { construct: "ORGANIZATION", name: "Organization", reason: "Below range." },
       ],
       responseQuality: "Indicators fall in the typical range.",
-      disclaimer: "FSW WorkFit is decision-support software.",
+      disclaimer: "FSW Talent Scout is decision-support software.",
     },
     dimensions: [
       dim({}),

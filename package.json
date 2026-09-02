@@ -1,8 +1,8 @@
 {
-  "name": "fsw-workfit",
+  "name": "fsw-talent-scout",
   "version": "0.1.0",
   "private": true,
-  "description": "FSW WorkFit Assessment \u2014 FSW Group's independent pre-employment and employee-development assessment platform.",
+  "description": "FSW Talent Scout Assessment \u2014 FSW Group's independent pre-employment and employee-development assessment platform.",
   "scripts": {
     "dev": "next dev -p 3000",
     "build": "next build",

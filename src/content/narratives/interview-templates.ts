@@ -1,5 +1,5 @@
 /**
- * FSW WorkFit — structured interview guide templates.
+ * FSW Talent Scout — structured interview guide templates.
  *
  * Original FSW Group content. Each scored dimension carries two templates:
  * BELOW_RANGE (probing whether an assessed lower standing shows up in real

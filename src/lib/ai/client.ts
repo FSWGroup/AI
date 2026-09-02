@@ -1,5 +1,5 @@
 /**
- * Anthropic client for FSW WorkFit's decision-support features.
+ * Anthropic client for FSW Talent Scout's decision-support features.
  *
  * Everything produced here is ADVISORY and human-reviewed:
  *  - AI never changes an assessment score, band, or benchmark comparison.
@@ -42,12 +42,12 @@ export class AiNotConfiguredError extends Error {
 }
 
 /**
- * Guardrails prepended to every FSW WorkFit analysis prompt. These are
+ * Guardrails prepended to every FSW Talent Scout analysis prompt. These are
  * deliberately restrictive: the product's defensibility depends on AI being
  * an aid to structured human judgment, not a selection mechanism.
  */
 export const SHARED_GUARDRAILS = `
-You are assisting FSW Group's hiring team with an employment assessment platform called FSW WorkFit. Your output is DECISION SUPPORT for a human interviewer — never a decision.
+You are assisting FSW Group's hiring team with an employment assessment platform called FSW Talent Scout. Your output is DECISION SUPPORT for a human interviewer — never a decision.
 
 Absolute rules:
 - NEVER recommend hiring, rejecting, advancing, or ranking a candidate. Do not say "strong candidate", "not a fit", "recommend proceeding", or any equivalent verdict.

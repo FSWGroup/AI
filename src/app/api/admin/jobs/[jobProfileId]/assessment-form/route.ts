@@ -131,7 +131,7 @@ export const POST = withErrorHandling(async (req, ctx) => {
     return apiError("A form needs at least one section.", 422);
   }
 
-  const name = `FSW WorkFit — ${profile.name}`;
+  const name = `FSW Talent Scout — ${profile.name}`;
   const previous = await prisma.assessmentVersion.findFirst({
     where: { name },
     orderBy: { versionNumber: "desc" },

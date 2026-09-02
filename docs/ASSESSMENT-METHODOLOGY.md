@@ -1,6 +1,6 @@
-# FSW WorkFit — Assessment Methodology
+# FSW Talent Scout — Assessment Methodology
 
-All content in FSW WorkFit is original FSW Group material. This document
+All content in FSW Talent Scout is original FSW Group material. This document
 describes what the instrument measures and exactly how scores are produced.
 The scoring code lives in `src/lib/scoring/` and is deterministic: the same
 answers, form version, scoring version, and norm tables always produce

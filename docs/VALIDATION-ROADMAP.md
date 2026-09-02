@@ -1,9 +1,9 @@
-# FSW WorkFit — Validation Roadmap
+# FSW Talent Scout — Validation Roadmap
 
-FSW WorkFit ships as **decision-support software with provisional scoring**.
+FSW Talent Scout ships as **decision-support software with provisional scoring**.
 Until the work below is done, treat results as structured interview
 preparation — one input among many — and keep the in-product language
-("FSW WorkFit internal assessment scores", "provisional 1-9 band") exactly
+("FSW Talent Scout internal assessment scores", "provisional 1-9 band") exactly
 as is. Do not describe the instrument as a scientifically proven predictor
 of performance, and do not lean on it heavily for selection decisions.
 
@@ -21,7 +21,7 @@ evidence this software cannot generate by existing — it must be collected.
 1. Document, per role, the tasks and the knowledge/skills/abilities/other
    characteristics they require (interviews with incumbents and supervisors,
    task questionnaires).
-2. Map each FSW WorkFit dimension used in that role's benchmark to specific
+2. Map each FSW Talent Scout dimension used in that role's benchmark to specific
    job requirements; disable dimensions you cannot connect to the job.
 3. Set desired ranges from the job analysis (and incumbent data where
    available), not intuition; record the rationale in each benchmark's note

@@ -164,7 +164,7 @@ export function JobDescriptionPanel({
         <div>
           <h3 className="text-sm font-bold text-navy-900">Job description</h3>
           <p className="mt-1 text-xs text-navy-500">
-            Paste the description and FSW WorkFit will propose which dimensions
+            Paste the description and FSW Talent Scout will propose which dimensions
             are job-related, the desired 1-9 ranges, and how the assessment
             should be weighted for this role.
           </p>

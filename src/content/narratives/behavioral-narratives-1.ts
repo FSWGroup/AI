@@ -1,5 +1,5 @@
 /**
- * FSW WorkFit behavioral narrative set 1.
+ * FSW Talent Scout behavioral narrative set 1.
  *
  * Original FSW Group content. Covers the first five behavioral constructs:
  * ENERGY, FLEXIBILITY, ORGANIZATION, COMMUNICATION, EMOTIONAL_DEVELOPMENT.

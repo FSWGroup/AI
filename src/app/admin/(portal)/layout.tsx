@@ -58,7 +58,7 @@ export default async function AdminPortalLayout({
           <p className="text-xs font-semibold uppercase tracking-widest text-fsw-600">
             FSW Group
           </p>
-          <p className="text-lg font-bold text-navy-900">WorkFit Admin</p>
+          <p className="text-lg font-bold text-navy-900">Talent Scout Admin</p>
         </div>
         <nav className="mt-8 flex flex-1 flex-col gap-1" aria-label="Admin">
           {nav

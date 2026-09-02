@@ -32,7 +32,7 @@ export default async function PrintReportPage({
     <div className="mx-auto max-w-3xl bg-white p-6 print:p-0">
       <ReportView payload={payload} print />
       <footer className="mt-10 border-t border-navy-100 pt-3 text-center text-[10px] text-navy-400">
-        FSW WorkFit Assessment | Confidential Employment Assessment —{" "}
+        FSW Talent Scout Assessment | Confidential Employment Assessment —{" "}
         {payload.meta.candidateName} · {payload.meta.position}
       </footer>
     </div>

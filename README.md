@@ -1,22 +1,28 @@
-# FSW WorkFit Assessment
+# FSW Talent Scout
 
-FSW Group's independent pre-employment and employee-development assessment
-platform. Candidates complete a proctored, webcam-recorded assessment of six
-mental aptitudes, ten performance/behavioral dimensions, and two
-response-quality indicators; authorized FSW personnel configure job
-benchmarks, review 1-9 score sheets against desired ranges, and generate
-narrative reports with targeted interview guides and development
-recommendations.
+FSW Group's recruiting platform: applicant tracking from sourcing through to a
+signed offer, built around an original pre-employment and employee-development
+assessment.
 
-FSW WorkFit is an original FSW Group instrument. It is not affiliated with,
-licensed by, or equivalent to any third-party assessment product, and all
-questions, scoring logic, narratives, and visual design are original.
+**Recruiting.** Requisitions with approval chains, a public careers site, an
+Indeed-format job feed and schema.org JSON-LD so roles reach boards without
+anyone re-typing a posting, multi-source application intake with attribution,
+a configurable pipeline, structured interview kits and scorecards, independent
+team review, offers through to electronic acceptance, and funnel analytics with
+adverse-impact analysis at every stage.
 
-> **Employment-testing notice.** Assessment instruments used for employment
-> decisions should be evaluated for job relevance, reliability, validity,
-> accessibility, and potential adverse impact. FSW WorkFit is
-> decision-support software and should not be the sole basis for an
-> employment decision. See `docs/VALIDATION-ROADMAP.md`.
+**Assessment.** Candidates complete a proctored, webcam-recorded assessment of
+six mental aptitudes, ten performance/behavioral dimensions, and two
+response-quality indicators. Authorized personnel configure job benchmarks,
+review 1-9 score sheets against desired ranges, and generate narrative reports
+with targeted interview guides and development suggestions.
+
+**Checks.** Consent-based social media review and Checkr background checks with
+the FCRA adverse-action sequence enforced.
+
+All assessment content is original FSW Group work. Results are decision support
+and never the sole basis for an employment decision; nothing in the product
+produces an automated hire or reject.
 
 ## Architecture
 
@@ -55,7 +61,7 @@ Prerequisites: Node 22+, PostgreSQL 14+.
 
 ```bash
 npm install
-createdb fsw_workfit                      # or any Postgres database
+createdb fsw_talent_scout                # or any Postgres database
 cp .env.example .env                      # then edit DATABASE_URL + APP_SECRET
 npx prisma migrate deploy                 # apply migrations
 npm run db:seed                           # question bank, form v1, Welsford profile,
@@ -63,7 +69,7 @@ npm run db:seed                           # question bank, form v1, Welsford pro
 npm run dev                               # http://localhost:3000
 ```
 
-Dev sign-in (seeded only outside production; password `fsw-workfit-dev` or
+Dev sign-in (seeded only outside production; password `fsw-talentscout-dev` or
 `SEED_ADMIN_PASSWORD`):
 
 | Email | Role |

@@ -1,7 +1,7 @@
 import { request, type APIRequestContext } from "@playwright/test";
 import { PrismaClient } from "@prisma/client";
 
-export const ADMIN_PASSWORD = process.env.SEED_ADMIN_PASSWORD ?? "fsw-workfit-dev";
+export const ADMIN_PASSWORD = process.env.SEED_ADMIN_PASSWORD ?? "fsw-talentscout-dev";
 
 let prisma: PrismaClient | null = null;
 export function db(): PrismaClient {

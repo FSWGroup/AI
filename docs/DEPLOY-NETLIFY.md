@@ -1,4 +1,4 @@
-# Deploying FSW WorkFit on Netlify (same-day runbook)
+# Deploying FSW Talent Scout on Netlify (same-day runbook)
 
 Total time: roughly 15-20 minutes of clicking. You need: a Netlify account,
 this GitHub repo (FSWGroup/AI), and a hosted Postgres database.

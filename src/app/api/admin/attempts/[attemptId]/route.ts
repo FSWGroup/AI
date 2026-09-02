@@ -86,10 +86,10 @@ export const POST = withErrorHandling(async (req, ctx) => {
       await getEmailProvider().send({
         to: attempt.invitation.candidate.email,
         template: "retest_invitation",
-        subject: "FSW WorkFit — retest invitation",
+        subject: "FSW Talent Scout — retest invitation",
         bodyText:
           `Hello ${attempt.invitation.candidate.firstName},\n\n` +
-          `You have been authorized to retake the FSW WorkFit assessment for ` +
+          `You have been authorized to retake the FSW Talent Scout assessment for ` +
           `${attempt.invitation.jobOpening.title}.\n\n` +
           `Start here: ${env.appBaseUrl}/assessment/${token}\n\n` +
           `This link expires on ${expiresAt.toDateString()}.`,

@@ -1,5 +1,5 @@
 /**
- * FSW WorkFit development seed.
+ * FSW Talent Scout development seed.
  *
  * Seeds: org settings, dev-only admin accounts, the full original question
  * bank (versioned + approved), assessment form v1 with section timers,
@@ -53,7 +53,7 @@ const BEHAVIORAL_ORDER = [
 ];
 
 async function main(): Promise<void> {
-  console.log("Seeding FSW WorkFit…");
+  console.log("Seeding FSW Talent Scout…");
 
   // ---- Org settings ---------------------------------------------------------
   await prisma.orgSettings.upsert({
@@ -66,7 +66,7 @@ async function main(): Promise<void> {
       hrNotificationEmail: "hr@fswgroup.example",
       privacyNoticeConfigured: true,
       assessmentDisclaimer:
-        "FSW WorkFit is decision-support software and should not be the sole basis for an employment decision.",
+        "FSW Talent Scout is decision-support software and should not be the sole basis for an employment decision.",
     },
     update: {},
   });
@@ -96,7 +96,7 @@ async function main(): Promise<void> {
   if (process.env.NODE_ENV === "production" && !process.env.SEED_DEV_USERS) {
     console.log("Production: skipping dev admin accounts (set real users manually).");
   } else {
-    const password = process.env.SEED_ADMIN_PASSWORD ?? "fsw-workfit-dev";
+    const password = process.env.SEED_ADMIN_PASSWORD ?? "fsw-talentscout-dev";
     const hash = await bcrypt.hash(password, 12);
     const users = [
       { email: "super@fsw.local", name: "Sam Superuser", role: "SUPER_ADMIN" },
@@ -127,16 +127,16 @@ async function main(): Promise<void> {
 
   // ---- Assessment version v1 ---------------------------------------------------
   let version = await prisma.assessmentVersion.findFirst({
-    where: { name: "FSW WorkFit Standard", versionNumber: 1 },
+    where: { name: "FSW Talent Scout Standard", versionNumber: 1 },
   });
   if (!version) {
     version = await prisma.assessmentVersion.create({
       data: {
-        name: "FSW WorkFit Standard",
+        name: "FSW Talent Scout Standard",
         versionNumber: 1,
         status: "ACTIVE",
         description:
-          "Standard FSW WorkFit form: behavioral inventory, mechanical interest, and five timed aptitude sections. Approx. 50-65 minutes.",
+          "Standard FSW Talent Scout form: behavioral inventory, mechanical interest, and five timed aptitude sections. Approx. 50-65 minutes.",
         scoringVersion: "1.0",
         narrativeVersion: NARRATIVE_VERSION,
         activatedAt: new Date(),

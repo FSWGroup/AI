@@ -47,7 +47,7 @@ export async function renderReportPdf(params: {
         </div>`,
       footerTemplate: `
         <div style="width:100%;font-size:8px;color:#6c88a8;padding:0 0.6in;display:flex;justify-content:space-between;">
-          <span>FSW WorkFit Assessment | Confidential Employment Assessment</span>
+          <span>FSW Talent Scout Assessment | Confidential Employment Assessment</span>
           <span>Page <span class="pageNumber"></span> of <span class="totalPages"></span></span>
         </div>`,
     });

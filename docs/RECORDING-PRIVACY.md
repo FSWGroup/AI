@@ -1,4 +1,4 @@
-# FSW WorkFit — Recording Architecture & Privacy Protections
+# FSW Talent Scout — Recording Architecture & Privacy Protections
 
 ## What is recorded, and why
 

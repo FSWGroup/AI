@@ -1,5 +1,5 @@
 /**
- * FSW WorkFit — Behavioral statement bank.
+ * FSW Talent Scout — Behavioral statement bank.
  *
  * ORIGINAL FSW Group content. Nothing in this file is copied from, adapted
  * from, or paraphrased out of any third-party assessment instrument.

@@ -67,7 +67,7 @@ export const PUT = withErrorHandling(async (req) => {
     await getEmailProvider().send({
       to: invitation.candidate.email,
       template: "reminder",
-      subject: "Your FSW WorkFit assessment resume link",
+      subject: "Your FSW Talent Scout assessment resume link",
       bodyText:
         `Hello ${invitation.candidate.firstName},\n\n` +
         `Use this secure link to resume your assessment exactly where you left off:\n\n` +

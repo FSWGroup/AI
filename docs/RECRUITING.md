@@ -1,6 +1,6 @@
 # The recruiting module (ATS)
 
-FSW WorkFit runs the whole hiring process, not only the assessment: a role is
+FSW Talent Scout runs the whole hiring process, not only the assessment: a role is
 raised, approved, advertised, applied to from several sources, worked as a
 pipeline, interviewed against a structured kit, and offered — with the
 assessment as one stage inside that.

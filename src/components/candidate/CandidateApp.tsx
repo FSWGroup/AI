@@ -511,7 +511,7 @@ export function CandidateApp({
       <header className="mb-5 flex items-center justify-between">
         <div>
           <p className="text-xs font-semibold uppercase tracking-widest text-fsw-600">
-            FSW WorkFit
+            FSW Talent Scout
           </p>
           <p className="text-sm font-semibold text-navy-900">
             Section {sectionNumber} of {state.sections.length}

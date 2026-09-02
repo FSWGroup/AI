@@ -28,7 +28,7 @@ export default async function SettingsPage() {
         <strong>Admin notice:</strong> Assessment instruments used for
         employment decisions should be evaluated for job relevance,
         reliability, validity, accessibility, and potential adverse impact.
-        FSW WorkFit is decision-support software and should not be the sole
+        FSW Talent Scout is decision-support software and should not be the sole
         basis for an employment decision.
       </p>
       <SettingsForm

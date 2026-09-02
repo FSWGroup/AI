@@ -29,7 +29,7 @@ function payload(over: Partial<ReportPayload> = {}): ReportPayload {
       position: "Inside Sales",
       company: "FSW Group",
       completedAt: "2026-01-01T00:00:00.000Z",
-      assessmentVersionName: "WorkFit v1",
+      assessmentVersionName: "Talent Scout v1",
       scoringVersion: "1.0",
       narrativeVersion: "1.0",
       reportVersion: 1,

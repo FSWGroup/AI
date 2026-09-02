@@ -6,7 +6,7 @@ export default async function globalTeardown(): Promise<void> {
     // Retire the E2E form so ordinary invitations go back to the standard
     // form (invitation creation picks the highest ACTIVE version).
     await prisma.assessmentVersion.updateMany({
-      where: { name: "FSW WorkFit E2E", versionNumber: 99 },
+      where: { name: "FSW Talent Scout E2E", versionNumber: 99 },
       data: { status: "RETIRED", retiredAt: new Date() },
     });
   } finally {

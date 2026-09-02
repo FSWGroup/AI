@@ -37,7 +37,7 @@ export function ScreenFrame({
       )}
       {plain ? children : <Card className="p-8 sm:p-10">{children}</Card>}
       <p className="mt-6 text-center text-xs text-navy-400 print:hidden">
-        FSW WorkFit Assessment · Confidential
+        FSW Talent Scout Assessment · Confidential
       </p>
     </main>
   );
@@ -56,7 +56,7 @@ export function WelcomeScreen({
         {state.job.company}
       </p>
       <h1 className="mt-2 text-3xl font-bold text-navy-900">
-        FSW WorkFit Assessment
+        FSW Talent Scout Assessment
       </h1>
       <p className="mt-1 text-navy-500">
         {state.job.title}

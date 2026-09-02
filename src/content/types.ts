@@ -1,5 +1,5 @@
 /**
- * Shared types for FSW WorkFit assessment content.
+ * Shared types for FSW Talent Scout assessment content.
  *
  * Every question, statement, and exercise in the platform is ORIGINAL
  * FSW Group content. Nothing in these banks may be copied from any

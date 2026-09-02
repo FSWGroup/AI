@@ -6,6 +6,9 @@
  * periods and page refreshes. Never holds the whole recording in memory.
  */
 
+// Kept from before the Talent Scout rename on purpose. This names an IndexedDB
+// database in the candidate's own browser; renaming it would strand chunks
+// queued by anyone mid-assessment at the moment of deploy.
 const DB_NAME = "fsw-workfit-recording";
 const STORE = "chunks";
 

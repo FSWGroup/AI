@@ -6,6 +6,7 @@ import { can } from "@/lib/auth/rbac";
 import { Badge, Card, SectionHeading } from "@/components/ui";
 import { PipelineBoard, EmptyBoard } from "@/components/admin/PipelineBoard";
 import { RequisitionActions } from "@/components/admin/RequisitionActions";
+import { JobDescriptionLinter } from "@/components/admin/JobDescriptionLinter";
 import { chainStatus, describeChain, type ApprovalStep } from "@/lib/ats/approvals";
 import { summarizeScorecards } from "@/lib/ats/scorecards";
 import { buildFunnel, formatRate, timeInStages } from "@/lib/ats/analytics";
@@ -278,6 +279,7 @@ export default async function RequisitionPage({
 
         {tab === "details" && (
           <>
+            <JobDescriptionLinter requisitionId={requisition.id} />
             <Card className="p-6">
               <h3 className="text-sm font-bold text-navy-900">Public description</h3>
               <dl className="mt-4 space-y-4 text-sm">

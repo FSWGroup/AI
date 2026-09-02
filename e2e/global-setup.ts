@@ -1,5 +1,5 @@
 /**
- * E2E global setup: create a small, fast assessment form ("FSW WorkFit E2E",
+ * E2E global setup: create a small, fast assessment form ("FSW Talent Scout E2E",
  * version 99) drawing from the same approved question pool, so end-to-end
  * runs finish in minutes while exercising every mechanism (timers, study
  * cards, Likert pages, recording, completion).
@@ -11,7 +11,7 @@ export default async function globalSetup(): Promise<void> {
   const prisma = new PrismaClient();
   try {
     const existing = await prisma.assessmentVersion.findFirst({
-      where: { name: "FSW WorkFit E2E", versionNumber: 99 },
+      where: { name: "FSW Talent Scout E2E", versionNumber: 99 },
     });
     if (existing) {
       if (existing.status !== "ACTIVE") {
@@ -24,13 +24,13 @@ export default async function globalSetup(): Promise<void> {
     }
 
     const base = await prisma.assessmentVersion.findFirstOrThrow({
-      where: { name: "FSW WorkFit Standard", versionNumber: 1 },
+      where: { name: "FSW Talent Scout Standard", versionNumber: 1 },
       include: { formQuestions: true },
     });
 
     const version = await prisma.assessmentVersion.create({
       data: {
-        name: "FSW WorkFit E2E",
+        name: "FSW Talent Scout E2E",
         versionNumber: 99,
         status: "ACTIVE",
         description: "Miniature form for automated end-to-end testing only.",

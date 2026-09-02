@@ -31,7 +31,7 @@ export default function AdminLoginPage() {
     <main className="flex min-h-screen items-center justify-center p-6">
       <Card className="w-full max-w-md p-10">
         <p className="text-center text-xs font-semibold uppercase tracking-widest text-fsw-600">
-          FSW WorkFit
+          FSW Talent Scout
         </p>
         <h1 className="mt-1 text-center text-2xl font-bold text-navy-900">
           Employer sign in

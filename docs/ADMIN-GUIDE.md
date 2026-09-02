@@ -1,4 +1,4 @@
-# FSW WorkFit — Administrator Guide
+# FSW Talent Scout — Administrator Guide
 
 ## Roles
 
@@ -117,6 +117,6 @@ can be traced back.
   self-identification is on and there is enough data — the four-fifths
   selection-rate ratios. Use it before you save a benchmark, not after.
 - The admin-only disclaimer shown in Settings applies everywhere: FSW
-  WorkFit is decision-support software and should not be the sole basis for
+  Talent Scout is decision-support software and should not be the sole basis for
   an employment decision. See `docs/VALIDATION-ROADMAP.md` before relying
   on it heavily for selection.

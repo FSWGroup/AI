@@ -128,7 +128,7 @@ export interface ReportPayload {
 }
 
 const EMPLOYMENT_DISCLAIMER =
-  "FSW WorkFit is decision-support software. Results are one input among many and " +
+  "FSW Talent Scout is decision-support software. Results are one input among many and " +
   "should never be the sole basis for an employment decision. Assessment " +
   "instruments used for employment decisions should be evaluated for job " +
   "relevance, reliability, validity, accessibility, and potential adverse impact.";

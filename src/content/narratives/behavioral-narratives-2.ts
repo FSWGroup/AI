@@ -1,5 +1,5 @@
 /**
- * FSW WorkFit behavioral narrative content — set 2 of 2.
+ * FSW Talent Scout behavioral narrative content — set 2 of 2.
  *
  * Covers: ASSERTIVENESS, COMPETITIVENESS, MENTAL_TOUGHNESS,
  * QUESTIONING_PROBING, MOTIVATION.

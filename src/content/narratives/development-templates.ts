@@ -1,5 +1,5 @@
 /**
- * FSW WorkFit — development recommendation templates.
+ * FSW Talent Scout — development recommendation templates.
  *
  * Original FSW Group content. One template per developable dimension: the
  * ten behavioral dimensions plus the four aptitude areas that respond to

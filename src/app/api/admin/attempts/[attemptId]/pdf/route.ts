@@ -58,7 +58,7 @@ export const GET = withErrorHandling(async (_req, ctx) => {
     entityId: report.id,
   });
 
-  const filename = `FSW-WorkFit-${payload.meta.candidateName.replaceAll(/[^a-zA-Z0-9]+/g, "-")}-v${report.version}.pdf`;
+  const filename = `FSW-Talent Scout-${payload.meta.candidateName.replaceAll(/[^a-zA-Z0-9]+/g, "-")}-v${report.version}.pdf`;
   return new NextResponse(new Uint8Array(pdf), {
     headers: {
       "Content-Type": "application/pdf",

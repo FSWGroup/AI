@@ -1,5 +1,5 @@
 /**
- * FSW WorkFit — display metadata for all assessed dimensions.
+ * FSW Talent Scout — display metadata for all assessed dimensions.
  *
  * Original FSW Group content. Definitions and score-sheet anchors follow
  * the LANGUAGE RULES in ../narrative-types.ts: probabilistic, work-related,

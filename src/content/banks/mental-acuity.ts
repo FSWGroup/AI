@@ -1,5 +1,5 @@
 /**
- * FSW WorkFit — Mental Acuity item bank.
+ * FSW Talent Scout — Mental Acuity item bank.
  *
  * 100% ORIGINAL FSW Group content. Nothing in this file is copied from,
  * derived from, or paraphrased from any third-party assessment instrument.

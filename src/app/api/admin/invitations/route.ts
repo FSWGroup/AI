@@ -97,7 +97,7 @@ export const POST = withErrorHandling(async (req) => {
     subject: `${settings?.companyName ?? "FSW Group"} — assessment invitation for ${opening.title}`,
     bodyText:
       `Hello ${candidate.firstName},\n\n` +
-      `${settings?.companyName ?? "FSW Group"} invites you to complete the FSW WorkFit assessment ` +
+      `${settings?.companyName ?? "FSW Group"} invites you to complete the FSW Talent Scout assessment ` +
       `as part of the evaluation process for: ${opening.title}.\n\n` +
       `Before you begin:\n` +
       `- Reserve approximately 1 hour and 10 minutes in one uninterrupted sitting.\n` +

@@ -81,7 +81,7 @@ test("candidate completes the full assessment and HR sees the report", async ({
 
   // ---- Entry flow -----------------------------------------------------------
   await page.goto(launchUrl);
-  await expect(page.getByText("FSW WorkFit Assessment").first()).toBeVisible();
+  await expect(page.getByText("FSW Talent Scout Assessment").first()).toBeVisible();
   await expect(page.getByText(/1 hour and 10 minutes/)).toBeVisible();
   await page.getByRole("button", { name: "Continue" }).click();
 
@@ -183,7 +183,7 @@ test("candidate completes the full assessment and HR sees the report", async ({
   const reportRes = await hr.get(`/admin/candidates/${attempt.id}/report`);
   expect(reportRes.ok()).toBe(true);
   const html = await reportRes.text();
-  expect(html).toContain("FSW WorkFit Assessment Report");
+  expect(html).toContain("FSW Talent Scout Assessment Report");
   expect(html).toContain("Targeted Interview Guide");
   expect(html).toContain("Sales Traits Analysis");
 

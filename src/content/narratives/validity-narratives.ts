@@ -1,5 +1,5 @@
 /**
- * FSW WorkFit — narratives for the two response-quality (validity) indicators.
+ * FSW Talent Scout — narratives for the two response-quality (validity) indicators.
  *
  * Original FSW Group content. These indicators describe how the candidate
  * approached the questionnaire and how much interpretive confidence the
