@@ -13,6 +13,7 @@ import {
 import { ReviewPanel } from "@/components/admin/ReviewPanel";
 import { ChecksPanel } from "@/components/admin/ChecksPanel";
 import { WorkSamplePanel } from "@/components/admin/WorkSamplePanel";
+import { KeepInTouchPanel } from "@/components/admin/KeepInTouchPanel";
 import { visibleReviews, reviewProgress, buildConsensus } from "@/lib/ats/reviews";
 import { categoryLabel } from "@/lib/ats/social-check";
 import { isCheckrConfigured } from "@/lib/checkr/client";
@@ -37,7 +38,7 @@ export default async function ApplicationPage({
   const application = await prisma.application.findUnique({
     where: { id: applicationId },
     include: {
-      candidate: true,
+      candidate: { include: { talentProfile: true } },
       requisition: {
         include: { stages: { orderBy: { orderIndex: "asc" } }, department: true },
       },
@@ -448,6 +449,19 @@ export default async function ApplicationPage({
         </div>
 
         <div className="space-y-6">
+          {can(user.role, "MANAGE_TALENT_POOL") && (
+            <KeepInTouchPanel
+              candidateId={application.candidateId}
+              consentStatus={application.candidate.talentProfile?.consentStatus ?? null}
+              askedAt={
+                application.candidate.talentProfile?.consentAskedAt?.toISOString() ?? null
+              }
+              expiresAt={
+                application.candidate.talentProfile?.expiresAt?.toISOString() ?? null
+              }
+            />
+          )}
+
           <WorkSamplePanel
             applicationId={application.id}
             canManage={can(user.role, "MANAGE_WORK_SAMPLES")}

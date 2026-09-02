@@ -83,6 +83,11 @@ model User {
   workSamplesCreated    WorkSample[]            @relation("WorkSampleCreatedBy")
   workSamplesAssigned   WorkSampleAssignment[]  @relation("WorkSampleAssignedBy")
   workSampleGrades      WorkSampleGrade[]       @relation("WorkSampleGrader")
+  talentProfilesCreated TalentProfile[]         @relation("TalentProfileCreatedBy")
+  talentTagsAdded       TalentProfileTag[]      @relation("TalentTagAddedBy")
+  talentPoolsCreated    TalentPool[]            @relation("TalentPoolCreatedBy")
+  talentPoolMembersAdded TalentPoolMember[]     @relation("TalentPoolMemberAddedBy")
+  talentOutreachSent    TalentOutreach[]        @relation("TalentOutreachSentBy")
 }
 
 model Session {
@@ -171,6 +176,9 @@ enum RetentionRecordType {
   INTEGRITY_EVENT_LOGS
   WEBCAM_RECORDINGS
   AUDIT_RECORDS
+  /// Talent-pool membership. A candidate who agreed to be kept in mind agreed
+  /// to it for a period, not forever.
+  TALENT_POOL_RECORDS
 }
 
 model RetentionPolicy {
@@ -407,6 +415,7 @@ model JobProfile {
   hires       Hire[]
   validationStudies ValidationStudy[]
   workSamples WorkSample[]
+  talentPools TalentPool[]
 }
 
 
@@ -500,6 +509,7 @@ model Candidate {
   documents    CandidateDocument[]
   applications Application[]
   hires        Hire[]
+  talentProfile TalentProfile?
 
   @@index([email])
 }
@@ -1163,6 +1173,7 @@ model Requisition {
   events       RequisitionEvent[]
   reviewRounds ReviewRound[]
   hires        Hire[]
+  talentOutreach TalentOutreach[]
 
   @@index([status])
   @@index([departmentId])
@@ -2494,4 +2505,156 @@ model WorkSampleRating {
   note        String?
 
   @@unique([gradeId, criterionId])
+}
+
+// ---------------------------------------------------------------------------
+// Talent CRM
+//
+// The people who nearly got the job are the best-qualified pool anyone has:
+// already sourced, already assessed, already interviewed, and already
+// interested. Losing them because the requisition closed is the most expensive
+// ordinary mistake in recruiting.
+//
+// But a person who applied for one job did not thereby agree to sit in a
+// marketing database indefinitely. Everything here is built around that:
+// nobody enters a pool without being asked, nobody is contacted without
+// agreeing, an opt-out is permanent, and membership expires on the
+// organization's retention schedule rather than never.
+// ---------------------------------------------------------------------------
+
+enum TalentConsentStatus {
+  /// We have not asked. Nobody may be contacted in this state.
+  NOT_ASKED
+  /// Asked; awaiting an answer. Still nobody may be contacted.
+  INVITED
+  OPTED_IN
+  /// Permanent. Cannot be reversed by anyone inside the organization.
+  OPTED_OUT
+}
+
+/// The CRM overlay on a candidate. Created when they are invited to a pool,
+/// not when they apply — an application is not consent.
+model TalentProfile {
+  id          String    @id @default(cuid())
+  candidateId String    @unique
+  candidate   Candidate @relation(fields: [candidateId], references: [id], onDelete: Cascade)
+  consentStatus TalentConsentStatus @default(NOT_ASKED)
+  consentAskedAt DateTime?
+  consentAt   DateTime?
+  /// How consent was obtained: "email_link", "verbal_recorded_by:<user>", etc.
+  consentSource String?
+  /// SHA-256 of the candidate's consent token, while the ask is outstanding.
+  consentTokenHash String? @unique
+  /// What the candidate said they are looking for, in their own words.
+  interests   String?
+  /// A recruiter's note. Never shown to the candidate.
+  summary     String?
+  /// When membership lapses under the retention policy. Null until consent.
+  expiresAt   DateTime?
+  lastContactedAt DateTime?
+  contactCount Int      @default(0)
+  createdById String?
+  createdBy   User?     @relation("TalentProfileCreatedBy", fields: [createdById], references: [id], onDelete: SetNull)
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  tags        TalentProfileTag[]
+  memberships TalentPoolMember[]
+  outreach    TalentOutreach[]
+
+  @@index([consentStatus])
+  @@index([expiresAt])
+}
+
+model TalentTag {
+  id        String @id @default(cuid())
+  label     String @unique
+  /// SKILL | SENIORITY | LOCATION | LANGUAGE | OTHER. Free-form grouping.
+  category  String @default("OTHER")
+  createdAt DateTime @default(now())
+
+  profiles TalentProfileTag[]
+
+  @@index([category])
+}
+
+model TalentProfileTag {
+  id        String @id @default(cuid())
+  profileId String
+  profile   TalentProfile @relation(fields: [profileId], references: [id], onDelete: Cascade)
+  tagId     String
+  tag       TalentTag     @relation(fields: [tagId], references: [id], onDelete: Cascade)
+  addedById String?
+  addedBy   User?  @relation("TalentTagAddedBy", fields: [addedById], references: [id], onDelete: SetNull)
+  createdAt DateTime @default(now())
+
+  @@unique([profileId, tagId])
+  @@index([tagId])
+}
+
+model TalentPool {
+  id          String  @id @default(cuid())
+  name        String  @unique
+  description String?
+  /// The kind of role this pool is for, when it is role-specific.
+  jobProfileId String?
+  jobProfile  JobProfile? @relation(fields: [jobProfileId], references: [id], onDelete: SetNull)
+  active      Boolean @default(true)
+  createdById String?
+  createdBy   User?   @relation("TalentPoolCreatedBy", fields: [createdById], references: [id], onDelete: SetNull)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  members TalentPoolMember[]
+
+  @@index([active])
+}
+
+model TalentPoolMember {
+  id        String @id @default(cuid())
+  poolId    String
+  pool      TalentPool @relation(fields: [poolId], references: [id], onDelete: Cascade)
+  profileId String
+  profile   TalentProfile @relation(fields: [profileId], references: [id], onDelete: Cascade)
+  /// Why this person is in this pool. Written by whoever added them.
+  note      String?
+  addedById String?
+  addedBy   User?  @relation("TalentPoolMemberAddedBy", fields: [addedById], references: [id], onDelete: SetNull)
+  createdAt DateTime @default(now())
+
+  @@unique([poolId, profileId])
+  @@index([profileId])
+}
+
+/// A recorded contact. Exists so two recruiters do not both reach out, and so
+/// "how often has this person been approached" is answerable.
+model TalentOutreach {
+  id            String @id @default(cuid())
+  profileId     String
+  profile       TalentProfile @relation(fields: [profileId], references: [id], onDelete: Cascade)
+  requisitionId String?
+  requisition   Requisition? @relation(fields: [requisitionId], references: [id], onDelete: SetNull)
+  /// EMAIL | PHONE | MESSAGE | OTHER.
+  channel       String @default("EMAIL")
+  note          String?
+  sentById      String?
+  sentBy        User?  @relation("TalentOutreachSentBy", fields: [sentById], references: [id], onDelete: SetNull)
+  sentAt        DateTime @default(now())
+
+  @@index([profileId, sentAt])
+}
+
+/// Permanent opt-out list, keyed by a hash of the email address.
+///
+/// Hashed on purpose. An opt-out has to outlive the deletion of the person's
+/// record — otherwise purging their data under the retention policy would
+/// erase the fact that they asked not to be contacted, and the next import
+/// would add them straight back. Storing the hash lets a future address be
+/// checked against the list without keeping the address itself.
+model TalentSuppression {
+  id        String @id @default(cuid())
+  emailHash String @unique
+  /// "opted_out" | "requested_deletion" | "manual".
+  reason    String @default("opted_out")
+  createdAt DateTime @default(now())
 }

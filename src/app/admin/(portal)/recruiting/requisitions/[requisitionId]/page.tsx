@@ -7,6 +7,7 @@ import { Badge, Card, SectionHeading } from "@/components/ui";
 import { PipelineBoard, EmptyBoard } from "@/components/admin/PipelineBoard";
 import { RequisitionActions } from "@/components/admin/RequisitionActions";
 import { JobDescriptionLinter } from "@/components/admin/JobDescriptionLinter";
+import { PastApplicantsPanel } from "@/components/admin/PastApplicantsPanel";
 import { chainStatus, describeChain, type ApprovalStep } from "@/lib/ats/approvals";
 import { summarizeScorecards } from "@/lib/ats/scorecards";
 import { buildFunnel, formatRate, timeInStages } from "@/lib/ats/analytics";
@@ -230,6 +231,10 @@ export default async function RequisitionPage({
       <div className="mt-6 space-y-6">
         {tab === "pipeline" && (
           <>
+            {/* Before sourcing anyone new: who did we already meet? */}
+            {can(user.role, "MANAGE_TALENT_POOL") && (
+              <PastApplicantsPanel requisitionId={requisition.id} />
+            )}
             {applications.length === 0 ? (
               <EmptyBoard />
             ) : (

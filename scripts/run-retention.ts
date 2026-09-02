@@ -133,6 +133,36 @@ async function main(): Promise<void> {
         deleted = res.count;
         break;
       }
+      case "TALENT_POOL_RECORDS": {
+        // Consent lapses rather than being deleted. Pool memberships go, and
+        // the profile returns to NOT_ASKED, so a recruiter who wants this
+        // person back has to ask again rather than inherit an expired yes.
+        //
+        // The do-not-contact list is deliberately untouched here. It exists
+        // precisely so that purging someone's data cannot erase the fact
+        // that they asked not to be contacted.
+        const lapsed = await prisma.talentProfile.findMany({
+          where: { consentStatus: "OPTED_IN", expiresAt: { lt: new Date() } },
+          select: { id: true },
+        });
+        const ids = lapsed.map((p) => p.id);
+        if (ids.length > 0) {
+          await prisma.talentPoolMember.deleteMany({
+            where: { profileId: { in: ids } },
+          });
+          await prisma.talentProfile.updateMany({
+            where: { id: { in: ids } },
+            data: {
+              consentStatus: "NOT_ASKED",
+              consentAt: null,
+              consentSource: null,
+              expiresAt: null,
+            },
+          });
+        }
+        deleted = ids.length;
+        break;
+      }
     }
     summary[policy.recordType] = deleted;
   }

@@ -40,6 +40,11 @@ export default async function AdminPortalLayout({
       show: can(user.role, "VIEW_QUALITY"),
     },
     {
+      href: "/admin/talent",
+      label: "Talent Pool",
+      show: can(user.role, "MANAGE_TALENT_POOL"),
+    },
+    {
       href: "/admin/work-samples",
       label: "Work Samples",
       show:

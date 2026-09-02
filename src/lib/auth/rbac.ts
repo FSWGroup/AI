@@ -67,6 +67,11 @@ export const PERMISSIONS = [
   "GRADE_WORK_SAMPLES",
   /// Read every grade on a submission without filing one first.
   "VIEW_ALL_GRADES",
+  // Talent CRM
+  /// Search past applicants, manage pools and tags, ask for consent, and
+  /// record outreach. There is no separate "contact" permission: the consent
+  /// gate decides who may be contacted, and it cannot be overridden by a role.
+  "MANAGE_TALENT_POOL",
 ] as const;
 export type Permission = (typeof PERMISSIONS)[number];
 
@@ -99,6 +104,7 @@ const ROLE_PERMISSIONS: Record<UserRole, Permission[]> = {
     "MANAGE_WORK_SAMPLES",
     "GRADE_WORK_SAMPLES",
     "VIEW_ALL_GRADES",
+    "MANAGE_TALENT_POOL",
   ],
   // A hiring manager runs their own roles: they move candidates, schedule
   // and score interviews, and approve what they are named on. They do not

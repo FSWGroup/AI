@@ -210,6 +210,63 @@ Acceptance takes a typed signature and records the time, IP and user agent —
 what makes an electronic acceptance evidentiary rather than a database flag.
 The link is single-use and spent on either decision.
 
+## Talent pool (the people who nearly got the job)
+
+Already sourced, already assessed, already interviewed, already interested.
+Losing them because the requisition closed is the most expensive ordinary
+mistake in recruiting.
+
+But a person who applied for one job did not thereby agree to sit in a
+marketing database indefinitely, and the whole module is built around that.
+
+### The consent gate
+
+| Rule | Why |
+| --- | --- |
+| Applying is not consent | A profile exists only once someone has been **asked**, and asking is recorded |
+| Silence is not consent | `INVITED` means "asked, no answer" and permits nothing |
+| An opt-out is permanent | It cannot be reversed by anyone inside the organization. Only the person can come back, by applying again |
+| Consent expires | Membership lapses on the retention schedule (`TALENT_POOL_RECORDS`), so nobody is kept forever by default |
+| One approach every 30 days | Someone who agreed to hear about relevant roles did not agree to be a mailing list |
+
+`OPTED_IN` is reachable **only** from the candidate's own link. There is
+deliberately no admin endpoint that sets it, because it is the one fact here
+that has to come from the person it is about.
+
+People who opted out do not appear in search at all — a recruiter should not
+be able to browse the list of people who declined.
+
+### The suppression list
+
+An opt-out is recorded twice: on the profile, and as a **hash of the email
+address** on a separate permanent list. The second one is the important one.
+It has to outlive the deletion of the person's record — otherwise purging
+their data under the retention policy would erase the fact that they asked not
+to be contacted, and the next import would add them straight back. Storing the
+hash lets a future address be checked without keeping the address itself.
+
+Addresses are normalized before hashing, so a plus-address does not defeat
+someone's opt-out.
+
+The retention job leaves this list alone on purpose.
+
+### Matching, not scoring
+
+When a role opens, the requisition's pipeline tab shows **past applicants worth
+another look**, and every one comes with reasons in words: applied for the same
+kind of role, reached a late stage, turned down for process reasons rather than
+qualifications, shares tags with the search.
+
+There is deliberately **no fit score and no ranking by one**. A match score
+over past applicants is an automated assessment of people for employment
+purposes, and once it exists everyone downstream treats it as a measurement
+rather than the crude keyword-and-history heuristic it actually is. Reasons can
+be read and argued with; a number can only be trusted or ignored.
+
+Ordering is by how far a real process took someone — a fact about what humans
+already decided, not a prediction. "Applied here once" is not a reason to
+surface anybody.
+
 ## Duplicate candidates
 
 The same person applies through a board on Monday and the careers page on
@@ -261,6 +318,7 @@ Work-sample permissions are separate from the rest:
 | `MANAGE_WORK_SAMPLES` | Super admin, HR admin, assessment admin | Author tasks and rubrics, activate them, send them |
 | `GRADE_WORK_SAMPLES` | Super admin, HR admin, hiring manager | Grade a submission, blind |
 | `VIEW_ALL_GRADES` | Super admin, HR admin, hiring manager | Read every filed grade — but not before filing your own, if you can grade |
+| `MANAGE_TALENT_POOL` | Super admin, HR admin | Search past applicants, manage pools and tags, ask for consent, record outreach. There is no separate "contact" permission — the consent gate decides that and no role overrides it |
 
 ## Things a recruiter should know
 
