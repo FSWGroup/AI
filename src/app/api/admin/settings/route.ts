@@ -18,6 +18,8 @@ const schema = z.discriminatedUnion("action", [
     httpsConfirmed: z.boolean().optional(),
     eeoModuleEnabled: z.boolean().optional(),
     candidateFeedbackEnabled: z.boolean().optional(),
+    socialCheckEnabled: z.boolean().optional(),
+    checkrDefaultPackage: z.string().max(120).nullable().optional(),
     recordingAccessRoles: z
       .array(z.enum(["SUPER_ADMIN", "HR_ADMIN", "HIRING_MANAGER", "ASSESSMENT_ADMIN", "VIEWER"]))
       .min(1)

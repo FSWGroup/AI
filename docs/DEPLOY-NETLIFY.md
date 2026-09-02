@@ -43,6 +43,10 @@ Site configuration → Environment variables:
 Optional:
 - `APP_BASE_URL` — only needed with a custom domain; otherwise the app uses
   Netlify's site URL automatically.
+- `CHECKR_API_KEY` and `CHECKR_WEBHOOK_SECRET` — enable background checks
+  (`docs/REVIEWS-AND-CHECKS.md`). Point Checkr's webhook at
+  `https://<your-site>/api/webhooks/checkr`. Without both, the feature reports
+  itself as unconfigured rather than half-working.
 - `ANTHROPIC_API_KEY` — enables the AI interview brief and job-description
   benchmark proposals (`docs/AI-FEATURES.md`). Without it those two features
   show a "not configured" notice and everything else works normally.

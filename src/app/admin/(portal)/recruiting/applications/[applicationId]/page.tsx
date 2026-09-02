@@ -10,6 +10,12 @@ import {
   RECOMMENDATION_LABEL,
   RATING_LABEL,
 } from "@/lib/ats/scorecards";
+import { ReviewPanel } from "@/components/admin/ReviewPanel";
+import { ChecksPanel } from "@/components/admin/ChecksPanel";
+import { visibleReviews, reviewProgress, buildConsensus } from "@/lib/ats/reviews";
+import { categoryLabel } from "@/lib/ats/social-check";
+import { isCheckrConfigured } from "@/lib/checkr/client";
+import { canSendAdverseAction } from "@/lib/checkr/adverse-action";
 
 export const dynamic = "force-dynamic";
 
@@ -64,6 +70,27 @@ export default async function ApplicationPage({
         include: { attempts: { select: { id: true, status: true } } },
       },
       referenceChecks: { orderBy: { createdAt: "desc" } },
+      reviewRounds: {
+        orderBy: { createdAt: "desc" },
+        include: {
+          kit: { select: { name: true } },
+          reviews: {
+            include: {
+              reviewer: { select: { id: true, name: true } },
+              ratings: true,
+            },
+          },
+        },
+      },
+      socialMediaCheck: {
+        include: {
+          reviewer: { select: { name: true } },
+          findings: { orderBy: { createdAt: "asc" } },
+        },
+      },
+      backgroundCheck: {
+        include: { events: { orderBy: { occurredAt: "desc" }, take: 10 } },
+      },
     },
   });
   if (!application) notFound();
@@ -91,6 +118,103 @@ export default async function ApplicationPage({
 
   const attempt = application.invitations.flatMap((i) => i.attempts)[0] ?? null;
   const manage = can(user.role, "MANAGE_PIPELINE");
+  const canSeeAllReviews = can(user.role, "VIEW_ALL_REVIEWS");
+
+  const [settings, kits, teamUsers, eligibleReviewers] = await Promise.all([
+    prisma.orgSettings.findUnique({ where: { id: "org" } }),
+    prisma.interviewKit.findMany({
+      where: { active: true },
+      select: { id: true, name: true },
+      orderBy: { name: "asc" },
+    }),
+    prisma.user.findMany({
+      where: { active: true, role: { in: ["SUPER_ADMIN", "HR_ADMIN", "HIRING_MANAGER"] } },
+      select: { id: true, name: true, role: true },
+      orderBy: { name: "asc" },
+    }),
+    prisma.user.findMany({
+      where: { active: true, role: { in: ["SUPER_ADMIN", "HR_ADMIN"] } },
+      select: { id: true, name: true },
+      orderBy: { name: "asc" },
+    }),
+  ]);
+
+  // Anyone deciding on this candidate is disqualified from social review.
+  const requisitionTeam = await prisma.hiringTeamMember.findMany({
+    where: { requisitionId: application.requisitionId },
+    select: { userId: true, role: true },
+  });
+  const deciderIds = new Set(
+    requisitionTeam
+      .filter((t) => t.role === "HIRING_MANAGER" || t.role === "RECRUITER")
+      .map((t) => t.userId),
+  );
+
+  const rounds = application.reviewRounds.map((round) => {
+    const asLike = round.reviews.map((r) => ({
+      id: r.id,
+      reviewerId: r.reviewerId,
+      reviewerName: r.reviewer.name,
+      status: r.status,
+      recommendation: r.recommendation,
+      summary: r.summary,
+      submittedAt: r.submittedAt,
+      ratings: r.ratings.map((x) => ({
+        criterionName: x.criterionName,
+        rating: x.rating,
+        note: x.note,
+      })),
+    }));
+    const visibility = visibleReviews({
+      reviews: asLike,
+      viewerId: user.id,
+      blind: round.blind,
+      canSeeAll: canSeeAllReviews,
+      roundClosed: round.status === "CLOSED",
+    });
+    const progress = reviewProgress(asLike);
+    const mine = asLike.find((r) => r.reviewerId === user.id) ?? null;
+    return {
+      id: round.id,
+      name: round.name,
+      blind: round.blind,
+      status: round.status,
+      dueAt: round.dueAt?.toISOString() ?? null,
+      reviews: [],
+      visible: visibility.visible.map((r) => ({
+        ...r,
+        submittedAt: undefined,
+      })) as never,
+      hiddenCount: visibility.hiddenCount,
+      hiddenReason: visibility.reason,
+      progress: {
+        invited: progress.invited,
+        submitted: progress.submitted,
+        outstanding: progress.outstanding.map((o) => o.reviewerName),
+      },
+      // The consensus summarizes the whole panel, so it is withheld from
+      // anyone still under the blind — otherwise an average would leak the
+      // reviews themselves.
+      consensus:
+        canSeeAllReviews && visibility.hiddenCount === 0
+          ? buildConsensus(asLike)
+          : { submittedCount: 0, averageScore: null, split: false, spread: null, criteria: [] },
+      myReviewId: mine?.id ?? null,
+      myReviewStatus: mine?.status ?? null,
+    };
+  });
+
+  const bg = application.backgroundCheck;
+  const adverseGate = bg
+    ? canSendAdverseAction({
+        state: {
+          stage: bg.adverseStage,
+          preAdverseSentAt: bg.preAdverseSentAt,
+          disputeReceivedAt: bg.disputeReceivedAt,
+          adverseActionSentAt: bg.adverseActionSentAt,
+        },
+      })
+    : null;
 
   return (
     <div className="mx-auto max-w-5xl">
@@ -270,6 +394,15 @@ export default async function ApplicationPage({
             </Card>
           )}
 
+          <ReviewPanel
+            applicationId={application.id}
+            rounds={rounds as never}
+            canOpenRound={manage}
+            canSeeAll={canSeeAllReviews}
+            teamOptions={teamUsers}
+            kitOptions={kits}
+          />
+
           <Card className="p-6">
             <h2 className="text-sm font-bold text-navy-900">History</h2>
             <ul className="mt-3 space-y-2 text-sm">
@@ -295,6 +428,57 @@ export default async function ApplicationPage({
         </div>
 
         <div className="space-y-6">
+          <ChecksPanel
+            applicationId={application.id}
+            socialEnabled={settings?.socialCheckEnabled ?? false}
+            checkrConfigured={isCheckrConfigured()}
+            canManageSocial={can(user.role, "MANAGE_SOCIAL_CHECKS")}
+            canManageBackground={can(user.role, "MANAGE_BACKGROUND_CHECKS")}
+            defaultPackage={settings?.checkrDefaultPackage ?? null}
+            offerAccepted={application.offers.some((o) => o.status === "ACCEPTED")}
+            stageKind={application.stage?.kind ?? null}
+            reviewerOptions={eligibleReviewers.filter((r) => !deciderIds.has(r.id))}
+            social={
+              application.socialMediaCheck
+                ? {
+                    id: application.socialMediaCheck.id,
+                    status: application.socialMediaCheck.status,
+                    outcome: application.socialMediaCheck.outcome,
+                    reviewerName: application.socialMediaCheck.reviewer?.name ?? null,
+                    reviewerNotes: application.socialMediaCheck.reviewerNotes,
+                    consentUrl: null,
+                    findings: application.socialMediaCheck.findings.map((f) => ({
+                      id: f.id,
+                      category: f.category,
+                      categoryLabel: categoryLabel(f.category),
+                      description: f.description,
+                    })),
+                  }
+                : null
+            }
+            background={
+              bg
+                ? {
+                    id: bg.id,
+                    status: bg.status,
+                    result: bg.result,
+                    packageSlug: bg.packageSlug,
+                    invitationUrl: bg.invitationUrl,
+                    adverseStage: bg.adverseStage,
+                    preAdverseSentAt: bg.preAdverseSentAt?.toISOString() ?? null,
+                    adverseGateReason: adverseGate?.reason ?? null,
+                    adverseAllowed: adverseGate?.allowed ?? false,
+                    events: bg.events.map((e) => ({
+                      id: e.id,
+                      type: e.type,
+                      summary: e.summary,
+                      occurredAt: e.occurredAt.toISOString(),
+                    })),
+                  }
+                : null
+            }
+          />
+
           <ApplicationActions
             applicationId={application.id}
             status={application.status}

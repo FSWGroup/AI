@@ -69,6 +69,11 @@ model User {
   offerApprovals        OfferApproval[]         @relation("OfferApprover")
   offerTemplates        OfferLetterTemplate[]
   requisitionEvents     RequisitionEvent[]
+  reviewRoundsRequested ReviewRound[]           @relation("ReviewRoundRequestedBy")
+  candidateReviews      CandidateReview[]
+  socialChecksReviewed  SocialMediaCheck[]      @relation("SocialCheckReviewer")
+  socialChecksRequested SocialMediaCheck[]      @relation("SocialCheckRequestedBy")
+  backgroundChecksRequested BackgroundCheck[]   @relation("BackgroundCheckRequestedBy")
 }
 
 model Session {
@@ -137,6 +142,10 @@ model OrgSettings {
   /// When on, candidates may view a strengths-and-development report about
   /// their own results. Never shows benchmarks, validity, or integrity data.
   candidateFeedbackEnabled  Boolean  @default(false)
+  /// Social media review is off until an organization enables it deliberately.
+  socialCheckEnabled        Boolean  @default(false)
+  /// Default Checkr package ordered for new background checks.
+  checkrDefaultPackage      String?
   privacyNoticeVersion      String   @default("1.0")
   privacyNoticeConfigured   Boolean  @default(false)
   /// Roles allowed to view webcam recordings. Least privilege by default.
@@ -1122,6 +1131,7 @@ model Requisition {
   screeningQuestions ScreeningQuestion[]
   offers       Offer[]
   events       RequisitionEvent[]
+  reviewRounds ReviewRound[]
 
   @@index([status])
   @@index([departmentId])
@@ -1304,6 +1314,9 @@ model Application {
   notes            ApplicationNote[]
   documents        CandidateDocument[]
   referenceChecks  ReferenceCheck[]
+  reviewRounds     ReviewRound[]
+  socialMediaCheck SocialMediaCheck?
+  backgroundCheck  BackgroundCheck?
   /// The assessment invitation issued for this application, if any.
   invitations      Invitation[]
 
@@ -1439,6 +1452,7 @@ model InterviewKit {
   questions    KitQuestion[]
   stages       PipelineStage[]
   interviews   Interview[]
+  reviewRounds ReviewRound[]
 }
 
 model KitCompetency {
@@ -1753,4 +1767,255 @@ model RequisitionEvent {
   occurredAt    DateTime    @default(now())
 
   @@index([requisitionId, occurredAt])
+}
+
+// ===========================================================================
+// INDEPENDENT TEAM REVIEW
+//
+// Distinct from interview scorecards: a review round asks named people to
+// assess a candidate from the record — application, resume, assessment,
+// interview write-ups — without having to be in an interview.
+//
+// The point is independence. Reviewers cannot see each other's reviews until
+// they file their own, because a panel that reads the first opinion before
+// forming its own is one opinion wearing four names.
+// ===========================================================================
+
+enum ReviewRoundStatus {
+  OPEN
+  CLOSED
+}
+
+model ReviewRound {
+  id            String            @id @default(cuid())
+  applicationId String
+  application   Application       @relation(fields: [applicationId], references: [id], onDelete: Cascade)
+  requisitionId String
+  requisition   Requisition       @relation(fields: [requisitionId], references: [id], onDelete: Cascade)
+  name          String
+  /// Criteria come from a kit so everyone rates the same things.
+  kitId         String?
+  kit           InterviewKit?     @relation(fields: [kitId], references: [id], onDelete: SetNull)
+  /// When true, a reviewer sees nobody else's review until theirs is in.
+  blind         Boolean           @default(true)
+  status        ReviewRoundStatus @default(OPEN)
+  dueAt         DateTime?
+  requestedById String?
+  requestedBy   User?             @relation("ReviewRoundRequestedBy", fields: [requestedById], references: [id], onDelete: SetNull)
+  closedAt      DateTime?
+  createdAt     DateTime          @default(now())
+
+  reviews CandidateReview[]
+
+  @@index([applicationId])
+}
+
+model CandidateReview {
+  id             String                   @id @default(cuid())
+  roundId        String
+  round          ReviewRound              @relation(fields: [roundId], references: [id], onDelete: Cascade)
+  reviewerId     String
+  reviewer       User                     @relation(fields: [reviewerId], references: [id], onDelete: Cascade)
+  status         ScorecardStatus          @default(DRAFT)
+  recommendation ScorecardRecommendation?
+  summary        String?
+  submittedAt    DateTime?
+  createdAt      DateTime                 @default(now())
+  updatedAt      DateTime                 @updatedAt
+
+  ratings CandidateReviewRating[]
+
+  @@unique([roundId, reviewerId])
+  @@index([reviewerId, status])
+}
+
+model CandidateReviewRating {
+  id             String          @id @default(cuid())
+  reviewId       String
+  review         CandidateReview @relation(fields: [reviewId], references: [id], onDelete: Cascade)
+  /// Snapshot, so editing the kit cannot rewrite a filed review.
+  criterionName  String
+  rating         Int?
+  note           String?
+
+  @@unique([reviewId, criterionName])
+}
+
+// ===========================================================================
+// SOCIAL MEDIA REVIEW
+//
+// Deliberately a structured human workflow, not an automated scanner.
+//
+// Screening someone's public social presence exposes the reviewer to age,
+// religion, disability, pregnancy, national origin and political affiliation
+// within seconds — none of which may inform a hiring decision, and all of
+// which are unforgettable once seen. The controls that make this defensible
+// are procedural: recorded consent, a reviewer who is not a decision-maker,
+// findings recorded only against pre-agreed job-relevant categories, and the
+// hiring team seeing the categorized outcome rather than the raw browsing.
+// ===========================================================================
+
+enum SocialCheckStatus {
+  NOT_STARTED
+  CONSENT_REQUESTED
+  CONSENT_DECLINED
+  AWAITING_REVIEW
+  COMPLETED
+  CANCELLED
+}
+
+enum SocialCheckOutcome {
+  NOTHING_FOUND
+  FINDINGS_TO_DISCUSS
+}
+
+/// Job-relevant conduct categories. Nothing here is a protected
+/// characteristic, and that is the point: a finding must be about something
+/// the person did that bears on the work.
+enum SocialFindingCategory {
+  VIOLENT_THREATS
+  HARASSMENT_OR_ABUSE
+  ILLEGAL_ACTIVITY
+  CONFIDENTIALITY_BREACH
+  MISREPRESENTATION
+  SAFETY_RISK
+}
+
+model SocialMediaCheck {
+  id            String             @id @default(cuid())
+  applicationId String             @unique
+  application   Application        @relation(fields: [applicationId], references: [id], onDelete: Cascade)
+  status        SocialCheckStatus  @default(NOT_STARTED)
+  /// SHA-256 of the candidate's disclosure link token.
+  consentTokenHash String?         @unique
+  consentRequestedAt DateTime?
+  consentGivenAt   DateTime?
+  consentDeclinedAt DateTime?
+  /// Public profiles the candidate chose to disclose. Visible only to the
+  /// assigned reviewer — a hiring manager who can open the links can see
+  /// everything the process exists to keep out of the decision.
+  disclosedProfiles Json?
+  /// Recorded verbatim so consent is reconstructable years later.
+  consentStatementVersion String?
+  reviewerId    String?
+  reviewer      User?              @relation("SocialCheckReviewer", fields: [reviewerId], references: [id], onDelete: SetNull)
+  reviewedAt    DateTime?
+  outcome       SocialCheckOutcome?
+  /// Reviewer's summary for the hiring team. Conduct only.
+  reviewerNotes String?
+  requestedById String?
+  requestedBy   User?              @relation("SocialCheckRequestedBy", fields: [requestedById], references: [id], onDelete: SetNull)
+  createdAt     DateTime           @default(now())
+  updatedAt     DateTime           @updatedAt
+
+  findings SocialMediaFinding[]
+}
+
+model SocialMediaFinding {
+  id          String                @id @default(cuid())
+  checkId     String
+  check       SocialMediaCheck      @relation(fields: [checkId], references: [id], onDelete: Cascade)
+  category    SocialFindingCategory
+  /// What was observed, in conduct terms.
+  description String
+  /// Where it was seen. Reviewer-only, for the same reason as the profiles.
+  sourceUrl   String?
+  observedAt  DateTime?
+  createdAt   DateTime              @default(now())
+
+  @@index([checkId])
+}
+
+// ===========================================================================
+// BACKGROUND CHECKS (Checkr)
+//
+// Consumer reports under the FCRA. Three things follow from that and are
+// enforced rather than documented:
+//
+//  1. Disclosure and authorization happen before the report is ordered. The
+//     Checkr invitation flow collects them, along with the SSN and date of
+//     birth, so this platform never holds that data.
+//  2. A report that returns "consider" is not a decision. Acting adversely on
+//     it requires a pre-adverse notice with a copy of the report, a waiting
+//     period for the candidate to dispute, and then a separate adverse action
+//     notice.
+//  3. Every step is timestamped, because the defence against an FCRA claim is
+//     the record of having followed the sequence.
+// ===========================================================================
+
+enum BackgroundCheckStatus {
+  NOT_STARTED
+  INVITATION_SENT
+  INVITATION_EXPIRED
+  PENDING
+  COMPLETE
+  SUSPENDED
+  CANCELLED
+}
+
+/// Checkr's report assessment. "CONSIDER" means a human must look, never that
+/// the candidate failed.
+enum BackgroundCheckResult {
+  CLEAR
+  CONSIDER
+  DISPUTE
+}
+
+enum AdverseActionStage {
+  NONE
+  PRE_ADVERSE_SENT
+  DISPUTED
+  ADVERSE_ACTION_SENT
+  CANCELLED
+}
+
+model BackgroundCheck {
+  id            String                @id @default(cuid())
+  applicationId String                @unique
+  application   Application           @relation(fields: [applicationId], references: [id], onDelete: Cascade)
+  offerId       String?
+  status        BackgroundCheckStatus @default(NOT_STARTED)
+  result        BackgroundCheckResult?
+  /// Checkr package slug, e.g. "tasker_standard".
+  packageSlug   String
+  /// Work location sent to Checkr; drives which searches are permitted.
+  workLocationCountry String            @default("US")
+  workLocationState   String?
+  workLocationCity    String?
+  checkrCandidateId  String?
+  checkrInvitationId String?
+  checkrReportId     String?
+  /// The candidate-facing Checkr link. Time limited by Checkr.
+  invitationUrl String?
+  invitedAt     DateTime?
+  completedAt   DateTime?
+  /// Per-screening statuses as Checkr reported them, for the audit record.
+  reportSummary Json?
+  adverseStage  AdverseActionStage    @default(NONE)
+  preAdverseSentAt   DateTime?
+  disputeReceivedAt  DateTime?
+  adverseActionSentAt DateTime?
+  adverseActionReason String?
+  requestedById String?
+  requestedBy   User?                 @relation("BackgroundCheckRequestedBy", fields: [requestedById], references: [id], onDelete: SetNull)
+  createdAt     DateTime              @default(now())
+  updatedAt     DateTime              @updatedAt
+
+  events BackgroundCheckEvent[]
+
+  @@index([status])
+}
+
+/// Every Checkr webhook and every action taken, kept raw.
+model BackgroundCheckEvent {
+  id        String          @id @default(cuid())
+  checkId   String
+  check     BackgroundCheck @relation(fields: [checkId], references: [id], onDelete: Cascade)
+  type      String
+  summary   String?
+  payload   Json?
+  actorId   String?
+  occurredAt DateTime       @default(now())
+
+  @@index([checkId, occurredAt])
 }

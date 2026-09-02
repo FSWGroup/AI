@@ -37,6 +37,12 @@ export const PERMISSIONS = [
   "MANAGE_OFFERS",
   "APPROVE_OFFERS",
   "VIEW_RECRUITING_ANALYTICS",
+  /// Read every filed review on a candidate without filing one first.
+  "VIEW_ALL_REVIEWS",
+  "MANAGE_SOCIAL_CHECKS",
+  /// Conduct a social review. Deliberately separate from deciding.
+  "CONDUCT_SOCIAL_REVIEW",
+  "MANAGE_BACKGROUND_CHECKS",
 ] as const;
 export type Permission = (typeof PERMISSIONS)[number];
 
@@ -58,6 +64,10 @@ const ROLE_PERMISSIONS: Record<UserRole, Permission[]> = {
     "SUBMIT_SCORECARD",
     "MANAGE_OFFERS",
     "VIEW_RECRUITING_ANALYTICS",
+    "VIEW_ALL_REVIEWS",
+    "MANAGE_SOCIAL_CHECKS",
+    "CONDUCT_SOCIAL_REVIEW",
+    "MANAGE_BACKGROUND_CHECKS",
   ],
   // A hiring manager runs their own roles: they move candidates, schedule
   // and score interviews, and approve what they are named on. They do not
@@ -72,6 +82,9 @@ const ROLE_PERMISSIONS: Record<UserRole, Permission[]> = {
     "SUBMIT_SCORECARD",
     "APPROVE_OFFERS",
     "VIEW_RECRUITING_ANALYTICS",
+    // The boss sees every rating and all the written feedback. They do not
+    // conduct social reviews — separating that from deciding is the control.
+    "VIEW_ALL_REVIEWS",
   ],
   ASSESSMENT_ADMIN: [
     "MANAGE_QUESTIONS",

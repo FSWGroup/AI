@@ -32,6 +32,8 @@ export function SettingsForm({
     httpsConfirmed: boolean;
     eeoModuleEnabled: boolean;
     candidateFeedbackEnabled: boolean;
+    socialCheckEnabled: boolean;
+    checkrDefaultPackage: string | null;
     recordingAccessRoles: string[];
   };
   retention: { recordType: string; retentionDays: number | null }[];
@@ -201,6 +203,28 @@ export function SettingsForm({
             <input
               type="checkbox"
               className="mt-0.5 h-4 w-4 shrink-0 accent-fsw-600"
+              checked={org.socialCheckEnabled}
+              onChange={(e) =>
+                setOrg({ ...org, socialCheckEnabled: e.target.checked })
+              }
+            />
+            <span className="text-sm">
+              <span className="font-semibold text-navy-900">
+                Allow social media review
+              </span>
+              <span className="mt-0.5 block text-xs leading-relaxed text-navy-500">
+                A consent-based, human review available only from the reference
+                stage onward. The candidate chooses what to share, a reviewer
+                who is not deciding looks at it, and only pre-defined
+                job-relevant conduct can be recorded. Review the process and the
+                candidate-facing wording with counsel before enabling it.
+              </span>
+            </span>
+          </label>
+          <label className="flex gap-3">
+            <input
+              type="checkbox"
+              className="mt-0.5 h-4 w-4 shrink-0 accent-fsw-600"
               checked={org.candidateFeedbackEnabled}
               onChange={(e) =>
                 setOrg({ ...org, candidateFeedbackEnabled: e.target.checked })
@@ -217,6 +241,21 @@ export function SettingsForm({
               </span>
             </span>
           </label>
+        </div>
+        <div className="mt-5">
+          <Label>Default Checkr package</Label>
+          <Input
+            className="max-w-xs"
+            placeholder="e.g. tasker_standard"
+            value={org.checkrDefaultPackage ?? ""}
+            onChange={(e) =>
+              setOrg({ ...org, checkrDefaultPackage: e.target.value || null })
+            }
+          />
+          <p className="mt-1 text-xs leading-relaxed text-navy-500">
+            Pre-filled when ordering a background check. Background checks stay
+            unavailable until CHECKR_API_KEY and CHECKR_WEBHOOK_SECRET are set.
+          </p>
         </div>
         <Button
           className="mt-5"

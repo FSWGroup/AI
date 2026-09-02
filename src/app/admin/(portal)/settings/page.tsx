@@ -42,6 +42,8 @@ export default async function SettingsPage() {
           httpsConfirmed: settings?.httpsConfirmed ?? false,
           eeoModuleEnabled: settings?.eeoModuleEnabled ?? false,
           candidateFeedbackEnabled: settings?.candidateFeedbackEnabled ?? false,
+          socialCheckEnabled: settings?.socialCheckEnabled ?? false,
+          checkrDefaultPackage: settings?.checkrDefaultPackage ?? null,
           recordingAccessRoles: settings?.recordingAccessRoles ?? [
             "SUPER_ADMIN",
             "HR_ADMIN",
