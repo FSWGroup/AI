@@ -96,6 +96,9 @@ model User {
   schedulingRequests    SchedulingRequest[]     @relation("SchedulingRequestCreatedBy")
   schedulingPanels      SchedulingPanelist[]
   scheduledReminders    ScheduledReminder[]
+  recordingConsents     InterviewRecordingConsent[]
+  recordingsUploaded    InterviewRecording[]       @relation("RecordingUploadedBy")
+  evidenceDismissed     InterviewEvidence[]        @relation("EvidenceDismissedBy")
 }
 
 model Session {
@@ -187,6 +190,8 @@ enum RetentionRecordType {
   INTEGRITY_EVENT_LOGS
   WEBCAM_RECORDINGS
   AUDIT_RECORDS
+  /// Interview recordings and their transcripts.
+  INTERVIEW_RECORDINGS
   /// Talent-pool membership. A candidate who agreed to be kept in mind agreed
   /// to it for a period, not forever.
   TALENT_POOL_RECORDS
@@ -1525,6 +1530,7 @@ model KitCompetency {
   orderIndex  Int
 
   ratings ScorecardRating[]
+  evidence InterviewEvidence[]
 
   @@unique([kitId, orderIndex])
 }
@@ -1571,6 +1577,8 @@ model Interview {
   scorecards   Scorecard[]
   schedulingRequest SchedulingRequest?
   reminders    ScheduledReminder[]
+  recording    InterviewRecording?
+  recordingConsents InterviewRecordingConsent[]
 
   @@index([applicationId])
   @@index([scheduledAt])
@@ -2807,4 +2815,156 @@ model ScheduledReminder {
 
   @@unique([interviewId, kind, userId])
   @@index([dueAt, sentAt])
+}
+
+// ---------------------------------------------------------------------------
+// Interview intelligence
+//
+// A recorded interview, transcribed, with the AI pulling out what the
+// candidate ACTUALLY SAID against each competency the kit asks about — so the
+// interviewer rates from evidence rather than from memory of an impression.
+//
+// Two hard constraints run through every model here.
+//
+// ALL-PARTY CONSENT. Not "two-party": every person in the room. The
+// Philippines' Anti-Wiretapping Act (RA 4200) makes recording a private
+// communication without the consent of all parties a criminal offence, and
+// several US states require all-party consent too. There is no one-party
+// mode in this schema because there is no lawful one for this organization.
+//
+// THE AI NEVER RATES. It extracts quotes and maps them to competencies. The
+// evidence model has no rating, no score and no recommendation field — the
+// guarantee is structural, not a matter of prompt wording. An interviewer
+// reads the quotes and forms their own view, in the scorecard, as before.
+//
+// What is deliberately absent: any analysis of voice, tone, pace, sentiment,
+// emotion, confidence or engagement, and any analysis of video at all. Those
+// are inferences about a person from how they sound and look rather than from
+// what they said, and this platform does not make them anywhere.
+// ---------------------------------------------------------------------------
+
+enum RecordingConsentStatus {
+  PENDING
+  GRANTED
+  DECLINED
+  WITHDRAWN
+}
+
+enum RecordingConsentParty {
+  CANDIDATE
+  INTERVIEWER
+}
+
+/// One person's answer about being recorded. Every party needs a GRANTED row
+/// before recording may begin, and any WITHDRAWN row ends it.
+model InterviewRecordingConsent {
+  id          String @id @default(cuid())
+  interviewId String
+  interview   Interview @relation(fields: [interviewId], references: [id], onDelete: Cascade)
+  party       RecordingConsentParty
+  /// Set for interviewers. Null means the candidate.
+  userId      String?
+  user        User?  @relation(fields: [userId], references: [id], onDelete: Cascade)
+  /// The user id, or the literal "CANDIDATE". Exists because a unique index
+  /// over a nullable column does not constrain anything in Postgres — NULL is
+  /// never equal to NULL, so two candidate rows for one interview would both
+  /// be accepted, and "did the candidate agree?" would have two answers.
+  partyKey    String
+  status      RecordingConsentStatus @default(PENDING)
+  /// SHA-256 of the candidate's consent link token, while outstanding.
+  tokenHash   String? @unique
+  /// The exact wording shown, kept so what someone agreed to is reconstructable.
+  statementVersion String
+  decidedAt   DateTime?
+  ip          String?
+  userAgent   String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@unique([interviewId, partyKey])
+  @@index([interviewId, status])
+}
+
+enum InterviewRecordingStatus {
+  AWAITING_CONSENT
+  READY
+  UPLOADED
+  TRANSCRIBED
+  ANALYZED
+  DELETED
+}
+
+model InterviewRecording {
+  id          String @id @default(cuid())
+  interviewId String @unique
+  interview   Interview @relation(fields: [interviewId], references: [id], onDelete: Cascade)
+  status      InterviewRecordingStatus @default(AWAITING_CONSENT)
+  /// Audio only. Video adds nothing this platform is willing to analyze and
+  /// multiplies what a breach would expose.
+  fileName    String?
+  mimeType    String?
+  sizeBytes   Int?
+  objectKey   String?
+  durationSeconds Int?
+  /// How the transcript arrived: "uploaded_vtt", "uploaded_srt", "pasted".
+  transcriptSource String?
+  uploadedById String?
+  uploadedBy  User?  @relation("RecordingUploadedBy", fields: [uploadedById], references: [id], onDelete: SetNull)
+  uploadedAt  DateTime?
+  transcribedAt DateTime?
+  analyzedAt  DateTime?
+  /// Set when the media is purged but the transcript is kept, or vice versa.
+  mediaDeletedAt DateTime?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  segments TranscriptSegment[]
+  evidence InterviewEvidence[]
+}
+
+model TranscriptSegment {
+  id          String @id @default(cuid())
+  recordingId String
+  recording   InterviewRecording @relation(fields: [recordingId], references: [id], onDelete: Cascade)
+  orderIndex  Int
+  /// Whatever the transcript called them. Not resolved to a person: guessing
+  /// who "Speaker 2" is would put words in someone's mouth.
+  speakerLabel String?
+  startMs     Int
+  endMs       Int
+  text        String
+
+  @@unique([recordingId, orderIndex])
+  @@index([recordingId, startMs])
+}
+
+/// A quote from the transcript, against a competency the kit asks about.
+///
+/// Note what this model does not have: a rating, a score, a level, a verdict,
+/// a sentiment, or a recommendation. There is nowhere to put one.
+model InterviewEvidence {
+  id          String @id @default(cuid())
+  recordingId String
+  recording   InterviewRecording @relation(fields: [recordingId], references: [id], onDelete: Cascade)
+  competencyId String?
+  competency  KitCompetency? @relation(fields: [competencyId], references: [id], onDelete: SetNull)
+  /// Snapshot, so editing the kit cannot rewrite what was found.
+  competencyName String
+  /// Verbatim from the transcript. Never paraphrased: a paraphrase is the
+  /// model's words presented as the candidate's.
+  quote       String
+  startMs     Int
+  endMs       Int
+  /// One neutral sentence on why this passage is relevant to the competency.
+  /// Explicitly not an evaluation of what was said.
+  relevance   String
+  /// Set when a human marked this quote as mis-attributed or out of context.
+  dismissedById String?
+  dismissedBy User?  @relation("EvidenceDismissedBy", fields: [dismissedById], references: [id], onDelete: SetNull)
+  dismissedAt DateTime?
+  dismissedReason String?
+  promptVersion String
+  createdAt   DateTime @default(now())
+
+  @@index([recordingId, competencyName])
 }

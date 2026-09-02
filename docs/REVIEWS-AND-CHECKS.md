@@ -101,6 +101,82 @@ adjusted for in a debrief and erratic disagreement cannot.
 
 ---
 
+## Interview recording and evidence
+
+A recorded interview, transcribed, with the AI pulling out **what the
+candidate actually said** against each competency the kit asks about — so the
+interviewer rates from evidence rather than from memory of an impression.
+
+Two hard constraints run through the whole feature.
+
+### All-party consent, with no override
+
+Not "two-party" — every person in the room, the candidate and every
+interviewer alike.
+
+This is not a configurable setting, because there is no lawful configuration
+of it here. The Philippines' **Anti-Wiretapping Act (RA 4200)** makes
+recording a private communication without the consent of all parties a
+criminal offence, punishable by imprisonment, and it covers a recruiter
+recording an interview. Several US states — California, Pennsylvania,
+Illinois, Florida among them — require all-party consent for the same act. A
+one-party toggle would exist only to be switched on by someone who did not
+know that, so there is not one, and there is no admin bypass on any code path.
+
+What follows, enforced in code rather than in a policy document:
+
+- A missing consent row is treated exactly like a refusal. "We never asked
+  them" is not consent, and is the specific failure the gate exists to stop.
+- A single decline or withdrawal, from anyone, stops it for everyone.
+- A withdrawal **destroys what was captured** — the audio, the transcript, and
+  every extracted quote, because those are the recording in another form.
+- `OPTED_IN` for the candidate is reachable only from the candidate's own
+  link. Nobody inside the organization can record it on their behalf.
+- The interviewer is told **whether** recording is on, never **who** declined.
+  The candidate was promised that saying no costs nothing; telling the
+  interviewer which of them said no is how that promise gets broken.
+
+The candidate's wording is versioned and the version is stored on every
+consent row, so what somebody agreed to can be reconstructed years later
+rather than inferred from whatever the file says today.
+
+### The AI surfaces evidence and never rates
+
+Its whole job is to find passages where the candidate spoke to a competency,
+quote them **verbatim**, and say in one neutral sentence why the passage is
+relevant. It does not rate, score, rank, summarize the candidate, or reach a
+conclusion.
+
+The guarantee is structural rather than a matter of prompt wording: the output
+schema has **no field a rating could live in**. A model that decided to be
+helpful and offer one would have nowhere to put it and the parse would strip
+it. Three further checks run on everything it returns, in `filter.ts`:
+
+| Check | What happens | Why |
+| --- | --- | --- |
+| Quote located in the transcript | **Dropped** if not found | An unlocatable quote attributed to a candidate is a fabrication, and a caveat under it does not stop an interviewer reading it |
+| Relevance line free of evaluative wording | **Replaced** if not | It is the sentence read fastest, and "a strong answer" there is the model rating the candidate by the back door |
+| Competency is in the kit | **Dropped** if not | Evidence against an invented competency is evidence for nothing |
+
+Also absent, deliberately: any analysis of voice, tone, pace, sentiment,
+emotion, confidence or engagement, and any analysis of video at all. Those are
+inferences about a person from how they sound and look rather than from what
+they said, and this platform does not make them anywhere. Only audio is
+accepted, and the upload refuses video outright.
+
+### Transcription
+
+The platform does not transcribe audio and does not pretend to. Zoom, Meet and
+Teams all produce a transcript already; taking theirs is more accurate than a
+bolted-on model, costs nothing, and means the audio never has to leave the
+meeting tool. Paste WebVTT, SRT, or plain text with speaker labels.
+
+A plain-text transcript has no timestamps, so quotes carry a position rather
+than a time and the UI says so — an offset presented as a timestamp sends
+someone scrubbing to the wrong part of the audio.
+
+---
+
 ## Social media review
 
 **Off by default.** Settings → Fairness and candidate experience → "Allow
@@ -220,3 +296,4 @@ do.
 | `CONDUCT_SOCIAL_REVIEW` | Super admin, HR admin | Be the reviewer. Never granted to hiring managers, who decide |
 | `MANAGE_BACKGROUND_CHECKS` | Super admin, HR admin | Order checks and run the adverse-action sequence |
 | `VIEW_INTERVIEWER_CALIBRATION` | Super admin, HR admin | See every interviewer's calibration. Everyone sees their own without it |
+| `MANAGE_INTERVIEWS` | Super admin, HR admin, hiring manager | Also gates interview recording — but the consent gate sits above it, and no permission overrides that |

@@ -228,9 +228,10 @@ Netlify Blobs; PDFs via the report's Print button there).
   time zones, work samples with blind multi-grader rubrics, the consent-gated
   talent pool, offers, and funnel-wide adverse impact.
 - `docs/REVIEWS-AND-CHECKS.md` — independent team review and the consolidated
-  ratings view, interviewer calibration, the consent-based social media
-  workflow, and the Checkr background-check integration with the FCRA
-  adverse-action sequence.
+  ratings view, interviewer calibration, all-party-consented interview
+  recording and the evidence extractor that never rates anyone, the
+  consent-based social media workflow, and the Checkr background-check
+  integration with the FCRA adverse-action sequence.
 - `docs/PDF-EXPORT.md` — the complete assessment export: what is in it, what
   is deliberately left out, and how it is rendered.
 - `docs/FAIRNESS-AND-FEEDBACK.md` — the benchmark impact preview, voluntary
@@ -253,6 +254,10 @@ Netlify Blobs; PDFs via the report's Print button there).
   which dimensions are which. Nothing activates below 200 cases.
 - The validation study engine reports relationships; it never applies them.
   No study changes a benchmark, reweights a dimension, or alters a decision.
+- Interview recording requires the consent of **everyone** present and has no
+  override. The platform does not transcribe audio — paste the transcript your
+  meeting tool produced. The evidence extractor quotes what was said and
+  cannot return a rating: there is no field for one.
 - **Getting results as a PDF.** A candidate's **Download PDF** tab exports
   the complete assessment as one file — summary and score sheet first, then
   every section including the interview guide, session record, and integrity

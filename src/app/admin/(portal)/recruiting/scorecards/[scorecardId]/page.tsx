@@ -4,6 +4,7 @@ import { prisma } from "@/lib/db";
 import { getCurrentUser } from "@/lib/auth/session";
 import { SectionHeading, Card } from "@/components/ui";
 import { ScorecardForm } from "@/components/admin/ScorecardForm";
+import { InterviewEvidencePanel } from "@/components/admin/InterviewEvidencePanel";
 
 export const dynamic = "force-dynamic";
 
@@ -106,6 +107,15 @@ export default async function ScorecardPage({
           }
         />
       </div>
+      {scorecard.interview && (
+        <div className="mt-6">
+          <InterviewEvidencePanel
+            interviewId={scorecard.interview.id}
+            hasKit={kitCompetencies.length > 0}
+          />
+        </div>
+      )}
+
       <div className="mt-6">
         <ScorecardForm
           scorecardId={scorecard.id}
