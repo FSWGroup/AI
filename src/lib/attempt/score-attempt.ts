@@ -91,6 +91,8 @@ export async function scoreAttempt(attemptId: string): Promise<void> {
       id: table.id,
       construct,
       thresholds: table.thresholds as NormTableData["thresholds"],
+      percentileCurve:
+        (table.percentileCurve as NormTableData["percentileCurve"]) ?? undefined,
     };
   };
 

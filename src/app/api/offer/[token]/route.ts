@@ -12,6 +12,7 @@ import { prisma } from "@/lib/db";
 import { apiError, apiOk, parseBody, rateLimit, withErrorHandling } from "@/lib/api";
 import { hashToken } from "@/lib/crypto";
 import { audit, AUDIT_ACTIONS } from "@/lib/audit";
+import { recordHireFromOffer } from "@/lib/validation/service";
 import { canTransition } from "@/lib/ats/offers";
 import { logRequisitionEvent } from "@/lib/ats/service";
 
@@ -105,6 +106,22 @@ export const POST = withErrorHandling(async (req, ctx) => {
     entityId: offer.id,
     newValue: { decision: target },
   });
+
+  if (target === "ACCEPTED") {
+    // Open the employment record now, while the link between this person, the
+    // requisition, and the attempt their scores came from is still to hand.
+    // Reconstructing it a year later, when someone finally wants to know
+    // whether the assessment predicted anything, is guesswork.
+    //
+    // Deliberately outside the transaction and deliberately swallowed: a
+    // candidate accepting their offer must never see an error because the
+    // research bookkeeping failed.
+    try {
+      await recordHireFromOffer(offer.id);
+    } catch (err) {
+      console.error("[offer] could not record hire", err instanceof Error ? err.message : err);
+    }
+  }
 
   return apiOk({ status: target });
 });

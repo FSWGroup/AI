@@ -74,6 +74,12 @@ model User {
   socialChecksReviewed  SocialMediaCheck[]      @relation("SocialCheckReviewer")
   socialChecksRequested SocialMediaCheck[]      @relation("SocialCheckRequestedBy")
   backgroundChecksRequested BackgroundCheck[]   @relation("BackgroundCheckRequestedBy")
+  hiresManaged          Hire[]                  @relation("HireManager")
+  hiresCreated          Hire[]                  @relation("HireCreatedBy")
+  performanceReviews    PerformanceReview[]     @relation("PerformanceRater")
+  performanceMetrics    PerformanceMetric[]     @relation("MetricCreatedBy")
+  studiesCreated        ValidationStudy[]       @relation("StudyCreatedBy")
+  studiesComputed       ValidationStudy[]       @relation("StudyComputedBy")
 }
 
 model Session {
@@ -395,7 +401,10 @@ model JobProfile {
   concernRules AreaOfConcernRule[]
   aiAnalyses  AiAnalysis[]
   requisitions Requisition[]
+  hires       Hire[]
+  validationStudies ValidationStudy[]
 }
+
 
 model JobDimensionBenchmark {
   id           String     @id @default(cuid())
@@ -486,6 +495,7 @@ model Candidate {
   notes        CandidateNote[]
   documents    CandidateDocument[]
   applications Application[]
+  hires        Hire[]
 
   @@index([email])
 }
@@ -586,6 +596,7 @@ model Attempt {
   accommodations  AccommodationOverride[]
   documents       CandidateDocument[]
   aiAnalyses      AiAnalysis[]
+  hire            Hire?
 
   @@index([candidateId])
   @@index([jobOpeningId])
@@ -674,12 +685,25 @@ model NormTable {
   /// Ordered raw-score (or theta) upper bounds for bands 1..8; band 9 above.
   /// [{ "band": 1, "maxRaw": 4 }, ...] or z-thresholds per methodology.
   thresholds          Json
+  /// Raw-to-percentile curve from the norming sample, one point per whole
+  /// percentile: [{ "raw": 12, "percentile": 40 }, ...]. Lets a report state
+  /// where a person actually stands rather than approximating it from the
+  /// midpoint of their band.
+  percentileCurve     Json?
+  /// ACTIVE | DRAFT | RETIRED. Only ACTIVE tables band new attempts, and
+  /// only one per construct is ACTIVE at a time.
   status              String   @default("ACTIVE")
+  /// The validity study this table was generated from, when it came from one.
+  /// A table with no study behind it is an externally supplied norm and says
+  /// so in `methodology`.
+  sourceStudyId       String?
+  sourceStudy         ValidationStudy? @relation(fields: [sourceStudyId], references: [id], onDelete: SetNull)
   createdAt           DateTime @default(now())
 
   scores Score[]
 
   @@index([construct])
+  @@index([status])
 }
 
 model Score {
@@ -1036,6 +1060,7 @@ model Department {
   createdAt DateTime @default(now())
 
   requisitions Requisition[]
+  hires        Hire[]
 }
 
 model Location {
@@ -1052,6 +1077,7 @@ model Location {
   createdAt DateTime @default(now())
 
   requisitions Requisition[]
+  hires        Hire[]
 
   @@unique([name, country])
 }
@@ -1132,6 +1158,7 @@ model Requisition {
   offers       Offer[]
   events       RequisitionEvent[]
   reviewRounds ReviewRound[]
+  hires        Hire[]
 
   @@index([status])
   @@index([departmentId])
@@ -1317,6 +1344,7 @@ model Application {
   reviewRounds     ReviewRound[]
   socialMediaCheck SocialMediaCheck?
   backgroundCheck  BackgroundCheck?
+  hire             Hire?
   /// The assessment invitation issued for this application, if any.
   invitations      Invitation[]
 
@@ -1684,6 +1712,7 @@ model Offer {
   updatedAt     DateTime    @updatedAt
 
   approvals OfferApproval[]
+  hire      Hire?
 
   @@index([applicationId])
   @@index([status])
@@ -2018,4 +2047,274 @@ model BackgroundCheckEvent {
   occurredAt DateTime       @default(now())
 
   @@index([checkId, occurredAt])
+}
+
+// ---------------------------------------------------------------------------
+// Criterion validation: hires, post-hire performance, validity studies
+//
+// This is the part of the platform that lets the assessment stop making
+// claims and start earning them. Nothing in here changes a candidate's
+// score. It records what happened AFTER the hire, and asks whether the
+// scores predicted it.
+// ---------------------------------------------------------------------------
+
+enum HireStatus {
+  ACTIVE
+  ON_LEAVE
+  DEPARTED_VOLUNTARY
+  DEPARTED_INVOLUNTARY
+}
+
+/// An employment record: the bridge between a candidate we assessed and an
+/// employee whose performance we can observe. Created when an offer is
+/// accepted, or entered by hand for hires that predate the platform.
+model Hire {
+  id          String    @id @default(cuid())
+  candidateId String
+  candidate   Candidate @relation(fields: [candidateId], references: [id], onDelete: Cascade)
+  /// The assessment attempt supplying this hire's predictor scores. Frozen at
+  /// creation: a study that silently swapped in a later attempt would be
+  /// reporting on a different predictor than the one it names.
+  attemptId   String?   @unique
+  attempt     Attempt?  @relation(fields: [attemptId], references: [id], onDelete: SetNull)
+  applicationId String? @unique
+  application Application? @relation(fields: [applicationId], references: [id], onDelete: SetNull)
+  offerId     String?   @unique
+  offer       Offer?    @relation(fields: [offerId], references: [id], onDelete: SetNull)
+  jobProfileId String?
+  jobProfile  JobProfile? @relation(fields: [jobProfileId], references: [id], onDelete: SetNull)
+  requisitionId String?
+  requisition Requisition? @relation(fields: [requisitionId], references: [id], onDelete: SetNull)
+  jobTitle    String
+  departmentId String?
+  department  Department? @relation(fields: [departmentId], references: [id], onDelete: SetNull)
+  locationId  String?
+  location    Location?  @relation(fields: [locationId], references: [id], onDelete: SetNull)
+  /// Who rates this person. Reviews are requested from them by cycle.
+  managerId   String?
+  manager     User?     @relation("HireManager", fields: [managerId], references: [id], onDelete: SetNull)
+  hiredAt     DateTime
+  status      HireStatus @default(ACTIVE)
+  endedAt     DateTime?
+  /// Free text. Never used as a criterion on its own — involuntary exit is
+  /// recorded in `status`, and reasons vary too much to code automatically.
+  endReason   String?
+  createdById String?
+  createdBy   User?     @relation("HireCreatedBy", fields: [createdById], references: [id], onDelete: SetNull)
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  reviews PerformanceReview[]
+  metrics PerformanceMetric[]
+
+  @@index([candidateId])
+  @@index([jobProfileId])
+  @@index([status])
+  @@index([hiredAt])
+}
+
+enum PerformanceCycleKind {
+  DAY_30
+  DAY_90
+  DAY_180
+  ANNUAL
+  AD_HOC
+}
+
+enum PerformanceCycleStatus {
+  DRAFT
+  OPEN
+  CLOSED
+}
+
+/// A round of performance ratings. Either tenure-anchored (`dueAfterDays`,
+/// e.g. every hire's 90-day review) or calendar-anchored (`opensAt`).
+model PerformanceCycle {
+  id           String @id @default(cuid())
+  name         String
+  kind         PerformanceCycleKind
+  /// Days after the hire date at which this cycle falls due for a hire.
+  /// Null for calendar cycles that fall due for everyone at once.
+  dueAfterDays Int?
+  opensAt      DateTime?
+  closesAt     DateTime?
+  status       PerformanceCycleStatus @default(DRAFT)
+  /// Performance criterion keys rated in this cycle, in display order.
+  /// Keys come from src/content/performance-criteria.ts.
+  criterionKeys String[]
+  instructions String?
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  reviews PerformanceReview[]
+
+  @@index([status])
+}
+
+enum PerformanceReviewStatus {
+  DRAFT
+  SUBMITTED
+}
+
+/// One rater's ratings of one hire in one cycle. Multiple raters per hire is
+/// the point, not an edge case: two independent ratings are what make the
+/// criterion's own reliability estimable.
+model PerformanceReview {
+  id       String @id @default(cuid())
+  hireId   String
+  hire     Hire   @relation(fields: [hireId], references: [id], onDelete: Cascade)
+  cycleId  String
+  cycle    PerformanceCycle @relation(fields: [cycleId], references: [id], onDelete: Cascade)
+  raterId  String
+  rater    User   @relation("PerformanceRater", fields: [raterId], references: [id], onDelete: Cascade)
+  status   PerformanceReviewStatus @default(DRAFT)
+  /// Overall effectiveness, 1-5. Rated independently of the criterion rows so
+  /// it is not a mechanical average of them.
+  overallRating Int?
+  /// Would you hire this person again, knowing what you know now?
+  wouldRehire   Boolean?
+  comment       String?
+  submittedAt   DateTime?
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  ratings PerformanceRating[]
+
+  @@unique([hireId, cycleId, raterId])
+  @@index([raterId, status])
+  @@index([cycleId, status])
+}
+
+model PerformanceRating {
+  id           String @id @default(cuid())
+  reviewId     String
+  review       PerformanceReview @relation(fields: [reviewId], references: [id], onDelete: Cascade)
+  criterionKey String
+  /// 1-5 behaviourally anchored rating.
+  value        Int
+  note         String?
+
+  @@unique([reviewId, criterionKey])
+}
+
+/// An objective post-hire outcome: quota attainment, output per week, error
+/// rate. Kept apart from ratings because it does not share their rater bias
+/// and does not share their scale.
+model PerformanceMetric {
+  id          String @id @default(cuid())
+  hireId      String
+  hire        Hire   @relation(fields: [hireId], references: [id], onDelete: Cascade)
+  key         String
+  label       String
+  value       Float
+  unit        String?
+  /// True when a higher value is better. A study correlating against a
+  /// lower-is-better metric flips the sign so "positive r" always means
+  /// "the assessment predicted the good outcome".
+  higherIsBetter Boolean @default(true)
+  periodStart DateTime
+  periodEnd   DateTime
+  source      String?
+  createdById String?
+  createdBy   User?  @relation("MetricCreatedBy", fields: [createdById], references: [id], onDelete: SetNull)
+  createdAt   DateTime @default(now())
+
+  @@unique([hireId, key, periodStart, periodEnd])
+  @@index([key])
+}
+
+enum ValidationCriterionKind {
+  /// Mean of raters' overall effectiveness ratings.
+  OVERALL_RATING
+  /// Mean of one named performance criterion's ratings.
+  COMPETENCY_RATING
+  /// Mean across several named criteria (a composite criterion).
+  COMPOSITE_RATING
+  /// A named objective metric.
+  METRIC
+  /// Still employed at N days. A 0/1 criterion — point-biserial correlation.
+  RETENTION
+}
+
+enum ValidationStudyStatus {
+  DRAFT
+  COMPUTED
+  PUBLISHED
+  ARCHIVED
+}
+
+/// A concurrent or predictive validity study: one criterion, one sample,
+/// one set of coefficients, recomputable and dated.
+model ValidationStudy {
+  id            String @id @default(cuid())
+  name          String
+  description   String?
+  jobProfileId  String?
+  jobProfile    JobProfile? @relation(fields: [jobProfileId], references: [id], onDelete: SetNull)
+  criterionKind ValidationCriterionKind
+  /// Criterion key(s): a criterion key, several of them, or a metric key.
+  criterionKeys String[]
+  /// Days for a RETENTION criterion.
+  retentionDays Int?
+  /// Restrict to these cycle kinds; empty means every submitted review.
+  cycleKinds    PerformanceCycleKind[]
+  /// Hires made on or after this date only. Lets a study exclude a period
+  /// before the current form version was in use.
+  hiredFrom     DateTime?
+  hiredTo       DateTime?
+  /// Correct observed coefficients for range restriction using the applicant
+  /// pool's own standard deviation, and for criterion unreliability using the
+  /// interrater reliability measured in this sample. Both are reported
+  /// alongside the observed value, never in place of it.
+  correctRangeRestriction Boolean @default(true)
+  correctAttenuation      Boolean @default(true)
+  status        ValidationStudyStatus @default(DRAFT)
+  /// Sample size, criterion reliability, gate verdicts, warnings.
+  summary       Json?
+  computedAt    DateTime?
+  computedById  String?
+  computedBy    User?  @relation("StudyComputedBy", fields: [computedById], references: [id], onDelete: SetNull)
+  createdById   String?
+  createdBy     User?  @relation("StudyCreatedBy", fields: [createdById], references: [id], onDelete: SetNull)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  coefficients ValidityCoefficient[]
+  normTables   NormTable[]
+
+  @@index([status])
+  @@index([jobProfileId])
+}
+
+/// One predictor's relationship with the study's criterion.
+model ValidityCoefficient {
+  id        String @id @default(cuid())
+  studyId   String
+  study     ValidationStudy @relation(fields: [studyId], references: [id], onDelete: Cascade)
+  /// Exactly one of these identifies the predictor.
+  construct    Construct?
+  compositeKey String?
+  label     String
+  n         Int
+  /// Observed Pearson r between predictor and criterion in this sample.
+  r         Float
+  ciLow     Float
+  ciHigh    Float
+  pValue    Float
+  /// Benjamini-Hochberg adjusted p across the predictors in this study.
+  qValue    Float
+  /// Corrected for range restriction (Thorndike Case II), when computed.
+  rRangeCorrected Float?
+  /// Additionally corrected for criterion unreliability, when computed.
+  rFullyCorrected Float?
+  /// Predictor SD in the hired sample and in the applicant pool.
+  sdRestricted   Float?
+  sdUnrestricted Float?
+  predictorMean  Float?
+  /// INSUFFICIENT | PRELIMINARY | SUPPORTED — the honest sample-size verdict.
+  verdict   String
+  createdAt DateTime @default(now())
+
+  @@unique([studyId, construct, compositeKey])
+  @@index([studyId])
 }

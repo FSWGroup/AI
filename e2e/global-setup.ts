@@ -23,8 +23,10 @@ export default async function globalSetup(): Promise<void> {
       return;
     }
 
+    // By version number, not name: a database seeded before the Talent Scout
+    // rename holds the same form under its old name.
     const base = await prisma.assessmentVersion.findFirstOrThrow({
-      where: { name: "FSW Talent Scout Standard", versionNumber: 1 },
+      where: { versionNumber: 1 },
       include: { formQuestions: true },
     });
 

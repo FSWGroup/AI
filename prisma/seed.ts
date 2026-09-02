@@ -126,9 +126,20 @@ async function main(): Promise<void> {
   }
 
   // ---- Assessment version v1 ---------------------------------------------------
+  // Located by version number, not by name. An instance seeded before the
+  // Talent Scout rename holds this same form under its old name; matching on
+  // the name would create a SECOND active v1 beside it, and two active forms
+  // means candidates competing for one opening can sit different assessments.
   let version = await prisma.assessmentVersion.findFirst({
-    where: { name: "FSW Talent Scout Standard", versionNumber: 1 },
+    where: { versionNumber: 1 },
   });
+  if (version && version.name !== "FSW Talent Scout Standard") {
+    version = await prisma.assessmentVersion.update({
+      where: { id: version.id },
+      data: { name: "FSW Talent Scout Standard" },
+    });
+    console.log("Renamed the existing v1 assessment form to FSW Talent Scout Standard.");
+  }
   if (!version) {
     version = await prisma.assessmentVersion.create({
       data: {

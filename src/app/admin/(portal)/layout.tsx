@@ -40,6 +40,20 @@ export default async function AdminPortalLayout({
       show: can(user.role, "VIEW_QUALITY"),
     },
     {
+      href: "/admin/validation",
+      label: "Validation",
+      show: can(user.role, "VIEW_VALIDATION"),
+    },
+    {
+      href: "/admin/validation/reviews",
+      label: "Performance Reviews",
+      // Managers get here directly: they hold no other validation permission,
+      // and the reviews they file are the criterion everything else rests on.
+      show:
+        can(user.role, "SUBMIT_PERFORMANCE_REVIEW") &&
+        !can(user.role, "VIEW_VALIDATION"),
+    },
+    {
       href: "/admin/audit",
       label: "Audit Log",
       show: can(user.role, "VIEW_AUDIT"),

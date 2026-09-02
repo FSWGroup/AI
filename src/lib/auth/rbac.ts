@@ -43,6 +43,17 @@ export const PERMISSIONS = [
   /// Conduct a social review. Deliberately separate from deciding.
   "CONDUCT_SOCIAL_REVIEW",
   "MANAGE_BACKGROUND_CHECKS",
+  // Validation
+  /// Create and maintain employment records for people we hired.
+  "MANAGE_HIRES",
+  /// Rate a hire's on-the-job performance. Held by managers, not analysts.
+  "SUBMIT_PERFORMANCE_REVIEW",
+  /// Read validity studies and norm tables.
+  "VIEW_VALIDATION",
+  /// Run studies, generate norm tables, and activate them. Activating a norm
+  /// table changes what every future band means, so it sits with the people
+  /// who own the instrument rather than with the people using its output.
+  "MANAGE_VALIDATION",
 ] as const;
 export type Permission = (typeof PERMISSIONS)[number];
 
@@ -68,6 +79,9 @@ const ROLE_PERMISSIONS: Record<UserRole, Permission[]> = {
     "MANAGE_SOCIAL_CHECKS",
     "CONDUCT_SOCIAL_REVIEW",
     "MANAGE_BACKGROUND_CHECKS",
+    "MANAGE_HIRES",
+    "SUBMIT_PERFORMANCE_REVIEW",
+    "VIEW_VALIDATION",
   ],
   // A hiring manager runs their own roles: they move candidates, schedule
   // and score interviews, and approve what they are named on. They do not
@@ -85,12 +99,17 @@ const ROLE_PERMISSIONS: Record<UserRole, Permission[]> = {
     // The boss sees every rating and all the written feedback. They do not
     // conduct social reviews — separating that from deciding is the control.
     "VIEW_ALL_REVIEWS",
+    // Managers rate the people they hired. That rating is the criterion every
+    // validity study rests on, so it comes from the person who sees the work.
+    "SUBMIT_PERFORMANCE_REVIEW",
   ],
   ASSESSMENT_ADMIN: [
     "MANAGE_QUESTIONS",
     "MANAGE_BENCHMARKS",
     "MANAGE_NORMS",
     "VIEW_QUALITY",
+    "VIEW_VALIDATION",
+    "MANAGE_VALIDATION",
   ],
   VIEWER: ["VIEW_CANDIDATES", "VIEW_REPORTS", "VIEW_REQUISITIONS"],
 };

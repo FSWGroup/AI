@@ -121,8 +121,22 @@ See `.env.example`. Summary:
   scoring version + norms ⇒ identical scores). Raw scores are never
   destroyed. 1-9 bands are **provisional** internal bands until a real
   `NormTable` (population, sample size, methodology, effective date) is
-  installed, after which the construct reports validated **stanines**. See
+  activated, after which that construct — and only that construct — reports
+  validated **stanines**. Norm tables are generated from this instance's own
+  applicant score distributions; see below. Details in
   `docs/ASSESSMENT-METHODOLOGY.md`.
+- **Validation** — the part that lets the assessment stop making claims and
+  start earning them. Accepting an offer opens an employment record frozen to
+  the attempt that informed the decision; performance cycles collect 1-5
+  behaviorally anchored manager ratings on job outcomes (deliberately *not*
+  named after the assessment's own dimensions); a study correlates the two
+  and reports r with a 95% interval, a false-discovery-rate-adjusted q, and
+  corrections for range restriction and criterion unreliability applied only
+  where the data supports them. Under 20 hires it reports no coefficient at
+  all; under 100 everything stays preliminary. A "no relationship" result is
+  reported as a finding, not hidden. It also generates local norm tables and
+  a technical report shaped to 29 CFR 1607.15B. It never changes a benchmark
+  or applies a finding automatically. See `docs/VALIDATION-ROADMAP.md`.
 - **Benchmarks** — per-job desired ranges (1-9) per dimension, edited
   visually; above range is not automatically better. Configurable
   areas-of-concern rules flag "Additional Interview Attention Recommended" —
@@ -205,8 +219,10 @@ Netlify Blobs; PDFs via the report's Print button there).
 - `docs/ASSESSMENT-METHODOLOGY.md` — constructs, item types, scoring,
   validity indicators, bands vs stanines, composites, selection rules.
 - `docs/RECORDING-PRIVACY.md` — recording architecture and protections.
-- `docs/VALIDATION-ROADMAP.md` — what FSW must do before treating results
-  as validated predictors.
+- `docs/VALIDATION-ROADMAP.md` — what FSW must do before treating results as
+  validated predictors, and how the built-in validation study engine
+  (post-hire performance capture, validity coefficients, local norms,
+  technical report) covers Phases 3 and 4 of it.
 - `docs/RECRUITING.md` — the ATS: requisitions, job feeds and multi-source
   intake, pipeline, structured interviewing, offers, and funnel-wide adverse
   impact.
@@ -222,8 +238,12 @@ Netlify Blobs; PDFs via the report's Print button there).
 ## Known limitations
 
 - Real email delivery requires wiring a provider (`src/lib/email/index.ts`).
-- Norm tables must be imported from actual calibration data; until then all
-  bands are provisional and labeled as such.
+- Norm tables are generated from this instance's own score distributions
+  (Validation → Norm tables) or imported; either way a dimension reports
+  provisional bands until a table for it is activated, and every report says
+  which dimensions are which. Nothing activates below 200 cases.
+- The validation study engine reports relationships; it never applies them.
+  No study changes a benchmark, reweights a dimension, or alters a decision.
 - **Getting results as a PDF.** A candidate's **Download PDF** tab exports
   the complete assessment as one file — summary and score sheet first, then
   every section including the interview guide, session record, and integrity

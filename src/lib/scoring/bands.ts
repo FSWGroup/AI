@@ -14,6 +14,7 @@
  */
 
 import type { BandResult, NormTableData } from "./types";
+import { percentileFromCurve } from "@/lib/validation/norms";
 
 /**
  * Provisional band thresholds over the 0-100 scaled score.
@@ -59,18 +60,29 @@ export function stanineFromNormTable(
   rawScore: number,
   table: NormTableData,
 ): BandResult {
+  // Prefer the norming sample's own raw-to-percentile curve. Without it the
+  // only percentile available is the midpoint of the band, which would
+  // report everyone in band 5 as exactly the 50th percentile.
+  const curved = table.percentileCurve?.length
+    ? percentileFromCurve(table.percentileCurve, rawScore)
+    : undefined;
   const sorted = [...table.thresholds].sort((a, b) => a.band - b.band);
   for (const t of sorted) {
     if (rawScore <= t.maxRaw) {
       return {
         band: t.band,
         bandType: "STANINE",
-        percentile: t.percentile,
+        percentile: curved ?? t.percentile,
         normTableId: table.id,
       };
     }
   }
-  return { band: 9, bandType: "STANINE", normTableId: table.id };
+  return {
+    band: 9,
+    bandType: "STANINE",
+    percentile: curved,
+    normTableId: table.id,
+  };
 }
 
 /**

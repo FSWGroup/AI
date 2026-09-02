@@ -144,7 +144,7 @@ export async function generateReport(attemptId: string): Promise<string> {
           jobProfile: { include: { benchmarks: true, concernRules: true } },
         },
       },
-      scores: true,
+      scores: { include: { normTable: true } },
       compositeScores: true,
       integrityEvents: true,
     },
@@ -168,6 +168,9 @@ export async function generateReport(attemptId: string): Promise<string> {
   const bands: Partial<Record<Construct, number>> = {};
   let usedStanine = false;
   let usedProvisional = false;
+  // A stanine means nothing without the group it was normed against, so the
+  // reference groups actually used are collected and named on the report.
+  const normSources = new Map<string, number>();
 
   const scoredConstructs: Construct[] = [
     ...APTITUDE_CONSTRUCTS,
@@ -177,8 +180,12 @@ export async function generateReport(attemptId: string): Promise<string> {
     const score = attempt.scores.find((s) => s.construct === construct);
     if (!score) continue;
     bands[construct] = score.band;
-    if (score.bandType === "STANINE") usedStanine = true;
-    else usedProvisional = true;
+    if (score.bandType === "STANINE") {
+      usedStanine = true;
+      if (score.normTable) {
+        normSources.set(score.normTable.population, score.normTable.sampleSize);
+      }
+    } else usedProvisional = true;
 
     const dm = dimensionMeta[construct];
     const bm = benchmarks.find((b) => b.construct === construct && b.enabled);
@@ -411,11 +418,7 @@ export async function generateReport(attemptId: string): Promise<string> {
       reportVersion: 1,
       attemptNumber: attempt.attemptNumber,
       recordId: attempt.recordId,
-      bandTypeNote: usedStanine
-        ? usedProvisional
-          ? "Some dimensions use validated stanines; others use provisional internal 1-9 bands pending norm calibration."
-          : "Scores use validated stanine norms."
-        : "All 1-9 scores are provisional internal bands. Validated stanines become available once FSW installs norm tables from calibration data.",
+      bandTypeNote: bandTypeNote(usedStanine, usedProvisional, normSources),
     },
     executiveSummary: {
       strongestAlignment,
@@ -486,4 +489,29 @@ async function getDimensionMeta(): Promise<
     };
   }
   return map;
+}
+
+/**
+ * The sentence that tells a reader what kind of 1-9 number they are looking at.
+ *
+ * Reports routinely mix the two: a dimension whose norm table has reached its
+ * sample size is a stanine, and the one next to it on the same page may still
+ * be provisional. Saying which is which — and naming the group each stanine was
+ * normed against — is what keeps the number honest.
+ */
+function bandTypeNote(
+  usedStanine: boolean,
+  usedProvisional: boolean,
+  normSources: Map<string, number>,
+): string {
+  if (!usedStanine) {
+    return "All 1-9 scores are provisional internal bands, from a documented but arbitrary conversion. They become validated stanines for a dimension once a norm table built from a large enough reference group is activated for it.";
+  }
+  const groups = [...normSources.entries()]
+    .map(([population, n]) => `${population} (n = ${n})`)
+    .join("; ");
+  const against = groups ? ` Stanines are relative to: ${groups}.` : "";
+  return usedProvisional
+    ? `Mixed: some dimensions are validated stanines, others are still provisional internal 1-9 bands. Each dimension says which it is.${against}`
+    : `All 1-9 scores are validated stanines.${against}`;
 }
