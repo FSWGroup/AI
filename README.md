@@ -224,9 +224,9 @@ Netlify Blobs; PDFs via the report's Print button there).
   (post-hire performance capture, validity coefficients, local norms,
   technical report) covers Phases 3 and 4 of it.
 - `docs/RECRUITING.md` — the ATS: requisitions, job feeds and multi-source
-  intake, pipeline, structured interviewing, work samples with blind
-  multi-grader rubrics, the consent-gated talent pool, offers, and funnel-wide
-  adverse impact.
+  intake, pipeline, structured interviewing, candidate self-scheduling across
+  time zones, work samples with blind multi-grader rubrics, the consent-gated
+  talent pool, offers, and funnel-wide adverse impact.
 - `docs/REVIEWS-AND-CHECKS.md` — independent team review and the consolidated
   ratings view, interviewer calibration, the consent-based social media
   workflow, and the Checkr background-check integration with the FCRA
@@ -240,6 +240,13 @@ Netlify Blobs; PDFs via the report's Print button there).
 ## Known limitations
 
 - Real email delivery requires wiring a provider (`src/lib/email/index.ts`).
+  Interview reminders are queued on booking and sent by
+  `npm run reminders:run` on a cron; without that cron they are queued and
+  never sent.
+- Only the internal calendar provider ships. It prevents double-booking from
+  this platform’s own interviews and emits .ics files that work everywhere,
+  but it cannot see commitments outside the platform. `src/lib/calendar/` is
+  the seam for Google or Microsoft.
 - Norm tables are generated from this instance's own score distributions
   (Validation → Norm tables) or imported; either way a dimension reports
   provisional bands until a table for it is activated, and every report says

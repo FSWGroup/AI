@@ -118,6 +118,76 @@ Aggregation surfaces a **split panel** as a split rather than averaging it
 away. An average of 2.5 hides a disagreement, which is exactly what a hiring
 manager most needs to see.
 
+## Self-scheduling
+
+The back-and-forth to book one interview costs more recruiter time than
+anything else in the pipeline, and every day of it is a day the candidate
+spends talking to someone else. A scheduling link replaces it: the candidate
+picks from times the panel is actually free.
+
+### Time is stored in UTC and shown in yours
+
+Every instant in the database is UTC. Availability is written the way people
+think about it — "Tuesdays, 9 to 5" — which is a statement about a wall clock
+in a particular place, so every interviewer has an IANA time zone and windows
+are converted through it.
+
+Conversion uses `Intl.DateTimeFormat` against the runtime's own zone database
+(`src/lib/scheduling/timezone.ts`), so it stays correct through
+daylight-saving changes with no table to maintain. Somebody who said "9am"
+means 9am on both sides of a clock change, even though the two UTC instants
+are an hour apart — there is a test for exactly that.
+
+The candidate's page detects their browser's zone, renders every time in it,
+and **names the zone on the page**. Every scheduling mix-up starts with a time
+shown without saying whose clock it is on.
+
+### Panel coordination
+
+A slot is offered only when **every required panelist is free for the whole of
+it**. Optional panelists never remove a slot; they are reported alongside so a
+recruiter can see which times get the fullest panel.
+
+Offering a time that then has to be taken back is worse than offering fewer
+times, because the candidate has already told their current employer they need
+that hour. So: no slot that overruns the end of a free window, a minimum
+notice period, and a **re-check at the moment of booking** — the list on the
+candidate's screen was computed when their page loaded, and this is what stops
+two candidates booking the same panel for the same hour.
+
+### Reschedule, cancel, remind
+
+Both are on the same link. A candidate who needs to move an interview at 9pm
+should not have to find a recruiter's email address. Reschedules are capped
+(twice by default) and the interview being moved does not block its own new
+time.
+
+Reminders are queued when an interview is booked — candidate at 24 hours and
+1 hour, panelists at 24 hours — and **rewritten from scratch on every
+booking**, so a moved interview never leaves a reminder pointing at the old
+time. Cancelling marks them cancelled rather than leaving them to fire. Send
+them with `npm run reminders:run` on a cron; the job marks each sent before
+attempting delivery, because two reminders read as a mistake and none reads as
+an outage.
+
+### The calendar seam
+
+`src/lib/calendar/` is modelled on the storage provider: one interface, an
+internal default, room for Google or Microsoft later without touching the
+scheduling logic.
+
+The internal default is **not a stub**. Busy time comes from this platform's
+own scheduled interviews, which is the source that actually prevents
+double-booking a panel, and every interview produces an **.ics file**, which
+every calendar application understands with no integration, no consent screen
+and no token to refresh. For a candidate — who by definition has no account
+with us — it is the only mechanism that can work at all.
+
+What it cannot see is a dentist appointment. An organization that needs that
+connects a real provider; `getCalendar()` is the one place that changes, and
+`readsExternalBusy` says plainly whether the platform can see beyond its own
+records.
+
 ## Work samples
 
 A candidate does a piece of the actual job, and more than one person grades it

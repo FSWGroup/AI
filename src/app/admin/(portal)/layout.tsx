@@ -40,6 +40,12 @@ export default async function AdminPortalLayout({
       show: can(user.role, "VIEW_QUALITY"),
     },
     {
+      href: "/admin/availability",
+      label: "My Availability",
+      // Everyone who might sit on a panel, which is everyone.
+      show: true,
+    },
+    {
       href: "/admin/talent",
       label: "Talent Pool",
       show: can(user.role, "MANAGE_TALENT_POOL"),

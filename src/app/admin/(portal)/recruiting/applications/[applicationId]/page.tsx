@@ -14,6 +14,7 @@ import { ReviewPanel } from "@/components/admin/ReviewPanel";
 import { ChecksPanel } from "@/components/admin/ChecksPanel";
 import { WorkSamplePanel } from "@/components/admin/WorkSamplePanel";
 import { KeepInTouchPanel } from "@/components/admin/KeepInTouchPanel";
+import { SelfSchedulePanel } from "@/components/admin/SelfSchedulePanel";
 import { visibleReviews, reviewProgress, buildConsensus } from "@/lib/ats/reviews";
 import { categoryLabel } from "@/lib/ats/social-check";
 import { isCheckrConfigured } from "@/lib/checkr/client";
@@ -68,6 +69,10 @@ export default async function ApplicationPage({
         orderBy: { createdAt: "desc" },
       },
       offers: { orderBy: { createdAt: "desc" } },
+      schedulingRequests: {
+        include: { interview: { select: { id: true, scheduledAt: true } } },
+        orderBy: { createdAt: "desc" },
+      },
       workSamples: {
         include: {
           workSample: { select: { id: true, title: true, requiredGraders: true } },
@@ -459,6 +464,27 @@ export default async function ApplicationPage({
               expiresAt={
                 application.candidate.talentProfile?.expiresAt?.toISOString() ?? null
               }
+            />
+          )}
+
+          {can(user.role, "MANAGE_INTERVIEWS") && (
+            <SelfSchedulePanel
+              applicationId={application.id}
+              teamUsers={teamUsers.map((u) => ({ id: u.id, name: u.name }))}
+              kits={kits}
+              stages={application.requisition.stages.map((s) => ({
+                id: s.id,
+                name: s.name,
+                kind: s.kind,
+              }))}
+              existing={application.schedulingRequests.map((r) => ({
+                id: r.id,
+                reference: r.reference,
+                title: r.title,
+                status: r.status,
+                scheduledAt: r.interview?.scheduledAt?.toISOString() ?? null,
+                interviewId: r.interview?.id ?? null,
+              }))}
             />
           )}
 

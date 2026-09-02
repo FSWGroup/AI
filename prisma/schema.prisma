@@ -41,6 +41,9 @@ model User {
   passwordHash String
   role         UserRole
   active       Boolean  @default(true)
+  /// IANA zone this person works in. A distributed panel does not share one,
+  /// and availability written as "9 to 5" means nothing without it.
+  timeZone     String   @default("Asia/Manila")
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
 
@@ -88,6 +91,11 @@ model User {
   talentPoolsCreated    TalentPool[]            @relation("TalentPoolCreatedBy")
   talentPoolMembersAdded TalentPoolMember[]     @relation("TalentPoolMemberAddedBy")
   talentOutreachSent    TalentOutreach[]        @relation("TalentOutreachSentBy")
+  availabilityRules     AvailabilityRule[]
+  availabilityExceptions AvailabilityException[]
+  schedulingRequests    SchedulingRequest[]     @relation("SchedulingRequestCreatedBy")
+  schedulingPanels      SchedulingPanelist[]
+  scheduledReminders    ScheduledReminder[]
 }
 
 model Session {
@@ -166,6 +174,9 @@ model OrgSettings {
   recordingAccessRoles      String[] @default(["SUPER_ADMIN", "HR_ADMIN"])
   storageConfigured         Boolean  @default(false)
   httpsConfirmed            Boolean  @default(false)
+  /// IANA zone the organization schedules in. Every stored instant is UTC;
+  /// this decides how availability windows and slots are rendered.
+  timeZone                  String   @default("Asia/Manila")
   updatedAt                 DateTime @updatedAt
 }
 
@@ -1253,6 +1264,7 @@ model PipelineStage {
   applications      Application[]
   stageHistory      ApplicationStageEvent[]
   interviews        Interview[]
+  schedulingRequests SchedulingRequest[]
 
   @@unique([requisitionId, orderIndex])
   @@index([requisitionId])
@@ -1362,6 +1374,7 @@ model Application {
   backgroundCheck  BackgroundCheck?
   hire             Hire?
   workSamples      WorkSampleAssignment[]
+  schedulingRequests SchedulingRequest[]
   /// The assessment invitation issued for this application, if any.
   invitations      Invitation[]
 
@@ -1497,6 +1510,7 @@ model InterviewKit {
   questions    KitQuestion[]
   stages       PipelineStage[]
   interviews   Interview[]
+  schedulingRequests SchedulingRequest[]
   reviewRounds ReviewRound[]
 }
 
@@ -1555,6 +1569,8 @@ model Interview {
 
   participants InterviewParticipant[]
   scorecards   Scorecard[]
+  schedulingRequest SchedulingRequest?
+  reminders    ScheduledReminder[]
 
   @@index([applicationId])
   @@index([scheduledAt])
@@ -2657,4 +2673,138 @@ model TalentSuppression {
   /// "opted_out" | "requested_deletion" | "manual".
   reason    String @default("opted_out")
   createdAt DateTime @default(now())
+}
+
+// ---------------------------------------------------------------------------
+// Scheduling
+//
+// The back-and-forth to book one interview costs more recruiter time than
+// anything else in the pipeline, and every day of it is a day a candidate
+// spends talking to someone else.
+//
+// Every instant stored here is UTC. Availability is written in a person's own
+// zone and converted; a panel spread across zones is the normal case, not an
+// edge case, and "9 to 5" means nothing without knowing whose 9.
+// ---------------------------------------------------------------------------
+
+/// A recurring weekly window when someone is willing to interview, expressed
+/// in minutes from midnight in that user's own time zone.
+model AvailabilityRule {
+  id          String @id @default(cuid())
+  userId      String
+  user        User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  /// 0 = Sunday.
+  dayOfWeek   Int
+  startMinute Int
+  endMinute   Int
+  active      Boolean @default(true)
+  createdAt   DateTime @default(now())
+
+  @@index([userId, dayOfWeek])
+}
+
+/// A one-off change: a day off, or an extra window opened for a specific date.
+model AvailabilityException {
+  id          String @id @default(cuid())
+  userId      String
+  user        User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  /// The calendar date in the user's own zone, stored as midnight UTC.
+  date        DateTime
+  startMinute Int
+  endMinute   Int
+  /// False blocks the window; true opens one outside the weekly pattern.
+  available   Boolean @default(false)
+  reason      String?
+  createdAt   DateTime @default(now())
+
+  @@index([userId, date])
+}
+
+enum SchedulingRequestStatus {
+  OPEN
+  BOOKED
+  CANCELLED
+  EXPIRED
+}
+
+/// An invitation to a candidate to pick a time.
+model SchedulingRequest {
+  id            String @id @default(cuid())
+  applicationId String
+  application   Application @relation(fields: [applicationId], references: [id], onDelete: Cascade)
+  kitId         String?
+  kit           InterviewKit? @relation(fields: [kitId], references: [id], onDelete: SetNull)
+  stageId       String?
+  stage         PipelineStage? @relation(fields: [stageId], references: [id], onDelete: SetNull)
+  title         String
+  durationMinutes Int @default(45)
+  /// Shown to the candidate: what to expect, what to bring.
+  notes         String?
+  /// Where the interview happens. Copied onto the interview when booked.
+  meetingDetail String?
+  status        SchedulingRequestStatus @default(OPEN)
+  reference     String @unique
+  /// SHA-256 of the candidate's booking token.
+  tokenHash     String @unique
+  /// The window inside which slots may be offered.
+  earliestAt    DateTime
+  latestAt      DateTime
+  /// Hours of notice a candidate must give. Stops a 6am booking for 7am.
+  minNoticeHours Int @default(12)
+  /// The candidate's own zone, once we know it. Used for reminders.
+  candidateTimeZone String?
+  interviewId   String? @unique
+  interview     Interview? @relation(fields: [interviewId], references: [id], onDelete: SetNull)
+  rescheduleCount Int @default(0)
+  maxReschedules Int @default(2)
+  cancelledReason String?
+  createdById   String?
+  createdBy     User?  @relation("SchedulingRequestCreatedBy", fields: [createdById], references: [id], onDelete: SetNull)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  panelists SchedulingPanelist[]
+
+  @@index([applicationId])
+  @@index([status])
+}
+
+model SchedulingPanelist {
+  id        String @id @default(cuid())
+  requestId String
+  request   SchedulingRequest @relation(fields: [requestId], references: [id], onDelete: Cascade)
+  userId    String
+  user      User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  /// Required panelists must all be free for a slot to be offered. Optional
+  /// ones are invited to whatever the candidate picks.
+  required  Boolean @default(true)
+
+  @@unique([requestId, userId])
+  @@index([userId])
+}
+
+enum ReminderKind {
+  CANDIDATE_DAY_BEFORE
+  CANDIDATE_HOUR_BEFORE
+  PANELIST_DAY_BEFORE
+}
+
+/// A reminder due to be sent. Written when an interview is booked and marked
+/// sent when it goes out, so a retry cannot send it twice.
+model ScheduledReminder {
+  id          String @id @default(cuid())
+  interviewId String
+  interview   Interview @relation(fields: [interviewId], references: [id], onDelete: Cascade)
+  kind        ReminderKind
+  /// Who it goes to. Null recipient means the candidate.
+  userId      String?
+  user        User?  @relation(fields: [userId], references: [id], onDelete: Cascade)
+  dueAt       DateTime
+  sentAt      DateTime?
+  /// Set when the interview moved or was cancelled before this went out.
+  cancelledAt DateTime?
+  createdAt   DateTime @default(now())
+
+  @@unique([interviewId, kind, userId])
+  @@index([dueAt, sentAt])
 }

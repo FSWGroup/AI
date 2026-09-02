@@ -20,7 +20,8 @@
     "db:reset": "prisma migrate reset --force",
     "retention:run": "tsx scripts/run-retention.ts",
     "report:sample": "tsx scripts/generate-sample-report.ts",
-    "seed:ats": "tsx prisma/seed-ats.ts"
+    "seed:ats": "tsx prisma/seed-ats.ts",
+    "reminders:run": "tsx scripts/send-reminders.ts"
   },
   "prisma": {
     "seed": "tsx prisma/seed.ts"
