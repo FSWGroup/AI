@@ -80,6 +80,9 @@ model User {
   performanceMetrics    PerformanceMetric[]     @relation("MetricCreatedBy")
   studiesCreated        ValidationStudy[]       @relation("StudyCreatedBy")
   studiesComputed       ValidationStudy[]       @relation("StudyComputedBy")
+  workSamplesCreated    WorkSample[]            @relation("WorkSampleCreatedBy")
+  workSamplesAssigned   WorkSampleAssignment[]  @relation("WorkSampleAssignedBy")
+  workSampleGrades      WorkSampleGrade[]       @relation("WorkSampleGrader")
 }
 
 model Session {
@@ -403,6 +406,7 @@ model JobProfile {
   requisitions Requisition[]
   hires       Hire[]
   validationStudies ValidationStudy[]
+  workSamples WorkSample[]
 }
 
 
@@ -1216,6 +1220,7 @@ enum StageKind {
   APPLIED
   SCREEN
   ASSESSMENT
+  WORK_SAMPLE
   INTERVIEW
   REFERENCE
   OFFER
@@ -1345,6 +1350,7 @@ model Application {
   socialMediaCheck SocialMediaCheck?
   backgroundCheck  BackgroundCheck?
   hire             Hire?
+  workSamples      WorkSampleAssignment[]
   /// The assessment invitation issued for this application, if any.
   invitations      Invitation[]
 
@@ -2317,4 +2323,175 @@ model ValidityCoefficient {
 
   @@unique([studyId, construct, compositeKey])
   @@index([studyId])
+}
+
+// ---------------------------------------------------------------------------
+// Work samples
+//
+// A candidate does a piece of the actual job and someone grades it against a
+// rubric written before anyone saw the work. Of everything in this platform
+// this is the closest thing to watching someone do the job, which is why the
+// grading controls matter more here than anywhere else: an unblinded,
+// single-grader, rubric-free work sample is just an interview that takes
+// longer.
+// ---------------------------------------------------------------------------
+
+enum WorkSampleStatus {
+  DRAFT
+  ACTIVE
+  RETIRED
+}
+
+enum WorkSampleSubmissionKind {
+  TEXT
+  FILE
+  TEXT_AND_FILE
+}
+
+/// The task definition. Original content authored by the organization.
+model WorkSample {
+  id           String @id @default(cuid())
+  title        String
+  /// Shown to the candidate before they start.
+  summary      String?
+  /// The task itself. Shown once the timer starts.
+  instructions String
+  /// What "good" looks like, in the candidate's own terms. Shown with the
+  /// task: hiding the standard does not measure skill, it measures guessing.
+  successCriteria String?
+  submissionKind WorkSampleSubmissionKind @default(TEXT)
+  /// Null means untimed. A timed sample runs on the server clock.
+  timeLimitMinutes Int?
+  /// Days the candidate has to start, from assignment.
+  dueInDays    Int @default(5)
+  /// Comma-free list of permitted file extensions, lower case, no dots.
+  allowedFileTypes String[]
+  status       WorkSampleStatus @default(DRAFT)
+  /// Graders needed before a submission is considered graded. Two is the
+  /// point of the exercise; one grader cannot be calibrated against anything.
+  requiredGraders Int @default(2)
+  jobProfileId String?
+  jobProfile   JobProfile? @relation(fields: [jobProfileId], references: [id], onDelete: SetNull)
+  createdById  String?
+  createdBy    User?  @relation("WorkSampleCreatedBy", fields: [createdById], references: [id], onDelete: SetNull)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  criteria    WorkSampleCriterion[]
+  assignments WorkSampleAssignment[]
+
+  @@index([status])
+}
+
+/// One row of the rubric. Levels are anchored in writing, because "4 out of 5"
+/// means whatever the grader had in mind unless somebody wrote it down.
+model WorkSampleCriterion {
+  id           String @id @default(cuid())
+  workSampleId String
+  workSample   WorkSample @relation(fields: [workSampleId], references: [id], onDelete: Cascade)
+  name         String
+  description  String?
+  /// Anchors by level: [{ "level": 1, "text": "..." }, ...]. 1-4, no midpoint.
+  anchors      Json
+  /// Relative weight in the overall score. Equal weights are the default.
+  weight       Float @default(1)
+  orderIndex   Int   @default(0)
+
+  ratings WorkSampleRating[]
+
+  @@unique([workSampleId, name])
+  @@index([workSampleId, orderIndex])
+}
+
+enum WorkSampleAssignmentStatus {
+  ASSIGNED
+  STARTED
+  SUBMITTED
+  EXPIRED
+  WITHDRAWN
+  GRADED
+}
+
+model WorkSampleAssignment {
+  id           String @id @default(cuid())
+  workSampleId String
+  workSample   WorkSample @relation(fields: [workSampleId], references: [id], onDelete: Cascade)
+  applicationId String
+  application  Application @relation(fields: [applicationId], references: [id], onDelete: Cascade)
+  /// Shown to graders in place of the candidate's name.
+  reference    String @unique
+  /// SHA-256 of the candidate's access token.
+  tokenHash    String @unique
+  status       WorkSampleAssignmentStatus @default(ASSIGNED)
+  assignedAt   DateTime @default(now())
+  /// Deadline to START. Once started, the time limit governs.
+  dueAt        DateTime
+  startedAt    DateTime?
+  /// Server-authoritative deadline, set when the candidate starts. The
+  /// browser countdown is display only, exactly as in the assessment.
+  expiresAt    DateTime?
+  submittedAt  DateTime?
+  /// Work in progress, saved as the candidate types.
+  draftText    String?
+  submittedText String?
+  /// Uploaded file, when the sample asks for one.
+  fileName     String?
+  fileMimeType String?
+  fileSizeBytes Int?
+  objectKey    String?
+  assignedById String?
+  assignedBy   User?  @relation("WorkSampleAssignedBy", fields: [assignedById], references: [id], onDelete: SetNull)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  grades WorkSampleGrade[]
+
+  @@unique([workSampleId, applicationId])
+  @@index([applicationId])
+  @@index([status])
+}
+
+enum WorkSampleGradeStatus {
+  DRAFT
+  SUBMITTED
+}
+
+/// One grader's assessment of one submission.
+model WorkSampleGrade {
+  id           String @id @default(cuid())
+  assignmentId String
+  assignment   WorkSampleAssignment @relation(fields: [assignmentId], references: [id], onDelete: Cascade)
+  graderId     String
+  grader       User   @relation("WorkSampleGrader", fields: [graderId], references: [id], onDelete: Cascade)
+  status       WorkSampleGradeStatus @default(DRAFT)
+  /// Free-text evidence. Required on submit — a score with no reasoning
+  /// cannot be reconciled with another grader's.
+  comment      String?
+  submittedAt  DateTime?
+  /// True when this grade was revised after seeing another grader's, during
+  /// reconciliation. Recorded so an independent grade is never confused with
+  /// a reconciled one.
+  reconciled   Boolean @default(false)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  ratings WorkSampleRating[]
+
+  @@unique([assignmentId, graderId])
+  @@index([graderId, status])
+}
+
+model WorkSampleRating {
+  id          String @id @default(cuid())
+  gradeId     String
+  grade       WorkSampleGrade @relation(fields: [gradeId], references: [id], onDelete: Cascade)
+  criterionId String
+  criterion   WorkSampleCriterion @relation(fields: [criterionId], references: [id], onDelete: Cascade)
+  /// Snapshot, so editing the rubric cannot rewrite a submitted grade.
+  criterionName String
+  /// 1-4. Null means "could not assess from what was submitted".
+  level       Int?
+  note        String?
+
+  @@unique([gradeId, criterionId])
 }

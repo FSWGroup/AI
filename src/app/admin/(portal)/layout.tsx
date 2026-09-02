@@ -40,6 +40,13 @@ export default async function AdminPortalLayout({
       show: can(user.role, "VIEW_QUALITY"),
     },
     {
+      href: "/admin/work-samples",
+      label: "Work Samples",
+      show:
+        can(user.role, "MANAGE_WORK_SAMPLES") ||
+        can(user.role, "GRADE_WORK_SAMPLES"),
+    },
+    {
       href: "/admin/calibration",
       label: "Calibration",
       // Anyone who files a scorecard gets their own card; the oversight

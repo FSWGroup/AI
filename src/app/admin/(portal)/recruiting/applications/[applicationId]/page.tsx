@@ -12,6 +12,7 @@ import {
 } from "@/lib/ats/scorecards";
 import { ReviewPanel } from "@/components/admin/ReviewPanel";
 import { ChecksPanel } from "@/components/admin/ChecksPanel";
+import { WorkSamplePanel } from "@/components/admin/WorkSamplePanel";
 import { visibleReviews, reviewProgress, buildConsensus } from "@/lib/ats/reviews";
 import { categoryLabel } from "@/lib/ats/social-check";
 import { isCheckrConfigured } from "@/lib/checkr/client";
@@ -66,6 +67,13 @@ export default async function ApplicationPage({
         orderBy: { createdAt: "desc" },
       },
       offers: { orderBy: { createdAt: "desc" } },
+      workSamples: {
+        include: {
+          workSample: { select: { id: true, title: true, requiredGraders: true } },
+          grades: { select: { status: true } },
+        },
+        orderBy: { assignedAt: "desc" },
+      },
       invitations: {
         include: { attempts: { select: { id: true, status: true } } },
       },
@@ -120,7 +128,8 @@ export default async function ApplicationPage({
   const manage = can(user.role, "MANAGE_PIPELINE");
   const canSeeAllReviews = can(user.role, "VIEW_ALL_REVIEWS");
 
-  const [settings, kits, teamUsers, eligibleReviewers] = await Promise.all([
+  const [settings, kits, teamUsers, eligibleReviewers, activeWorkSamples] =
+    await Promise.all([
     prisma.orgSettings.findUnique({ where: { id: "org" } }),
     prisma.interviewKit.findMany({
       where: { active: true },
@@ -136,6 +145,17 @@ export default async function ApplicationPage({
       where: { active: true, role: { in: ["SUPER_ADMIN", "HR_ADMIN"] } },
       select: { id: true, name: true },
       orderBy: { name: "asc" },
+    }),
+    prisma.workSample.findMany({
+      where: {
+        status: "ACTIVE",
+        OR: [
+          { jobProfileId: null },
+          { jobProfileId: application.requisition.jobProfileId },
+        ],
+      },
+      select: { id: true, title: true },
+      orderBy: { title: "asc" },
     }),
   ]);
 
@@ -428,6 +448,22 @@ export default async function ApplicationPage({
         </div>
 
         <div className="space-y-6">
+          <WorkSamplePanel
+            applicationId={application.id}
+            canManage={can(user.role, "MANAGE_WORK_SAMPLES")}
+            available={activeWorkSamples.map((w) => ({ id: w.id, title: w.title }))}
+            assigned={application.workSamples.map((a) => ({
+              id: a.id,
+              reference: a.reference,
+              title: a.workSample.title,
+              status: a.status,
+              dueAt: a.dueAt.toISOString(),
+              submittedAt: a.submittedAt?.toISOString() ?? null,
+              gradesFiled: a.grades.filter((g) => g.status === "SUBMITTED").length,
+              gradesRequired: a.workSample.requiredGraders,
+            }))}
+          />
+
           <ChecksPanel
             applicationId={application.id}
             socialEnabled={settings?.socialCheckEnabled ?? false}

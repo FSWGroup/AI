@@ -118,6 +118,75 @@ Aggregation surfaces a **split panel** as a split rather than averaging it
 away. An average of 2.5 hides a disagreement, which is exactly what a hiring
 manager most needs to see.
 
+## Work samples
+
+A candidate does a piece of the actual job, and more than one person grades it
+against a rubric written before anyone saw the work. `WORK_SAMPLE` is a
+pipeline stage kind and appears in the default pipeline between the assessment
+and the first interview.
+
+Of everything in this platform, this is the closest thing to watching someone
+do the job — which is exactly why the grading controls matter more here than
+anywhere else. An unblinded, single-grader, rubric-free work sample is an
+interview that took the candidate four hours instead of forty minutes.
+
+### The rubric comes first
+
+A work sample cannot be activated until its rubric passes validation, and it
+cannot be sent to anyone until it is active. Every level of every criterion
+needs a **written anchor**: two graders reading "level 3" otherwise supply
+their own definitions and never find out they differed. The scale is four
+points with no midpoint, the same as a scorecard and for the same reason.
+
+The candidate is shown "what we are looking for" alongside the task. Hiding
+the standard does not measure skill, it measures guessing.
+
+### Delivery
+
+The candidate's side works like an assessment section: a single-use token, a
+**server-authoritative clock** set when they start, and autosave as they type.
+The browser countdown is display only, every autosave re-syncs it from the
+server, and refreshing or closing the laptop never adds time. Task
+instructions are withheld until the clock starts — handing them out first
+turns a timed task into an untimed one.
+
+The link is shown once, when the sample is sent. The token is stored only as a
+hash, so a lost link is reissued rather than looked up.
+
+### Blind grading
+
+Graders see a reference (`WS-XXXXXX`), never a name — including in the
+filename of a downloaded file. A grader is under the blind until they file,
+and **the blind follows the ability to grade, not whether a grade row exists
+yet**: someone who could grade this submission but has not started has no row,
+and keying off the row would treat them as a bystander at exactly the moment
+their view is most easily contaminated. Oversight opens the panel only for
+people who cannot grade it themselves.
+
+Submitting requires written evidence, not just levels. A filed grade cannot be
+edited except as an explicit **reconciliation**, and the revision is recorded
+as one — an independent grade and a grade revised after reading a colleague's
+are different evidence, and the record has to say which it is holding.
+
+### Reconciling rather than averaging
+
+Two graders two or more levels apart on any criterion, or a full level apart
+overall, are flagged for reconciliation. They talk, then either revises. The
+mean is shown *alongside* the individual grades and never instead of them: an
+average of 1 and 4 is 2.5, which describes neither grader and is the number
+most likely to be quietly wrong.
+
+A criterion a grader could not assess is excluded and the remaining weights
+renormalized, rather than scored as the bottom level. "The submission did not
+show this" is a fact about the submission; scoring it 1 would turn it into a
+judgement of the person.
+
+### What it does not do
+
+Nothing here moves an application and no score crosses a threshold anywhere.
+The grades are evidence for a person to weigh against everything else they
+know.
+
 ## Offers
 
 An offer runs a state machine (`src/lib/ats/offers.ts`) with an approval chain
@@ -182,8 +251,16 @@ Fairness and candidate experience) and enough people who chose to answer. See
 | `SUPER_ADMIN` | Everything |
 | `HR_ADMIN` | Create and run requisitions, pipeline, interviews, offers |
 | `HIRING_MANAGER` | Runs their own roles: pipeline, interviews, scorecards, approvals. Does not create requisitions or send offers |
-| `ASSESSMENT_ADMIN` | Assessment configuration only |
+| `ASSESSMENT_ADMIN` | Assessment configuration only, plus authoring work samples — the same discipline as writing an assessment item |
 | `VIEWER` | Read-only |
+
+Work-sample permissions are separate from the rest:
+
+| Permission | Who has it | What it does |
+| --- | --- | --- |
+| `MANAGE_WORK_SAMPLES` | Super admin, HR admin, assessment admin | Author tasks and rubrics, activate them, send them |
+| `GRADE_WORK_SAMPLES` | Super admin, HR admin, hiring manager | Grade a submission, blind |
+| `VIEW_ALL_GRADES` | Super admin, HR admin, hiring manager | Read every filed grade — but not before filing your own, if you can grade |
 
 ## Things a recruiter should know
 
@@ -193,6 +270,10 @@ Fairness and candidate experience) and enough people who chose to answer. See
   happened.
 - Marking someone **Hired** requires an accepted offer. It is the one stage the
   software will not let you reach by accident.
+- Keep a **work sample** to a slice of the real job small enough to be fair to
+  ask for unpaid — an hour or two, not a weekend. The platform will let you
+  set any time limit; the judgement about what is reasonable to ask of someone
+  who does not work for you is yours.
 - **Rejection always asks for a reason.** Partly reporting — you cannot improve
   a funnel you cannot explain — and partly the discipline of naming the ground
   for a decision that affects a real person.

@@ -59,6 +59,14 @@ export const PERMISSIONS = [
   /// people whose judgement it describes — everyone sees their own card
   /// without needing this.
   "VIEW_INTERVIEWER_CALIBRATION",
+  // Work samples
+  /// Author work samples and their rubrics, and send them to candidates.
+  "MANAGE_WORK_SAMPLES",
+  /// Grade a submission. Deliberately separate from authoring: the person who
+  /// wrote the task should not be the only one judging the answer.
+  "GRADE_WORK_SAMPLES",
+  /// Read every grade on a submission without filing one first.
+  "VIEW_ALL_GRADES",
 ] as const;
 export type Permission = (typeof PERMISSIONS)[number];
 
@@ -88,6 +96,9 @@ const ROLE_PERMISSIONS: Record<UserRole, Permission[]> = {
     "SUBMIT_PERFORMANCE_REVIEW",
     "VIEW_VALIDATION",
     "VIEW_INTERVIEWER_CALIBRATION",
+    "MANAGE_WORK_SAMPLES",
+    "GRADE_WORK_SAMPLES",
+    "VIEW_ALL_GRADES",
   ],
   // A hiring manager runs their own roles: they move candidates, schedule
   // and score interviews, and approve what they are named on. They do not
@@ -108,6 +119,10 @@ const ROLE_PERMISSIONS: Record<UserRole, Permission[]> = {
     // Managers rate the people they hired. That rating is the criterion every
     // validity study rests on, so it comes from the person who sees the work.
     "SUBMIT_PERFORMANCE_REVIEW",
+    // A hiring manager grades work samples for their own roles and, once they
+    // have filed, sees the other graders — the same blind as team review.
+    "GRADE_WORK_SAMPLES",
+    "VIEW_ALL_GRADES",
   ],
   ASSESSMENT_ADMIN: [
     "MANAGE_QUESTIONS",
@@ -116,6 +131,9 @@ const ROLE_PERMISSIONS: Record<UserRole, Permission[]> = {
     "VIEW_QUALITY",
     "VIEW_VALIDATION",
     "MANAGE_VALIDATION",
+    // Authoring a work sample is instrument design: the same discipline as
+    // writing an assessment item, and the same people.
+    "MANAGE_WORK_SAMPLES",
   ],
   VIEWER: ["VIEW_CANDIDATES", "VIEW_REPORTS", "VIEW_REQUISITIONS"],
 };
