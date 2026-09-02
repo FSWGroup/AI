@@ -40,6 +40,15 @@ export default async function AdminPortalLayout({
       show: can(user.role, "VIEW_QUALITY"),
     },
     {
+      href: "/admin/calibration",
+      label: "Calibration",
+      // Anyone who files a scorecard gets their own card; the oversight
+      // permission adds everyone else's.
+      show:
+        can(user.role, "SUBMIT_SCORECARD") ||
+        can(user.role, "VIEW_INTERVIEWER_CALIBRATION"),
+    },
+    {
       href: "/admin/validation",
       label: "Validation",
       show: can(user.role, "VIEW_VALIDATION"),

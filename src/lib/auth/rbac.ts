@@ -54,6 +54,11 @@ export const PERMISSIONS = [
   /// table changes what every future band means, so it sits with the people
   /// who own the instrument rather than with the people using its output.
   "MANAGE_VALIDATION",
+  /// See how every interviewer rates relative to their colleagues. This is
+  /// data about employees' judgement, so it is not granted by default to the
+  /// people whose judgement it describes — everyone sees their own card
+  /// without needing this.
+  "VIEW_INTERVIEWER_CALIBRATION",
 ] as const;
 export type Permission = (typeof PERMISSIONS)[number];
 
@@ -82,6 +87,7 @@ const ROLE_PERMISSIONS: Record<UserRole, Permission[]> = {
     "MANAGE_HIRES",
     "SUBMIT_PERFORMANCE_REVIEW",
     "VIEW_VALIDATION",
+    "VIEW_INTERVIEWER_CALIBRATION",
   ],
   // A hiring manager runs their own roles: they move candidates, schedule
   // and score interviews, and approve what they are named on. They do not

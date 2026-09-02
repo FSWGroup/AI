@@ -112,6 +112,8 @@ async function purge(): Promise<void> {
   // Scores, reviews and ratings do cascade, from Attempt and Hire.
   await prisma.hire.deleteMany({ where: { candidateId: { in: ids } } });
   await prisma.attempt.deleteMany({ where: { candidateId: { in: ids } } });
+  // Scorecards and interviews cascade from the application.
+  await prisma.application.deleteMany({ where: { candidateId: { in: ids } } });
   await prisma.invitation.deleteMany({ where: { candidateId: { in: ids } } });
   await prisma.candidate.deleteMany({ where: { id: { in: ids } } });
   await prisma.normTable.deleteMany({ where: { population: { startsWith: DEMO_PREFIX } } });
@@ -148,12 +150,22 @@ async function main(): Promise<void> {
   const count = Number(args.find((a) => a.startsWith("--n="))?.slice(4) ?? 220);
   const rand = makeRandom(20260902);
 
-  const [jobOpening, version, manager, secondRater] = await Promise.all([
-    prisma.jobOpening.findFirst({ include: { jobProfile: true } }),
-    prisma.assessmentVersion.findFirst({ where: { status: "ACTIVE" } }),
-    prisma.user.findFirst({ where: { role: { in: ["HIRING_MANAGER", "SUPER_ADMIN"] } } }),
-    prisma.user.findFirst({ where: { role: "HR_ADMIN" } }),
-  ]);
+  const [jobOpening, version, manager, secondRater, requisition, interviewers] =
+    await Promise.all([
+      prisma.jobOpening.findFirst({ include: { jobProfile: true } }),
+      prisma.assessmentVersion.findFirst({ where: { status: "ACTIVE" } }),
+      prisma.user.findFirst({ where: { role: { in: ["HIRING_MANAGER", "SUPER_ADMIN"] } } }),
+      prisma.user.findFirst({ where: { role: "HR_ADMIN" } }),
+      prisma.requisition.findFirst({
+        where: { status: "OPEN" },
+        include: { stages: { orderBy: { orderIndex: "asc" } } },
+      }),
+      prisma.user.findMany({
+        where: { active: true },
+        select: { id: true, name: true },
+        orderBy: { email: "asc" },
+      }),
+    ]);
   if (!jobOpening || !version || !manager) {
     console.error("Seed the database first (npm run db:seed): a job opening, an active form and a user are needed.");
     process.exit(1);
@@ -237,10 +249,70 @@ async function main(): Promise<void> {
       }),
     });
 
+    // An application and an interview panel, so the calibration analytics have
+    // something to measure. Three interviewers see every candidate: one rates
+    // the panel's view, one is deliberately a point more generous, and one is
+    // deliberately erratic. A calibration report that cannot find those three
+    // is not working.
+    let applicationId: string | null = null;
+    if (requisition && requisition.stages.length > 0 && interviewers.length >= 3) {
+      const hiredStage =
+        requisition.stages.find((st) => st.kind === "HIRED") ??
+        requisition.stages[requisition.stages.length - 1];
+      const interviewAt = new Date(now - (395 - i) * DAY);
+
+      const application = await prisma.application.create({
+        data: {
+          candidateId: candidate.id,
+          requisitionId: requisition.id,
+          reference: `DEMO-APP-${String(i + 1).padStart(4, "0")}`,
+          stageId: hiredStage.id,
+          status: "HIRED",
+          hiredAt: new Date(now - (390 - i) * DAY),
+          appliedAt: new Date(now - (400 - i) * DAY),
+        },
+      });
+      applicationId = application.id;
+
+      const interview = await prisma.interview.create({
+        data: {
+          applicationId: application.id,
+          stageId: hiredStage.id,
+          title: "DEMO panel interview",
+          status: "COMPLETED",
+          scheduledAt: interviewAt,
+        },
+      });
+
+      // The panel's honest read of this candidate, on the 1-4 scale.
+      const panelCall = Math.max(1, Math.min(4, Math.round(2.5 + latent)));
+      const calls: [string, number, number][] = [
+        // [userId, recommendation, hours taken to file]
+        [interviewers[0].id, panelCall, 1],
+        [interviewers[1].id, Math.min(4, panelCall + 1), 2],
+        [interviewers[2].id, i % 2 === 0 ? Math.min(4, panelCall + 2) : Math.max(1, panelCall - 2), 90],
+      ];
+      const NAMES = ["STRONG_NO", "NO", "YES", "STRONG_YES"] as const;
+      for (const [userId, value, hours] of calls) {
+        await prisma.scorecard.create({
+          data: {
+            applicationId: application.id,
+            interviewId: interview.id,
+            authorId: userId,
+            status: "SUBMITTED",
+            recommendation: NAMES[value - 1],
+            summary: "Synthetic demo scorecard.",
+            submittedAt: new Date(interviewAt.getTime() + hours * 60 * 60 * 1000),
+          },
+        });
+      }
+    }
+
     const hire = await prisma.hire.create({
       data: {
         candidateId: candidate.id,
         attemptId: attempt.id,
+        applicationId,
         jobProfileId: jobOpening.jobProfileId,
         jobTitle: jobOpening.title,
         managerId: manager.id,

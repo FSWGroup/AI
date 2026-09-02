@@ -227,8 +227,9 @@ Netlify Blobs; PDFs via the report's Print button there).
   intake, pipeline, structured interviewing, offers, and funnel-wide adverse
   impact.
 - `docs/REVIEWS-AND-CHECKS.md` — independent team review and the consolidated
-  ratings view, the consent-based social media workflow, and the Checkr
-  background-check integration with the FCRA adverse-action sequence.
+  ratings view, interviewer calibration, the consent-based social media
+  workflow, and the Checkr background-check integration with the FCRA
+  adverse-action sequence.
 - `docs/PDF-EXPORT.md` — the complete assessment export: what is in it, what
   is deliberately left out, and how it is rendered.
 - `docs/FAIRNESS-AND-FEEDBACK.md` — the benchmark impact preview, voluntary

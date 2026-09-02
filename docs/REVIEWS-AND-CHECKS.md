@@ -52,6 +52,55 @@ leaks the reviews it summarizes.
 
 ---
 
+## Interviewer calibration
+
+Two interviewers watching the same interview routinely reach different
+conclusions, and the difference is often more about the interviewer than the
+candidate. Admin → **Calibration** measures that so it can be corrected.
+
+### Everything is a paired comparison
+
+No interviewer is measured against the team's overall average. Every figure
+compares them only with the other people who assessed the **same candidates**.
+An interviewer who only meets finalists would look generous beside one who
+takes every first screen, and that difference is the pipeline, not their
+judgement.
+
+Scorecards and independent reviews both count — both put a person's name
+against a four-point recommendation on one application.
+
+### What is measured
+
+| Figure | What it says |
+| --- | --- |
+| Gap from the panel | Mean difference from the others on shared candidates. Positive is more generous. |
+| Agreement | Correlation with the panel across shared candidates. Catches disagreement that varies case by case, which a mean gap of zero hides. |
+| Spread | Whether they use the range of the scale at all. |
+| Extremes | Share of ratings at "strong no"/"strong yes". A rater who only uses the ends has *high* spread and no discrimination. |
+| Predicts performance | Correlation between their calls and how the people they rated actually did once hired — joined through the validation engine's criterion. |
+| Timeliness | Scorecards filed more than 48 hours after the interview, written from memory of an impression. |
+
+Gates: nothing at all is reported below 5 assessments, no peer comparison
+below 4 shared candidates, and no predictive value below 10 people hired
+*and* rated on the job.
+
+### Two views, and what is deliberately absent
+
+Anyone who files scorecards sees **their own card**, in plain language, with
+what to do about each finding. `VIEW_INTERVIEWER_CALIBRATION` adds everyone
+else's. It is not granted to hiring managers by default: this is data about
+employees' judgement, and widening it should be a deliberate choice rather
+than a default.
+
+There is **no ranking and no overall interviewer score**, and the team list is
+alphabetical. The moment there is a number to optimize, interviewers start
+rating to the metric instead of to the candidate — and the ratings stop being
+about candidates at all. The badge shows the single most significant finding,
+with inconsistency ahead of leniency, because a consistent bias can be
+adjusted for in a debrief and erratic disagreement cannot.
+
+---
+
 ## Social media review
 
 **Off by default.** Settings → Fairness and candidate experience → "Allow
@@ -170,3 +219,4 @@ do.
 | `MANAGE_SOCIAL_CHECKS` | Super admin, HR admin | Start a social review, assign a reviewer |
 | `CONDUCT_SOCIAL_REVIEW` | Super admin, HR admin | Be the reviewer. Never granted to hiring managers, who decide |
 | `MANAGE_BACKGROUND_CHECKS` | Super admin, HR admin | Order checks and run the adverse-action sequence |
+| `VIEW_INTERVIEWER_CALIBRATION` | Super admin, HR admin | See every interviewer's calibration. Everyone sees their own without it |
