@@ -67,6 +67,22 @@ export function recordingChunkKey(
   ).padStart(6, "0")}.webm`;
 }
 
+/**
+ * Bump this whenever the rendered report changes shape or wording.
+ *
+ * A report PDF is cached in object storage and served forever after, and the
+ * key used to be `(attemptId, reportId)` alone — nothing about the code that
+ * drew it. So a presentation change left every previously downloaded report
+ * frozen at the old rendering, and the stored document went on disagreeing
+ * with the screen. That is exactly the failure the shared POSITION_LABEL was
+ * added to end: one candidate, one dimension, the PDF saying "Below" and the
+ * score sheet saying "Below range", in the two documents most likely to be
+ * put side by side in a dispute.
+ *
+ * v2: benchmark position wording unified with the score sheet.
+ */
+const REPORT_RENDER_VERSION = "v2";
+
 export function reportPdfKey(attemptId: string, reportId: string): string {
-  return `reports/${attemptId}/${reportId}.pdf`;
+  return `reports/${attemptId}/${reportId}.${REPORT_RENDER_VERSION}.pdf`;
 }

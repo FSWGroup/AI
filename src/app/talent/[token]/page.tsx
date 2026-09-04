@@ -22,6 +22,9 @@ export default async function TalentConsentPage({
   const [profile, company] = await Promise.all([
     prisma.talentProfile.findUnique({
       where: { consentTokenHash: hashToken(token) },
+      // The page was found BY the hash; it never needs to hold it. Leaving it
+      // on the row puts it in the server component's payload.
+      omit: { consentTokenHash: true },
       include: { candidate: { select: { firstName: true } } },
     }),
     getCompanyName(),

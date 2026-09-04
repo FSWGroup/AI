@@ -21,6 +21,9 @@ export default async function SocialCheckPage({
   const [check, company] = await Promise.all([
     prisma.socialMediaCheck.findUnique({
       where: { consentTokenHash: hashToken(token) },
+      // The page was found BY the hash; it never needs to hold it. Leaving it
+      // on the row puts it in the server component's payload.
+      omit: { consentTokenHash: true },
       include: {
         application: {
           include: {

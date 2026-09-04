@@ -22,6 +22,9 @@ export default async function InterviewConsentPage({
   const [consent, company] = await Promise.all([
     prisma.interviewRecordingConsent.findUnique({
       where: { tokenHash: hashToken(token) },
+      // The page was found BY the hash; it never needs to hold it. Leaving it
+      // on the row puts it in the server component's payload.
+      omit: { tokenHash: true },
       include: {
         interview: {
           include: {

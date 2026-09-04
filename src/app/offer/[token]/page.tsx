@@ -21,6 +21,9 @@ export default async function OfferPage({
   const { token } = await params;
   const offer = await prisma.offer.findUnique({
     where: { acceptTokenHash: hashToken(token) },
+    // The page was found BY the hash; it never needs to hold it. Leaving it
+    // on the row puts it in the server component's payload.
+    omit: { acceptTokenHash: true },
     include: {
       application: { include: { candidate: true } },
       template: { select: { acceptanceStatement: true } },

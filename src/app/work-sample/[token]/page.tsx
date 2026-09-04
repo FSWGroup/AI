@@ -22,6 +22,9 @@ export default async function WorkSamplePage({
   const [assignment, company] = await Promise.all([
     prisma.workSampleAssignment.findUnique({
       where: { tokenHash: hashToken(token) },
+      // The page was found BY the hash; it never needs to hold it. Leaving it
+      // on the row puts it in the server component's payload.
+      omit: { tokenHash: true },
       include: {
         workSample: true,
         application: {
