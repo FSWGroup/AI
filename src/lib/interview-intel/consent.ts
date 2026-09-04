@@ -68,6 +68,23 @@ export function canRecord(
   expected: { party: ConsentParty; userId: string | null }[],
   consents: ConsentRow[],
 ): RecordingGate {
+  // All-party consent over a party list of one is not all-party consent.
+  //
+  // The interviewers come from InterviewParticipant, and an interview created
+  // by hand often has no participant rows at all. Left alone, the gate would
+  // ask only the candidate and then report that everyone present had agreed —
+  // producing exactly the recording RA 4200 makes a criminal offence, with
+  // this file's own reasoning stamped on it as approval.
+  const interviewers = expected.filter((p) => p.party === "INTERVIEWER");
+  if (interviewers.length === 0) {
+    return {
+      ok: false,
+      missing: [],
+      reason:
+        "Nobody is listed as an interviewer on this interview, so there is no one to ask. Add the interviewers to the interview before asking anyone to be recorded.",
+    };
+  }
+
   const missing: ConsentRow[] = [];
   for (const party of expected) {
     const row = consents.find(

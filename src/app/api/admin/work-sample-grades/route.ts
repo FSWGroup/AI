@@ -11,6 +11,7 @@ import { z } from "zod";
 import { prisma } from "@/lib/db";
 import { apiError, apiOk, parseBody, withErrorHandling } from "@/lib/api";
 import { requirePermission } from "@/lib/auth/session";
+import { assertApplicationAccess } from "@/lib/auth/scope";
 import { audit } from "@/lib/audit";
 import { MAX_LEVEL, MIN_LEVEL, validateGradeSubmission } from "@/lib/worksample/rubric";
 import { refreshGradedStatus, toCriterionLike } from "@/lib/worksample/service";
@@ -43,6 +44,12 @@ export const POST = withErrorHandling(async (req) => {
     include: { workSample: { include: { criteria: { orderBy: { orderIndex: "asc" } } } } },
   });
   if (!assignment) return apiError("That submission does not exist.", 404);
+  // "A hiring manager grades work samples for their own roles" is the rule the
+  // permission table states; this is what enforces it. The assignmentId comes
+  // straight off the request body, so without a scope check the permission
+  // reads as "grades every work sample in the company", and two such grades
+  // satisfy requiredGraders with people who have no business on the role.
+  await assertApplicationAccess(user, assignment.applicationId);
   if (assignment.status === "ASSIGNED" || assignment.status === "STARTED") {
     return apiError("That work sample has not been submitted yet.", 409);
   }

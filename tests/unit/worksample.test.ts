@@ -4,6 +4,7 @@ import {
   canSeeOtherGrades,
   canStart,
   canSubmit,
+  effectiveAssignmentStatus,
   fileTypeAllowed,
   remainingSeconds,
   scoreGrade,
@@ -311,6 +312,41 @@ describe("validateGradeSubmission", () => {
   });
 });
 
+describe("effectiveAssignmentStatus", () => {
+  // Expiry is derived at read time rather than written by a cron, so a job
+  // that failed to run cannot leave the admin list showing a stale status.
+  it("reports an overdue assignment as expired without anything having run", () => {
+    expect(
+      effectiveAssignmentStatus(
+        { status: "ASSIGNED", dueAt: new Date(NOW.getTime() - 1000) },
+        NOW,
+      ),
+    ).toBe("EXPIRED");
+  });
+
+  it("leaves an assignment inside its window alone", () => {
+    expect(
+      effectiveAssignmentStatus(
+        { status: "ASSIGNED", dueAt: new Date(NOW.getTime() + 1000) },
+        NOW,
+      ),
+    ).toBe("ASSIGNED");
+  });
+
+  it("never overrides a status the candidate has already moved past", () => {
+    // Somebody who started before the deadline and is mid-task must not have
+    // their work reported as expired out from under them.
+    for (const status of ["STARTED", "SUBMITTED", "GRADED", "WITHDRAWN"]) {
+      expect(
+        effectiveAssignmentStatus(
+          { status, dueAt: new Date(NOW.getTime() - 86_400_000) },
+          NOW,
+        ),
+      ).toBe(status);
+    }
+  });
+});
+
 describe("the candidate's side", () => {
   it("runs the clock on the server", () => {
     expect(
@@ -357,6 +393,9 @@ describe("the candidate's side", () => {
     expect(fileTypeAllowed("answer.pdf", [".PDF"])).toBe(true);
     expect(fileTypeAllowed("answer.exe", ["pdf"])).toBe(false);
     expect(fileTypeAllowed("noextension", ["pdf"])).toBe(false);
-    expect(fileTypeAllowed("anything.zip", [])).toBe(true);
+    // An empty allowlist is a refusal, not a wildcard: a TEXT task never
+    // gets asked for a list, and "accepts anything" is how an executable
+    // arrives.
+    expect(fileTypeAllowed("anything.zip", [])).toBe(false);
   });
 });

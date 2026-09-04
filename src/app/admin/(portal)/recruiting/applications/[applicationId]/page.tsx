@@ -13,6 +13,7 @@ import {
 import { ReviewPanel } from "@/components/admin/ReviewPanel";
 import { ChecksPanel } from "@/components/admin/ChecksPanel";
 import { WorkSamplePanel } from "@/components/admin/WorkSamplePanel";
+import { effectiveAssignmentStatus } from "@/lib/worksample/service";
 import { KeepInTouchPanel } from "@/components/admin/KeepInTouchPanel";
 import { SelfSchedulePanel } from "@/components/admin/SelfSchedulePanel";
 import { visibleReviews, reviewProgress, buildConsensus } from "@/lib/ats/reviews";
@@ -170,6 +171,7 @@ export default async function ApplicationPage({
     where: { requisitionId: application.requisitionId },
     select: { userId: true, role: true },
   });
+  const hiringTeamIds = new Set(requisitionTeam.map((t) => t.userId));
   const deciderIds = new Set(
     requisitionTeam
       .filter((t) => t.role === "HIRING_MANAGER" || t.role === "RECRUITER")
@@ -470,7 +472,14 @@ export default async function ApplicationPage({
           {can(user.role, "MANAGE_INTERVIEWS") && (
             <SelfSchedulePanel
               applicationId={application.id}
-              teamUsers={teamUsers.map((u) => ({ id: u.id, name: u.name }))}
+              // The hiring team for THIS requisition, not every admin in the
+              // company. A panelist's working hours and busy times are shown
+              // to the candidate and their address goes on the invitation, so
+              // the picker offers the people already recorded as working this
+              // role — which is what the server accepts.
+              teamUsers={teamUsers
+                .filter((u) => hiringTeamIds.has(u.id))
+                .map((u) => ({ id: u.id, name: u.name }))}
               kits={kits}
               stages={application.requisition.stages.map((s) => ({
                 id: s.id,
@@ -496,7 +505,7 @@ export default async function ApplicationPage({
               id: a.id,
               reference: a.reference,
               title: a.workSample.title,
-              status: a.status,
+              status: effectiveAssignmentStatus(a),
               dueAt: a.dueAt.toISOString(),
               submittedAt: a.submittedAt?.toISOString() ?? null,
               gradesFiled: a.grades.filter((g) => g.status === "SUBMITTED").length,

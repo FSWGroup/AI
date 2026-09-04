@@ -35,6 +35,14 @@ export interface MatchCandidate {
   applications: PastApplication[];
   /** Highest band on the assessment's cognitive composite, if assessed. */
   assessed: boolean;
+  /**
+   * Working here right now. Set from the employment record rather than from
+   * an application status: somebody hired in 2024 who has since left is a
+   * legitimate person to call, and one who started last month is not.
+   */
+  currentlyEmployed: boolean;
+  /** Hired here before and no longer employed. A useful thing to know. */
+  formerEmployee: boolean;
 }
 
 export interface OpeningLike {
@@ -53,7 +61,8 @@ export interface MatchReason {
     | "REACHED_LATE_STAGE"
     | "SHARED_TAGS"
     | "ALREADY_ASSESSED"
-    | "PASSED_OVER_FOR_ANOTHER";
+    | "PASSED_OVER_FOR_ANOTHER"
+    | "FORMER_EMPLOYEE";
   text: string;
 }
 
@@ -99,6 +108,14 @@ export function findMatches(
   const matches: Match[] = [];
 
   for (const c of candidates) {
+    // Never surface somebody who already works here.
+    //
+    // Worth stating why this is not a nicety: HIRED is the HIGHEST stage rank,
+    // so without this check a current employee sorts to the very top of the
+    // list and is the first person a recruiter is told to call back about a
+    // job they already have.
+    if (c.currentlyEmployed) continue;
+
     // Never resurface someone for the requisition they are currently in.
     const relevant = c.applications.filter(
       (a) => a.requisitionId !== opening.requisitionId,
@@ -106,6 +123,13 @@ export function findMatches(
     if (relevant.length === 0) continue;
 
     const reasons: MatchReason[] = [];
+
+    if (c.formerEmployee) {
+      reasons.push({
+        kind: "FORMER_EMPLOYEE",
+        text: "Has worked here before and left. Check with their old manager before approaching them.",
+      });
+    }
 
     const sameProfile = relevant.filter(
       (a) => opening.jobProfileId && a.jobProfileId === opening.jobProfileId,

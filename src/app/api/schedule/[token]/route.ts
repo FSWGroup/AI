@@ -31,6 +31,12 @@ const schema = z.discriminatedUnion("action", [
 
 export const GET = withErrorHandling(async (req, ctx) => {
   const { token } = await ctx.params;
+  const meta = await requestMeta();
+  // Slot generation walks every panelist's calendar, so this GET is the more
+  // expensive half of the route. Bounding only the POST left the costly one open.
+  if (!rateLimit(`schedule-get:${meta.ip}`, 60, 60_000)) {
+    return apiError("Too many requests. Please wait a moment.", 429);
+  }
   const request = await loadRequestByToken(token);
   if (!request) return apiError("That link is not valid.", 404);
 

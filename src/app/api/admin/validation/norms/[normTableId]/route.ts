@@ -8,6 +8,7 @@
  */
 
 import { z } from "zod";
+import { prisma } from "@/lib/db";
 import { apiError, apiOk, parseBody, withErrorHandling } from "@/lib/api";
 import { requirePermission } from "@/lib/auth/session";
 import { activateNormTable, retireNormTable } from "@/lib/validation/service";
@@ -20,6 +21,12 @@ export const POST = withErrorHandling(async (req, ctx) => {
   const user = await requirePermission("MANAGE_VALIDATION");
   const { normTableId } = await ctx.params;
   const body = await parseBody(req, schema);
+
+  const exists = await prisma.normTable.findUnique({
+    where: { id: normTableId },
+    select: { id: true },
+  });
+  if (!exists) return apiError("That norm table does not exist.", 404);
 
   if (body.action === "retire") {
     await retireNormTable(normTableId, user.id);

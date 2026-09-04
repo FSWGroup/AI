@@ -3,6 +3,7 @@
 import { z } from "zod";
 import { apiError, apiOk, parseBody, withErrorHandling } from "@/lib/api";
 import { requirePermission } from "@/lib/auth/session";
+import { assertApplicationAccess } from "@/lib/auth/scope";
 import { env } from "@/lib/env";
 import { createSchedulingRequest } from "@/lib/scheduling/service";
 
@@ -26,6 +27,12 @@ const schema = z.object({
 export const POST = withErrorHandling(async (req) => {
   const user = await requirePermission("MANAGE_INTERVIEWS");
   const body = await parseBody(req, schema);
+  // The applicationId comes off the request body. Without this a job-scoped
+  // manager can open a booking request against any candidate in the company
+  // and is handed their booking token, which discloses their name, the role
+  // and the panel — and, once booked, an Interview whose .ics carries their
+  // email address.
+  await assertApplicationAccess(user, body.applicationId);
 
   const now = new Date();
   const result = await createSchedulingRequest({

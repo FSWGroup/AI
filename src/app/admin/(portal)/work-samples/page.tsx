@@ -3,6 +3,7 @@ import { redirect } from "next/navigation";
 import { prisma } from "@/lib/db";
 import { getCurrentUser } from "@/lib/auth/session";
 import { can } from "@/lib/auth/rbac";
+import { scopedJobProfileIds } from "@/lib/auth/scope";
 import { Badge, Card, SectionHeading } from "@/components/ui";
 import { NewWorkSampleForm } from "@/components/admin/NewWorkSampleForm";
 
@@ -14,6 +15,11 @@ export default async function WorkSamplesPage() {
   const canManage = can(user.role, "MANAGE_WORK_SAMPLES");
   const canGrade = can(user.role, "GRADE_WORK_SAMPLES");
   if (!canManage && !canGrade) redirect("/admin");
+
+  // The queue is "work waiting for YOUR grade", so it has to be scoped the
+  // way the grading endpoint is. Listing every submission in the company also
+  // published the assignment ids that address the file download.
+  const scopedIds = await scopedJobProfileIds(user);
 
   const [samples, queue, jobProfiles] = await Promise.all([
     prisma.workSample.findMany({
@@ -29,6 +35,13 @@ export default async function WorkSamplesPage() {
           where: {
             status: { in: ["SUBMITTED", "GRADED"] },
             grades: { none: { graderId: user.id, status: "SUBMITTED" } },
+            ...(scopedIds
+              ? {
+                  application: {
+                    requisition: { jobProfileId: { in: scopedIds } },
+                  },
+                }
+              : {}),
           },
           include: {
             workSample: { select: { title: true, requiredGraders: true } },

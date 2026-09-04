@@ -150,6 +150,35 @@ export async function createSchedulingRequest(args: {
     return { error: "The booking window ends before it starts." };
   }
 
+  // The panel has to be the hiring team for this requisition.
+  //
+  // A panelist row exposes that person's working hours and their busy times
+  // to the candidate's booking page, and puts their email address on the
+  // resulting invitation. Taking arbitrary user ids from the request body
+  // meant anyone who could open a scheduling request could publish any
+  // colleague's calendar to an outsider.
+  const application = await prisma.application.findUnique({
+    where: { id: args.applicationId },
+    select: { requisitionId: true },
+  });
+  if (!application) return { error: "That application does not exist." };
+
+  const team = await prisma.hiringTeamMember.findMany({
+    where: {
+      requisitionId: application.requisitionId,
+      userId: { in: args.panelists.map((p) => p.userId) },
+    },
+    select: { userId: true },
+  });
+  const onTeam = new Set(team.map((t) => t.userId));
+  const strangers = args.panelists.filter((p) => !onTeam.has(p.userId));
+  if (strangers.length > 0) {
+    return {
+      error:
+        "Everyone on the panel has to be on the hiring team for this role. Add them to the hiring team first — their calendar and their email address go to the candidate.",
+    };
+  }
+
   const token = generateToken();
   const request = await prisma.schedulingRequest.create({
     data: {

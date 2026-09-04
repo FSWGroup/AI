@@ -64,7 +64,13 @@ evidence this software cannot generate by existing — it must be collected.
 5. Promotion is **per dimension**. A report routinely mixes validated
    stanines and provisional bands, says which each one is, and names the
    reference group and its sample size for the stanines.
-6. Distortion and Equivocation are never normed. They flag how to read a
+6. **Invalidated attempts are excluded** from the norming sample. A norm
+   table *is* the reference group, so a score somebody already marked
+   unreliable would shift the band boundaries for everyone measured against
+   it afterwards. The same exclusion applies to validity studies and to the
+   applicant pool the range-restriction correction is measured from, and the
+   study reports how many were excluded rather than dropping them silently.
+7. Distortion and Equivocation are never normed. They flag how to read a
    profile, not where someone stands; a stanine on Distortion would read as
    "distorts more than 77% of applicants", turning a response-quality check
    into a trait comparison.

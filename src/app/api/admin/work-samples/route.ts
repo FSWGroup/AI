@@ -10,7 +10,7 @@
 import { z } from "zod";
 import { prisma } from "@/lib/db";
 import { apiError, apiOk, parseBody, withErrorHandling } from "@/lib/api";
-import { requirePermission } from "@/lib/auth/session";
+import { requireAnyPermission, requirePermission } from "@/lib/auth/session";
 import { audit } from "@/lib/audit";
 import { MAX_LEVEL, MIN_LEVEL, validateRubric } from "@/lib/worksample/rubric";
 
@@ -45,7 +45,12 @@ const createSchema = z.object({
 });
 
 export const GET = withErrorHandling(async () => {
-  await requirePermission("VIEW_REQUISITIONS");
+  // Not VIEW_REQUISITIONS. This returns `instructions`, `successCriteria` and
+  // every rubric anchor — the live task and the key to marking it. The
+  // candidate-facing route deliberately withholds the instructions until the
+  // clock starts; handing them to the lowest-privilege internal role gives
+  // away the same thing with more time to prepare.
+  await requireAnyPermission(["MANAGE_WORK_SAMPLES", "GRADE_WORK_SAMPLES"]);
   const samples = await prisma.workSample.findMany({
     include: {
       jobProfile: { select: { name: true } },

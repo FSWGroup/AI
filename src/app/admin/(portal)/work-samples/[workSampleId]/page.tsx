@@ -4,8 +4,17 @@ import { prisma } from "@/lib/db";
 import { getCurrentUser } from "@/lib/auth/session";
 import { can } from "@/lib/auth/rbac";
 import { Badge, Card, SectionHeading } from "@/components/ui";
-import { LEVEL_LABEL, summarizeGrades, validateRubric } from "@/lib/worksample/rubric";
-import { loadGrades, toCriterionLike } from "@/lib/worksample/service";
+import {
+  LEVEL_LABEL,
+  summarizeGrades,
+  validateRubric,
+  visibleGrades,
+} from "@/lib/worksample/rubric";
+import {
+  effectiveAssignmentStatus,
+  loadGradesFor,
+  toCriterionLike,
+} from "@/lib/worksample/service";
 import { WorkSampleActions } from "@/components/admin/WorkSampleActions";
 
 export const dynamic = "force-dynamic";
@@ -31,19 +40,30 @@ export default async function WorkSampleDetailPage({
   if (!canManage && !canGrade) redirect("/admin");
   const { workSampleId } = await params;
 
+  // An explicit select, because the default include pulls `draftText` and
+  // `submittedText` — each capped at 200,000 characters — for every row, to
+  // render a status badge. A busy task turns that into hundreds of megabytes
+  // of submission prose materialized to display nothing of it.
   const sample = await prisma.workSample.findUnique({
     where: { id: workSampleId },
     include: {
       jobProfile: { select: { name: true } },
       criteria: { orderBy: { orderIndex: "asc" } },
       assignments: {
-        include: {
+        select: {
+          id: true,
+          reference: true,
+          status: true,
+          assignedAt: true,
+          dueAt: true,
           application: {
-            include: { candidate: { select: { firstName: true, lastName: true } } },
+            select: {
+              candidate: { select: { firstName: true, lastName: true } },
+            },
           },
-          grades: { select: { id: true, status: true } },
         },
         orderBy: { assignedAt: "desc" },
+        take: 200,
       },
     },
   });
@@ -52,13 +72,31 @@ export default async function WorkSampleDetailPage({
   const criteria = toCriterionLike(sample.criteria);
   const problems = validateRubric(criteria);
 
-  // Per-submission grading state, for the table.
-  const summaries = new Map<string, Awaited<ReturnType<typeof summarizeGrades>>>();
-  for (const a of sample.assignments) {
-    if (a.status === "SUBMITTED" || a.status === "GRADED") {
-      const grades = await loadGrades(a.id);
-      summaries.set(a.id, summarizeGrades(grades, criteria, sample.requiredGraders));
-    }
+  // Whose names this viewer may see.
+  //
+  // The reference exists to be unlinkable to a person, and this table prints
+  // both halves of that mapping in one row. That is right for a recruiter
+  // watching the pipeline and wrong for anyone who might grade the work: it
+  // publishes exactly what the blind is for. Oversight without the ability to
+  // grade keeps the column; a grader loses it, whatever else they hold.
+  const showNames = !canGrade;
+
+  // Grading state for the table, in one query rather than three per row.
+  const gradeable = sample.assignments.filter(
+    (a) => a.status === "SUBMITTED" || a.status === "GRADED",
+  );
+  const gradesByAssignment = await loadGradesFor(gradeable.map((a) => a.id));
+  const summaries = new Map<string, ReturnType<typeof summarizeGrades>>();
+  for (const a of gradeable) {
+    // Run the same blind the grading screen runs. Summarizing every grade
+    // regardless of viewer let a grader read the other graders' mean — and
+    // whether they disagreed — before writing their own, which is the one
+    // thing this module is built to prevent.
+    const { visible } = visibleGrades(gradesByAssignment.get(a.id) ?? [], user.id, {
+      canGrade,
+      hasOversight: canManage,
+    });
+    summaries.set(a.id, summarizeGrades(visible, criteria, sample.requiredGraders));
   }
 
   return (
@@ -152,7 +190,7 @@ export default async function WorkSampleDetailPage({
             <thead className="border-b border-navy-100 text-xs uppercase tracking-wide text-navy-400">
               <tr>
                 <th className="px-4 py-3">Reference</th>
-                <th className="px-4 py-3">Candidate</th>
+                {showNames && <th className="px-4 py-3">Candidate</th>}
                 <th className="px-4 py-3">Sent</th>
                 <th className="px-4 py-3">Grades</th>
                 <th className="px-4 py-3">Status</th>
@@ -175,12 +213,14 @@ export default async function WorkSampleDetailPage({
                         a.reference
                       )}
                     </td>
-                    <td className="px-4 py-3 text-navy-600">
-                      {/* Names appear here, in the pipeline view — never on the
-                          grading screen, where the blind is what matters. */}
-                      {a.application.candidate.firstName}{" "}
-                      {a.application.candidate.lastName}
-                    </td>
+                    {showNames && (
+                      <td className="px-4 py-3 text-navy-600">
+                        {/* Only for a viewer who cannot grade this work. To a
+                            grader the reference is the person. */}
+                        {a.application.candidate.firstName}{" "}
+                        {a.application.candidate.lastName}
+                      </td>
+                    )}
                     <td className="px-4 py-3 text-navy-600">
                       {a.assignedAt.toISOString().slice(0, 10)}
                     </td>
@@ -200,8 +240,14 @@ export default async function WorkSampleDetailPage({
                       )}
                     </td>
                     <td className="px-4 py-3">
-                      <Badge tone={STATUS_TONE[a.status]}>
-                        {a.status.toLowerCase()}
+                      <Badge
+                        tone={
+                          STATUS_TONE[
+                            effectiveAssignmentStatus(a) as keyof typeof STATUS_TONE
+                          ]
+                        }
+                      >
+                        {effectiveAssignmentStatus(a).toLowerCase()}
                       </Badge>
                     </td>
                   </tr>

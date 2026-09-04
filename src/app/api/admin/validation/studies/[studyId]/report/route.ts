@@ -5,7 +5,7 @@ import { prisma } from "@/lib/db";
 import { apiError, withErrorHandling } from "@/lib/api";
 import { requirePermission } from "@/lib/auth/session";
 import { audit } from "@/lib/audit";
-import { runStudy } from "@/lib/validation/service";
+import { computeStudyResult } from "@/lib/validation/service";
 import { buildTechnicalReport } from "@/lib/validation/technical-report";
 
 export const runtime = "nodejs";
@@ -24,10 +24,14 @@ export const GET = withErrorHandling(async (_req, ctx) => {
   ]);
   if (!study) return apiError("That study does not exist.", 404);
 
-  // The report is generated from a fresh computation rather than from the
-  // stored rows: a technical report that quotes numbers older than its own
-  // date is the kind of document that gets a study thrown out.
-  const result = await runStudy(studyId, user.id);
+  // Freshly computed, not read from the stored coefficients: a technical
+  // report quoting numbers older than its own date is the kind of document
+  // that gets a study thrown out. Computed and NOT persisted, though — this
+  // is a GET behind a read-only permission, and calling the persisting
+  // version rewrote every stored coefficient and restamped the study's author
+  // as whoever last downloaded a PDF. With a lax session cookie, a link was
+  // enough to make someone else's browser do it.
+  const result = await computeStudyResult(studyId);
 
   const pdf = await buildTechnicalReport({
     study: {

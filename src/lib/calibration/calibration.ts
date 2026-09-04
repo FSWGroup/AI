@@ -484,13 +484,6 @@ export function calibrateTeam(
   };
 }
 
-export const TENDENCY_LABEL: Record<Tendency, string> = {
-  LENIENT: "More generous than the panel",
-  SEVERE: "Tougher than the panel",
-  ALIGNED: "In line with the panel",
-  UNKNOWN: "Not enough shared candidates",
-};
-
 /** Badge wording for the headline finding. */
 export const HEADLINE_LABEL: Record<CalibrationObservation["kind"], string> = {
   TOO_FEW: "Too few to say",

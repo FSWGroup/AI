@@ -148,17 +148,16 @@ function specFor(study: ValidationStudy): CriterionSpec {
 }
 
 /**
- * Load, compute and persist one study.
+ * Compute one study without writing anything.
  *
- * Recomputing is normal and expected: the same study run three months later
- * has more hires and more reviews behind it. The row is overwritten and the
- * date stamped, so a technical report always says when its numbers were
- * produced.
+ * Split out from `runStudy` so a reader can have fresh numbers without also
+ * having a write. The technical report needs the first — a document quoting
+ * figures older than its own date is the kind that gets a study thrown out —
+ * and must not perform the second: it is served from a GET, held by a
+ * read-only permission, and was rewriting every stored coefficient and
+ * restamping the study's author as whoever last downloaded a PDF.
  */
-export async function runStudy(
-  studyId: string,
-  actorId?: string | null,
-): Promise<StudyResult> {
+export async function computeStudyResult(studyId: string): Promise<StudyResult> {
   const study = await prisma.validationStudy.findUniqueOrThrow({
     where: { id: studyId },
   });
@@ -175,6 +174,11 @@ export async function runStudy(
           }
         : {}),
       attemptId: { not: null },
+      // An invalidated attempt is one an administrator has already said is not
+      // to be relied on — a technical failure, an integrity concern, an
+      // accommodation that went wrong. Those are precisely the scores that
+      // must not enter a validity study.
+      attempt: { status: { not: "INVALIDATED" } },
     },
     include: {
       attempt: {
@@ -246,6 +250,9 @@ export async function runStudy(
   ];
   const applicantWhere: Prisma.ScoreWhereInput = {
     attempt: {
+      // Excluded here too: an invalidated attempt would otherwise widen the
+      // applicant-pool spread and inflate every range-restriction correction.
+      status: { not: "INVALIDATED" },
       ...(sampleVersionIds.length > 0
         ? { assessmentVersionId: { in: sampleVersionIds } }
         : {}),
@@ -327,6 +334,18 @@ export async function runStudy(
       `This sample spans ${sampleVersionIds.length} assessment form versions. Raw scores from different forms are not automatically on the same scale, so a coefficient computed across them assumes the forms are equivalent. Confirm that before quoting these numbers, or split the study by version.`,
     );
   }
+  const invalidated = await prisma.hire.count({
+    where: {
+      ...(study.jobProfileId ? { jobProfileId: study.jobProfileId } : {}),
+      attempt: { status: "INVALIDATED" },
+    },
+  });
+  if (invalidated > 0) {
+    warnings.push(
+      `${invalidated} hires in scope are excluded because their assessment attempt was invalidated. That is deliberate — an attempt somebody marked unreliable should not become evidence — but it is worth checking why that many were invalidated before relying on what is left.`,
+    );
+  }
+
   const withoutAttempt = await prisma.hire.count({
     where: {
       ...(study.jobProfileId ? { jobProfileId: study.jobProfileId } : {}),
@@ -350,7 +369,24 @@ export async function runStudy(
     warnings,
   );
 
-  // ---- Persist ---------------------------------------------------------------
+  return result;
+}
+
+/**
+ * Load, compute and persist one study.
+ *
+ * Recomputing is normal and expected: the same study run three months later
+ * has more hires and more reviews behind it. The row is overwritten and the
+ * date stamped, so a technical report always says when its numbers were
+ * produced.
+ */
+export async function runStudy(
+  studyId: string,
+  actorId?: string | null,
+): Promise<StudyResult> {
+  const result = await computeStudyResult(studyId);
+  const hiresInScope = result.n;
+
   await prisma.$transaction(async (tx) => {
     await tx.validityCoefficient.deleteMany({ where: { studyId } });
     const rows: Prisma.ValidityCoefficientCreateManyInput[] = result.coefficients
@@ -405,7 +441,7 @@ export async function runStudy(
               .filter((c) => c.notes.length > 0)
               .map((c) => [c.key, c.notes]),
           ),
-          hiresInScope: hires.length,
+          hiresInScope,
         } as Prisma.InputJsonValue,
       },
     });
@@ -447,19 +483,36 @@ export async function previewNormTables(args: {
   jobProfileId?: string | null;
 }): Promise<NormPreview[]> {
   const constructs = NORMABLE_CONSTRUCTS;
-  const where: Prisma.ScoreWhereInput =
-    args.population === "HIRES"
-      ? { attempt: { hire: { isNot: null } } }
-      : args.jobProfileId
-        ? { attempt: { jobOpening: { jobProfileId: args.jobProfileId } } }
-        : {};
+  const where: Prisma.ScoreWhereInput = {
+    attempt: {
+      // An invalidated attempt must never sit in a norming sample. A norm
+      // table IS the reference group, so a score somebody already marked
+      // unreliable would shift the band boundaries for everyone measured
+      // against it afterwards.
+      status: { not: "INVALIDATED" },
+      ...(args.population === "HIRES" ? { hire: { isNot: null } } : {}),
+      ...(args.population !== "HIRES" && args.jobProfileId
+        ? { jobOpening: { jobProfileId: args.jobProfileId } }
+        : {}),
+    },
+  };
+
+  // One query for every construct rather than one per construct: sixteen
+  // round trips to build a page that shows sixteen rows of the same table.
+  const allRows = await prisma.score.findMany({
+    where,
+    select: { construct: true, rawScore: true, band: true },
+  });
+  const byConstruct = new Map<Construct, { rawScore: number; band: number }[]>();
+  for (const row of allRows) {
+    const list = byConstruct.get(row.construct);
+    if (list) list.push({ rawScore: row.rawScore, band: row.band });
+    else byConstruct.set(row.construct, [{ rawScore: row.rawScore, band: row.band }]);
+  }
 
   const previews: NormPreview[] = [];
   for (const construct of constructs) {
-    const rows = await prisma.score.findMany({
-      where: { ...where, construct },
-      select: { rawScore: true, band: true },
-    });
+    const rows = byConstruct.get(construct) ?? [];
     const table = buildNormTable(rows.map((r) => r.rawScore));
     previews.push({
       construct,

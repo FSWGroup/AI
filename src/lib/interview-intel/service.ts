@@ -13,7 +13,9 @@ import { prisma } from "@/lib/db";
 import { audit } from "@/lib/audit";
 import { generateToken, hashToken } from "@/lib/crypto";
 import { getStorage } from "@/lib/storage";
+import { sendEmail } from "@/lib/email";
 import {
+  CANDIDATE_CONSENT_STATEMENT,
   CANDIDATE_CONSENT_VERSION,
   canRecord,
   type ConsentRow,
@@ -75,8 +77,28 @@ export async function requestConsent(args: {
   interviewId: string;
   actorId: string;
   baseUrl: string;
-}): Promise<{ candidateUrl: string }> {
+}): Promise<{ sent: true; to: string } | { sent: false; reason: string }> {
+  const interview = await prisma.interview.findUnique({
+    where: { id: args.interviewId },
+    select: {
+      title: true,
+      scheduledAt: true,
+      application: {
+        select: { candidate: { select: { firstName: true, email: true } } },
+      },
+    },
+  });
+  if (!interview) return { sent: false, reason: "That interview does not exist." };
+
   const expected = await expectedParties(args.interviewId);
+  if (!expected.some((p) => p.party === "INTERVIEWER")) {
+    return {
+      sent: false,
+      reason:
+        "Nobody is listed as an interviewer on this interview. Add the panel before asking the candidate to be recorded — their consent alone is not all-party consent.",
+    };
+  }
+
   const token = generateToken();
 
   await prisma.$transaction(async (tx) => {
@@ -114,9 +136,29 @@ export async function requestConsent(args: {
     newValue: { parties: expected.length },
   });
 
-  return {
-    candidateUrl: `${args.baseUrl.replace(/\/$/, "")}/interview-consent/${token}`,
-  };
+  // The link goes to the candidate, not to the person who asked for it.
+  //
+  // This token is the sole authenticator for the candidate's answer, and the
+  // route that consumes it says why: "a consent an employer can enter for you
+  // is not consent." Handing the raw token back to the caller made that
+  // sentence false — anyone who could open the asking could then walk the link
+  // themselves and record an agreement the candidate never gave. Sending it
+  // out of band is the whole mechanism, not a delivery detail.
+  const candidate = interview.application.candidate;
+  const consentUrl = `${args.baseUrl.replace(/\/$/, "")}/interview-consent/${token}`;
+  await sendEmail({
+    to: candidate.email,
+    template: "interview_recording_consent",
+    subject: `About recording your interview${interview.title ? `: ${interview.title}` : ""}`,
+    bodyText: [
+      `Hello ${candidate.firstName},`,
+      CANDIDATE_CONSENT_STATEMENT,
+      `Please tell us your answer here: ${consentUrl}`,
+      "If you would rather not answer at all, that is also fine — the interview simply goes ahead unrecorded.",
+    ].join("\n\n"),
+  });
+
+  return { sent: true, to: candidate.email };
 }
 
 export async function recordDecision(args: {
@@ -139,9 +181,13 @@ export async function recordDecision(args: {
       decidedAt: new Date(),
       ip: args.ip ?? null,
       userAgent: args.userAgent?.slice(0, 400) ?? null,
-      // The link is spent on the first answer. Changing your mind afterwards
-      // goes through the withdrawal path, which also destroys the recording.
-      ...(args.status !== "WITHDRAWN" ? { tokenHash: null } : {}),
+      // DECLINED and WITHDRAWN are terminal, so the link is spent. GRANTED is
+      // not: the wording the candidate agreed to promises "you can change your
+      // mind during or after the interview", and the only thing that can carry
+      // them back to that page is this link. Spending it on the yes would have
+      // left withdrawal as something only an employee could perform on their
+      // behalf, which is not a right the candidate holds.
+      ...(args.status !== "GRANTED" ? { tokenHash: null } : {}),
     },
   });
 

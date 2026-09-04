@@ -25,13 +25,34 @@ import {
 export const runtime = "nodejs";
 export const maxDuration = 60;
 
+/** The same ceiling the autosave path enforces, and the same one saveDraft slices to. */
+const MAX_SUBMISSION_CHARS = 200_000;
+
 const actionSchema = z.object({
   action: z.enum(["start", "save"]),
-  text: z.string().max(200_000).optional(),
+  text: z.string().max(MAX_SUBMISSION_CHARS).optional(),
+});
+
+/**
+ * The multipart fields, parsed rather than trusted.
+ *
+ * This was the only request body in the module read straight off the form and
+ * passed on — so the submit path, which is public and unauthenticated, took a
+ * `text` of any length while the autosave beside it stopped at 200,000
+ * characters. A five-million-character submission stored in full.
+ */
+const multipartSchema = z.object({
+  text: z.string().max(MAX_SUBMISSION_CHARS).nullable(),
 });
 
 export const GET = withErrorHandling(async (_req, ctx) => {
   const { token } = await ctx.params;
+  const meta = await requestMeta();
+  // The token is 256 bits and matched on its hash, so this is not about
+  // guessing it — it is about one client hammering a public route.
+  if (!rateLimit(`work-sample-get:${meta.ip}`, 120, 60_000)) {
+    return apiError("Too many requests. Please wait a moment.", 429);
+  }
   const assignment = await loadAssignmentByToken(token);
   if (!assignment) return apiError("That link is not valid.", 404);
 
@@ -74,8 +95,25 @@ export const POST = withErrorHandling(async (req, ctx) => {
 
   // ---- Submission: multipart, because it may carry a file -------------------
   if (contentType.includes("multipart/form-data")) {
+    // Checked before formData(), which buffers the entire body into memory
+    // before any per-field limit can apply. The ceiling is the file cap plus
+    // the text cap plus room for the encoding overhead.
+    const declared = Number(req.headers.get("content-length") ?? 0);
+    if (declared > MAX_DOCUMENT_BYTES + MAX_SUBMISSION_CHARS * 4 + 64 * 1024) {
+      return apiError("That submission is too large.", 413);
+    }
+
     const form = await req.formData();
-    const text = (form.get("text") as string | null) ?? null;
+    const parsed = multipartSchema.safeParse({
+      text: (form.get("text") as string | null) ?? null,
+    });
+    if (!parsed.success) {
+      return apiError(
+        `Your written response is longer than ${MAX_SUBMISSION_CHARS.toLocaleString()} characters. Please shorten it.`,
+        422,
+      );
+    }
+    const text = parsed.data.text;
     const file = form.get("file");
 
     let filePayload: { name: string; mimeType: string; bytes: Buffer } | null = null;

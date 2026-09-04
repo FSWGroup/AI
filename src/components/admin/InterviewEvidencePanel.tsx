@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { api, ApiError } from "@/lib/client/api";
 import { Badge, Button, Card, Textarea } from "@/components/ui";
+import { INTERVIEWER_CONSENT_STATEMENT } from "@/lib/interview-intel/consent";
 import { msToClock } from "@/lib/interview-intel/transcript";
 
 interface Party {
@@ -57,7 +58,7 @@ export function InterviewEvidencePanel({
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [message, setMessage] = useState<string | null>(null);
-  const [link, setLink] = useState<string | null>(null);
+  const [sentTo, setSentTo] = useState<string | null>(null);
   const [showTranscriptBox, setShowTranscriptBox] = useState(false);
 
   const load = useCallback(async () => {
@@ -83,7 +84,7 @@ export function InterviewEvidencePanel({
         `/api/admin/interviews/${interviewId}/recording`,
         { method: "POST", body },
       );
-      if (typeof out.candidateUrl === "string") setLink(out.candidateUrl);
+      if (typeof out.to === "string") setSentTo(out.to);
       if (typeof out.stored === "number") {
         const parts = [`${out.stored} quotes found`];
         if (Number(out.droppedUnlocatable) > 0) {
@@ -166,22 +167,34 @@ export function InterviewEvidencePanel({
         </ul>
       )}
 
-      {link && (
+      {sentTo && (
         <div className="mt-3 rounded-lg bg-emerald-50 p-3">
           <p className="text-xs font-semibold text-emerald-900">
-            Send this to the candidate before the interview:
+            We have emailed {sentTo} to ask.
           </p>
-          <input
-            readOnly
-            className="mt-2 w-full rounded border border-emerald-200 bg-white px-2 py-1 font-mono text-xs text-navy-800"
-            value={link}
-            onFocus={(e) => e.currentTarget.select()}
-          />
+          <p className="mt-1 text-xs leading-relaxed text-emerald-800">
+            The link goes to them and not to you, on purpose. Their answer has
+            to be theirs — a consent you could enter on their behalf would not
+            be one.
+          </p>
         </div>
       )}
 
       {error && <p className="mt-3 text-sm text-red-700">{error}</p>}
       {message && <p className="mt-3 text-sm text-navy-700">{message}</p>}
+
+      {me && me.status !== "GRANTED" && me.status !== "WITHDRAWN" && (
+        <div className="mt-4 rounded-lg bg-navy-50 p-3">
+          <p className="text-xs font-semibold uppercase tracking-wide text-navy-500">
+            What you are agreeing to
+          </p>
+          {INTERVIEWER_CONSENT_STATEMENT.split("\n\n").map((para, i) => (
+            <p key={i} className="mt-1 text-xs leading-relaxed text-navy-700">
+              {para}
+            </p>
+          ))}
+        </div>
+      )}
 
       <div className="mt-4 flex flex-wrap gap-2">
         {state.parties.length === 0 && (

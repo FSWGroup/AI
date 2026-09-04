@@ -14,7 +14,7 @@
  */
 
 import type { BandResult, NormTableData } from "./types";
-import { percentileFromCurve } from "@/lib/validation/norms";
+import { percentileFromCurve } from "./percentile-curve";
 
 /**
  * Provisional band thresholds over the 0-100 scaled score.

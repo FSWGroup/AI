@@ -72,7 +72,11 @@ export default async function InterviewConsentPage({
         ))}
       </div>
 
-      <InterviewConsentForm token={token} company={company} />
+      <InterviewConsentForm
+        token={token}
+        company={company}
+        current={consent.status as "PENDING" | "GRANTED" | "DECLINED" | "WITHDRAWN"}
+      />
     </main>
   );
 }

@@ -77,6 +77,25 @@ export async function requirePermission(permission: Permission): Promise<User> {
   return user;
 }
 
+/**
+ * Require any one of several permissions.
+ *
+ * For endpoints two different roles reach for different reasons — a work
+ * sample's rubric is read both by the person who wrote it and by the people
+ * marking against it — where the alternative is gating on some third, broader
+ * permission that both happen to hold and that a fourth role holds too.
+ */
+export async function requireAnyPermission(
+  permissions: Permission[],
+): Promise<User> {
+  const user = await getCurrentUser();
+  if (!user) throw new AuthError("Not signed in.", 401);
+  if (!permissions.some((p) => can(user.role, p))) {
+    throw new AuthError("You do not have permission to do that.", 403);
+  }
+  return user;
+}
+
 export async function requireAnyUser(): Promise<User> {
   const user = await getCurrentUser();
   if (!user) throw new AuthError("Not signed in.", 401);
@@ -100,13 +119,69 @@ export async function assertJobProfileAccess(
   }
 }
 
+/**
+ * Headers set by the edge itself, which a client cannot forge because the
+ * platform overwrites whatever arrived. Checked before anything else.
+ */
+const PLATFORM_IP_HEADERS = [
+  "x-nf-client-connection-ip", // Netlify
+  "cf-connecting-ip", // Cloudflare
+  "true-client-ip", // Akamai, Cloudflare Enterprise
+  "x-vercel-forwarded-for", // Vercel
+];
+
+/**
+ * How many proxies sit in front of this app. Used to pick the right entry out
+ * of X-Forwarded-For.
+ */
+const TRUSTED_PROXY_HOPS = Math.max(
+  1,
+  Number(process.env.TRUSTED_PROXY_HOPS ?? "1") || 1,
+);
+
+/**
+ * The client's address, as far as it can be established.
+ *
+ * Reading the LEFTMOST X-Forwarded-For entry — the obvious thing, and what
+ * this used to do — reads a value the client wrote. Every proxy appends; only
+ * the entries a proxy added are trustworthy. So a caller sending
+ * `X-Forwarded-For: 10.0.0.1` simply became 10.0.0.1, and since every public
+ * token route keys its rate limit on this, sending a different value each time
+ * turned the limits off entirely. It also meant an attacker chose what the
+ * audit log recorded about them.
+ *
+ * The order here is: a header the edge sets and overwrites, then the
+ * X-Forwarded-For entry contributed by our own outermost proxy (counting from
+ * the right, which is the end proxies append to), then the socket peer.
+ * Nothing falls back to the leftmost entry.
+ */
+export function clientIpFrom(get: (name: string) => string | null): string | undefined {
+  for (const name of PLATFORM_IP_HEADERS) {
+    const value = get(name)?.trim();
+    if (value) return value.split(",")[0].trim();
+  }
+
+  const forwarded = get("x-forwarded-for");
+  if (forwarded) {
+    const hops = forwarded
+      .split(",")
+      .map((v) => v.trim())
+      .filter(Boolean);
+    // hops=1 → the last entry, which our own proxy appended.
+    const index = hops.length - TRUSTED_PROXY_HOPS;
+    if (index >= 0 && hops[index]) return hops[index];
+    // Fewer entries than configured hops: the chain is not what we were told
+    // it is, so trust none of it.
+    return undefined;
+  }
+
+  return get("x-real-ip")?.trim() || undefined;
+}
+
 export async function requestMeta(): Promise<{ ip?: string; userAgent?: string }> {
   const h = await headers();
   return {
-    ip:
-      h.get("x-forwarded-for")?.split(",")[0]?.trim() ??
-      h.get("x-real-ip") ??
-      undefined,
+    ip: clientIpFrom((name) => h.get(name)),
     userAgent: h.get("user-agent") ?? undefined,
   };
 }

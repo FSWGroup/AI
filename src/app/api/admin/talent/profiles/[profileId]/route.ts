@@ -38,6 +38,15 @@ export const POST = withErrorHandling(async (req, ctx) => {
   const { profileId } = await ctx.params;
   const body = await parseBody(req, schema);
 
+  // One guard for every branch below. Without it a bad profile id surfaces as
+  // a foreign-key violation or a P2025 — a 500 that reads like the server is
+  // broken rather than like the request was wrong.
+  const profile = await prisma.talentProfile.findUnique({
+    where: { id: profileId },
+    select: { id: true },
+  });
+  if (!profile) return apiError("That talent profile does not exist.", 404);
+
   switch (body.action) {
     case "tag": {
       const label = body.label.trim();

@@ -194,6 +194,15 @@ export function SelfSchedulePanel({
             Only times when every <em>required</em> person is free are offered.
           </p>
           <div className="mt-2 space-y-1">
+            {teamUsers.length === 0 && (
+              <p className="text-sm text-navy-500">
+                Nobody is on the hiring team for this role yet. Add the
+                interviewers to the requisition first — their working hours and
+                busy times are shown to the candidate, and their address goes
+                on the invitation, so the panel comes from the recorded team
+                rather than from everyone with an account.
+              </p>
+            )}
             {teamUsers.map((u) => (
               <div key={u.id} className="flex items-center justify-between gap-2">
                 <span className="text-sm text-navy-800">{u.name}</span>

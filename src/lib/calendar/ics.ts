@@ -9,13 +9,33 @@
 
 import type { CalendarEvent } from "./types";
 
-/** RFC 5545 escaping: backslash, semicolon, comma, and newline. */
+/**
+ * RFC 5545 escaping: backslash, semicolon, comma, and newline.
+ *
+ * Note the doubled backslashes. `"\\;"` is not an escaped semicolon in
+ * JavaScript — `\\;` is not a recognised escape sequence, so the string is
+ * just `";"` and the replacement was a no-op. A candidate named
+ * `Ana; Cruz` then injected a parameter break into the `ATTENDEE;CN=` line
+ * that carries their name.
+ */
 function escapeText(value: string): string {
   return value
     .replace(/\\/g, "\\\\")
-    .replace(/;/g, "\;")
+    .replace(/;/g, "\\;")
     .replace(/,/g, "\\,")
     .replace(/\r?\n/g, "\\n");
+}
+
+/**
+ * An address, or nothing.
+ *
+ * Addresses land in `mailto:` values, which are not text properties and are
+ * not escaped by `escapeText`. Rather than mangle a malformed address into
+ * something that parses, drop it: an invitation missing an attendee is a
+ * visible problem, and one carrying an injected property is not.
+ */
+function safeAddress(value: string): string | null {
+  return /^[^\s;:,<>"\\]+@[^\s;:,<>"\\]+$/.test(value) ? value : null;
 }
 
 /**
@@ -67,14 +87,17 @@ export function buildIcs(
 
   if (event.description) lines.push(`DESCRIPTION:${escapeText(event.description)}`);
   if (event.location) lines.push(`LOCATION:${escapeText(event.location)}`);
-  if (event.organizerEmail) {
+  const organizer = event.organizerEmail ? safeAddress(event.organizerEmail) : null;
+  if (organizer) {
     const cn = event.organizerName ? `;CN=${escapeText(event.organizerName)}` : "";
-    lines.push(`ORGANIZER${cn}:mailto:${event.organizerEmail}`);
+    lines.push(`ORGANIZER${cn}:mailto:${organizer}`);
   }
   for (const a of event.attendees ?? []) {
+    const address = safeAddress(a.email);
+    if (!address) continue;
     const cn = a.name ? `;CN=${escapeText(a.name)}` : "";
     lines.push(
-      `ATTENDEE${cn};ROLE=REQ-PARTICIPANT;PARTSTAT=NEEDS-ACTION;RSVP=TRUE:mailto:${a.email}`,
+      `ATTENDEE${cn};ROLE=REQ-PARTICIPANT;PARTSTAT=NEEDS-ACTION;RSVP=TRUE:mailto:${address}`,
     );
   }
 

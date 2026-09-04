@@ -16,7 +16,8 @@
  * claim than the report is making.
  */
 
-import { percentileOf, quantile } from "./stats";
+import { quantile } from "./stats";
+import { percentileFromCurve } from "@/lib/scoring/percentile-curve";
 import { MIN_N_NORM_ACTIVE, MIN_N_NORM_DRAFT, normGate } from "./gates";
 
 /**
@@ -153,28 +154,6 @@ export function previewBand(
   };
 }
 
-/** Linear interpolation along a stored raw-to-percentile curve. */
-export function percentileFromCurve(
-  curve: { raw: number; percentile: number }[],
-  rawScore: number,
-): number {
-  if (curve.length === 0) return Number.NaN;
-  const sorted = [...curve].sort((a, b) => a.raw - b.raw);
-  if (rawScore <= sorted[0].raw) return sorted[0].percentile;
-  const last = sorted[sorted.length - 1];
-  if (rawScore >= last.raw) return last.percentile;
-  for (let i = 1; i < sorted.length; i++) {
-    if (rawScore <= sorted[i].raw) {
-      const lo = sorted[i - 1];
-      const hi = sorted[i];
-      if (hi.raw === lo.raw) return hi.percentile;
-      const t = (rawScore - lo.raw) / (hi.raw - lo.raw);
-      return lo.percentile + t * (hi.percentile - lo.percentile);
-    }
-  }
-  return last.percentile;
-}
-
 /**
  * How many people would change band if this table were activated.
  *
@@ -203,6 +182,4 @@ export function bandShiftPreview(
   return { unchanged, moved, maxShift, distribution };
 }
 
-/** Percentile of a raw score in a raw sample. Used for study descriptives. */
-export const rawPercentile = (sample: number[], value: number): number =>
-  percentileOf([...sample].sort((a, b) => a - b), value);
+export { percentileFromCurve };

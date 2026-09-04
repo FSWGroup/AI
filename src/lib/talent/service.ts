@@ -261,6 +261,14 @@ export async function addToPool(args: {
     return { ok: false, reason: "That address is on the do-not-contact list." };
   }
 
+  // Checked rather than left to the foreign key: a bad pool id should say so,
+  // not surface as a 500 that reads like the server is broken.
+  const pool = await prisma.talentPool.findUnique({ where: { id: args.poolId } });
+  if (!pool) return { ok: false, reason: "That pool does not exist." };
+  if (!pool.active) {
+    return { ok: false, reason: `The pool "${pool.name}" is no longer active.` };
+  }
+
   await prisma.talentPoolMember.upsert({
     where: { poolId_profileId: { poolId: args.poolId, profileId: args.profileId } },
     create: {
@@ -365,9 +373,27 @@ export async function searchTalent(filters: TalentSearchFilters, take = 100) {
       : {}),
   };
 
+  // An explicit select rather than a bare include, because `include` carries
+  // every scalar on the row — `consentTokenHash` among them, which went out
+  // over the API to anyone who could run a search. It is a SHA-256 of a
+  // 256-bit token and so cannot be replayed, but a secret-shaped field with
+  // no reason to leave the server should not leave the server.
   return prisma.talentProfile.findMany({
     where,
-    include: {
+    select: {
+      id: true,
+      candidateId: true,
+      consentStatus: true,
+      consentAskedAt: true,
+      consentAt: true,
+      expiresAt: true,
+      consentSource: true,
+      interests: true,
+      summary: true,
+      lastContactedAt: true,
+      contactCount: true,
+      createdAt: true,
+      updatedAt: true,
       candidate: {
         select: { id: true, firstName: true, lastName: true, email: true },
       },
@@ -406,6 +432,9 @@ export async function matchesForRequisition(
           lastName: true,
           email: true,
           attempts: { select: { id: true }, take: 1 },
+          // The employment record, not the application status: somebody hired
+          // in 2024 who has since left is a legitimate person to call.
+          hires: { select: { status: true } },
           applications: {
             select: {
               requisitionId: true,
@@ -441,6 +470,13 @@ export async function matchesForRequisition(
       name: `${p.candidate.firstName} ${p.candidate.lastName}`,
       tags: p.tags.map((t) => t.tag.label),
       assessed: p.candidate.attempts.length > 0,
+      currentlyEmployed: p.candidate.hires.some(
+        (h) => h.status === "ACTIVE" || h.status === "ON_LEAVE",
+      ),
+      formerEmployee: p.candidate.hires.some(
+        (h) =>
+          h.status === "DEPARTED_VOLUNTARY" || h.status === "DEPARTED_INVOLUNTARY",
+      ),
       applications: p.candidate.applications.map((a) => ({
         requisitionId: a.requisitionId,
         requisitionTitle: a.requisition.title,

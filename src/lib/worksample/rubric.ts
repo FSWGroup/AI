@@ -453,11 +453,39 @@ export function validateCandidateSubmission(
   return errors;
 }
 
-/** Extensions are compared lower case and without the dot. */
+/**
+ * Extensions are compared lower case and without the dot.
+ *
+ * An empty allowlist is a refusal, not a wildcard. The route that creates a
+ * file-taking work sample already insists on a list, with the reason written
+ * out — "accepting anything means accepting an executable" — and returning
+ * true here for the empty case was the hole that sentence describes, reachable
+ * through any TEXT sample, which is never asked for a list at all.
+ */
 export function fileTypeAllowed(fileName: string, allowed: string[]): boolean {
-  if (allowed.length === 0) return true;
+  if (allowed.length === 0) return false;
   const dot = fileName.lastIndexOf(".");
   if (dot < 0) return false;
   const ext = fileName.slice(dot + 1).toLowerCase();
   return allowed.map((a) => a.toLowerCase().replace(/^\./, "")).includes(ext);
+}
+
+/**
+ * The status to SHOW for an assignment.
+ *
+ * Expiry is derived at read time rather than written by a scheduled job.
+ * `canStart` already refuses a late start from the due date itself, so a job
+ * would only be maintaining a display field — and a display field maintained
+ * by a cron is a display field that is wrong whenever the cron did not run.
+ *
+ * Nobody is rejected by this either way. The assignment stops accepting a
+ * start; the application stays exactly where it is, and a recruiter decides
+ * what that means.
+ */
+export function effectiveAssignmentStatus(
+  assignment: { status: string; dueAt: Date },
+  now: Date = new Date(),
+): string {
+  if (assignment.status === "ASSIGNED" && assignment.dueAt < now) return "EXPIRED";
+  return assignment.status;
 }

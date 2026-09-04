@@ -16,7 +16,13 @@ import {
 
 export const runtime = "nodejs";
 
-const schema = z.object({ decision: z.enum(["GRANTED", "DECLINED"]) });
+// WITHDRAWN is here because the wording the candidate agreed to says it is:
+// "you can change your mind during or after the interview". The link stays
+// live after a yes so that sentence is something they can act on themselves,
+// rather than a favour they have to ask an employee for.
+const schema = z.object({
+  decision: z.enum(["GRANTED", "DECLINED", "WITHDRAWN"]),
+});
 
 export const POST = withErrorHandling(async (req, ctx) => {
   const { token } = await ctx.params;

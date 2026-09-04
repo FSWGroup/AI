@@ -6,10 +6,13 @@
  * feature is only lawful while there isn't one.
  */
 
+import type { User } from "@prisma/client";
 import { z } from "zod";
 import { prisma } from "@/lib/db";
 import { apiError, apiOk, withErrorHandling } from "@/lib/api";
 import { requirePermission, requestMeta } from "@/lib/auth/session";
+import { canAccessRecordings } from "@/lib/auth/rbac";
+import { assertInterviewAccess } from "@/lib/auth/scope";
 import { env } from "@/lib/env";
 import { isAiConfigured } from "@/lib/ai/client";
 import { MAX_DOCUMENT_BYTES } from "@/lib/documents/extract";
@@ -35,20 +38,60 @@ const jsonSchema = z.discriminatedUnion("action", [
   z.object({ action: z.literal("destroy") }),
 ]);
 
+/**
+ * The gate both handlers open with.
+ *
+ * MANAGE_INTERVIEWS says you run interviews; it does not say you may listen
+ * to one. Recording access is read from OrgSettings.recordingAccessRoles
+ * exactly as it is for assessment recordings, because a room the candidate
+ * agreed to record for a hiring decision is not a room every interviewer in
+ * the company may replay. And the job scope answers "whose interview?" —
+ * without it a hiring manager holds MANAGE_INTERVIEWS over every requisition
+ * in the business, including the verbatim quotes pulled from the transcript.
+ *
+ * A mistyped id is a 404, never a 500.
+ */
+async function guardInterview(user: User, interviewId: string) {
+  const [found, settings] = await Promise.all([
+    prisma.interview.findUnique({ where: { id: interviewId }, select: { id: true } }),
+    prisma.orgSettings.findUnique({ where: { id: "org" } }),
+  ]);
+  if (!found) return apiError("That interview does not exist.", 404);
+  if (
+    !canAccessRecordings(
+      user.role,
+      settings?.recordingAccessRoles ?? ["SUPER_ADMIN", "HR_ADMIN"],
+    )
+  ) {
+    return apiError("You do not have permission to access interview recordings.", 403);
+  }
+  await assertInterviewAccess(user, interviewId);
+  return null;
+}
+
 export const GET = withErrorHandling(async (_req, ctx) => {
   const user = await requirePermission("MANAGE_INTERVIEWS");
   const { interviewId } = await ctx.params;
+  const denied = await guardInterview(user, interviewId);
+  if (denied) return denied;
 
-  const [{ expected, consents, gate }, recording] = await Promise.all([
-    consentState(interviewId),
-    prisma.interviewRecording.findUnique({
-      where: { interviewId },
-      include: {
-        segments: { orderBy: { orderIndex: "asc" }, take: 500 },
-        evidence: { orderBy: { startMs: "asc" } },
-      },
-    }),
-  ]);
+  // Count the transcript rather than loading it. This response reports a
+  // number and a boolean about the segments and shows none of them, and the
+  // `take: 500` that used to bound the load also silently capped the number:
+  // a 60-minute interview runs to well over a thousand lines, every one of
+  // which reported as exactly 500.
+  const [{ expected, consents, gate }, recording, segmentCount, timestamped] =
+    await Promise.all([
+      consentState(interviewId),
+      prisma.interviewRecording.findUnique({
+        where: { interviewId },
+        include: { evidence: { orderBy: { startMs: "asc" }, take: 200 } },
+      }),
+      prisma.transcriptSegment.count({ where: { recording: { interviewId } } }),
+      prisma.transcriptSegment.count({
+        where: { recording: { interviewId }, startMs: { gte: 0 } },
+      }),
+    ]);
 
   return apiOk({
     canRecord: gate.ok,
@@ -71,8 +114,8 @@ export const GET = withErrorHandling(async (_req, ctx) => {
           fileName: recording.fileName,
           durationSeconds: recording.durationSeconds,
           transcriptSource: recording.transcriptSource,
-          segmentCount: recording.segments.length,
-          hasTimestamps: recording.segments.some((s) => s.startMs >= 0),
+          segmentCount,
+          hasTimestamps: timestamped > 0,
           evidence: recording.evidence.map((e) => ({
             id: e.id,
             competencyName: e.competencyName,
@@ -90,6 +133,8 @@ export const GET = withErrorHandling(async (_req, ctx) => {
 export const POST = withErrorHandling(async (req, ctx) => {
   const user = await requirePermission("MANAGE_INTERVIEWS");
   const { interviewId } = await ctx.params;
+  const denied = await guardInterview(user, interviewId);
+  if (denied) return denied;
   const contentType = req.headers.get("content-type") ?? "";
 
   // ---- Audio upload ---------------------------------------------------------
@@ -127,6 +172,7 @@ export const POST = withErrorHandling(async (req, ctx) => {
         actorId: user.id,
         baseUrl: env.appBaseUrl,
       });
+      if (!out.sent) return apiError(out.reason, 409);
       return apiOk(out, { status: 201 });
     }
     case "my_consent": {

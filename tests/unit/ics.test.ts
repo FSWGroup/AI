@@ -37,7 +37,7 @@ describe("buildIcs", () => {
       title: "Sales, ops; and a\\thing",
       description: "Line one\nLine two",
     });
-    expect(ics).toContain("SUMMARY:Sales\\, ops\; and a\\\\thing");
+    expect(ics).toContain("SUMMARY:Sales\\, ops\\; and a\\\\thing");
     expect(ics).toContain("DESCRIPTION:Line one\\nLine two");
   });
 

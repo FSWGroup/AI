@@ -45,7 +45,16 @@ export function withErrorHandling(
   };
 }
 
-/** Simple fixed-window, per-key in-memory rate limiter for sensitive routes. */
+/**
+ * Simple fixed-window, per-key in-memory rate limiter for sensitive routes.
+ *
+ * Per-process and per-instance: the counters reset on deploy and are not
+ * shared between serverless instances, so the effective limit is the
+ * configured one multiplied by however many instances are warm. It raises the
+ * cost of abuse rather than capping it. Moving the buckets to the database or
+ * to a shared cache is the fix when that stops being enough — the call sites
+ * do not change.
+ */
 const rateBuckets = new Map<string, { count: number; resetAt: number }>();
 
 export function rateLimit(

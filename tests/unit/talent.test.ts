@@ -150,6 +150,8 @@ function candidate(over: Partial<MatchCandidate> = {}): MatchCandidate {
     name: "Ana Cruz",
     tags: [],
     assessed: false,
+    currentlyEmployed: false,
+    formerEmployee: false,
     applications: [],
     ...over,
   };
@@ -217,6 +219,37 @@ describe("findMatches", () => {
       }),
     ]);
     expect(matches[0].matchedTags).toEqual(["saas"]);
+  });
+
+  it("never surfaces someone who already works here", () => {
+    // HIRED is the highest stage rank, so without the check a current
+    // employee sorts to the TOP of the list and is the first person a
+    // recruiter is told to call back about a job they already have.
+    const matches = findMatches(OPENING, [
+      candidate({
+        currentlyEmployed: true,
+        applications: [application({ status: "HIRED", furthestStageKind: "HIRED" })],
+      }),
+    ]);
+    expect(matches).toHaveLength(0);
+  });
+
+  it("does surface someone who worked here and left, and says so", () => {
+    // A boomerang is a legitimate person to call, and the fact that they
+    // worked here is the most useful thing on their row.
+    const matches = findMatches(OPENING, [
+      candidate({
+        currentlyEmployed: false,
+        formerEmployee: true,
+        applications: [application({ status: "HIRED", furthestStageKind: "HIRED" })],
+      }),
+    ]);
+    expect(matches).toHaveLength(1);
+    const kinds = matches[0].reasons.map((r) => r.kind);
+    expect(kinds).toContain("FORMER_EMPLOYEE");
+    expect(matches[0].reasons.find((r) => r.kind === "FORMER_EMPLOYEE")!.text).toContain(
+      "old manager",
+    );
   });
 
   it("never resurfaces someone for the requisition they are already in", () => {

@@ -20,7 +20,8 @@ export interface EmailPayload {
     | "application_received"
     | "rejection"
     | "interview_invitation"
-    | "offer_sent";
+    | "offer_sent"
+    | "interview_recording_consent";
   subject: string;
   bodyText: string;
 }

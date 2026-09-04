@@ -136,24 +136,6 @@ export function formatTimeIn(instant: Date, timeZone: string): string {
   }).format(instant);
 }
 
-export function formatDateIn(instant: Date, timeZone: string): string {
-  return new Intl.DateTimeFormat("en-US", {
-    timeZone,
-    weekday: "long",
-    month: "long",
-    day: "numeric",
-  }).format(instant);
-}
-
-/** The short zone name a person would recognize, e.g. "PST" or "GMT+8". */
-export function zoneLabel(instant: Date, timeZone: string): string {
-  const parts = new Intl.DateTimeFormat("en-US", {
-    timeZone,
-    timeZoneName: "short",
-  }).formatToParts(instant);
-  return parts.find((p) => p.type === "timeZoneName")?.value ?? timeZone;
-}
-
 /** Whether a string is an IANA zone this runtime actually knows. */
 export function isValidTimeZone(timeZone: string): boolean {
   try {

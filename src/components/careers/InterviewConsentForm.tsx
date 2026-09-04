@@ -3,18 +3,25 @@
 import { useState } from "react";
 import { Button, Card } from "@/components/ui";
 
+type Decision = "GRANTED" | "DECLINED" | "WITHDRAWN";
+
 export function InterviewConsentForm({
   token,
   company,
+  current,
 }: {
   token: string;
   company: string;
+  /** What they have already said, if anything. Drives the withdrawal view. */
+  current?: Decision | "PENDING";
 }) {
   const [busy, setBusy] = useState(false);
-  const [done, setDone] = useState<"GRANTED" | "DECLINED" | null>(null);
+  const [done, setDone] = useState<Decision | null>(
+    current === "GRANTED" ? "GRANTED" : null,
+  );
   const [error, setError] = useState<string | null>(null);
 
-  const answer = async (decision: "GRANTED" | "DECLINED") => {
+  const answer = async (decision: Decision) => {
     setBusy(true);
     setError(null);
     try {
@@ -34,6 +41,24 @@ export function InterviewConsentForm({
     }
   };
 
+  if (done === "WITHDRAWN") {
+    return (
+      <Card className="mt-8 p-6">
+        <h2 className="text-lg font-semibold text-navy-900">
+          Withdrawn — the recording has been deleted
+        </h2>
+        <p className="mt-2 leading-relaxed text-navy-600">
+          Recording has stopped and anything already captured, including the
+          written transcript, has been destroyed. Nothing from it is kept.
+        </p>
+        <p className="mt-2 leading-relaxed text-navy-600">
+          Your application is unaffected, and nobody involved in the decision is
+          told that you withdrew.
+        </p>
+      </Card>
+    );
+  }
+
   if (done === "GRANTED") {
     return (
       <Card className="mt-8 p-6">
@@ -44,9 +69,19 @@ export function InterviewConsentForm({
         </p>
         <p className="mt-2 leading-relaxed text-navy-600">
           You can change your mind at any point, including during the interview
-          and afterwards. Tell your interviewer and the recording stops and is
-          deleted.
+          and afterwards. Keep this link: it is yours, it stays live, and the
+          button below does it without you having to ask anyone.
         </p>
+        {error && <p className="mt-4 text-sm text-red-700">{error}</p>}
+        <div className="mt-4">
+          <Button
+            variant="secondary"
+            disabled={busy}
+            onClick={() => answer("WITHDRAWN")}
+          >
+            {busy ? "Saving…" : "Change my mind — stop and delete the recording"}
+          </Button>
+        </div>
       </Card>
     );
   }

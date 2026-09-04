@@ -23,6 +23,8 @@ import {
   type GradeLike,
 } from "./rubric";
 
+export { effectiveAssignmentStatus } from "./rubric";
+
 const ALPHABET = "ABCDEFGHJKMNPQRSTUVWXYZ23456789";
 
 /**
@@ -212,9 +214,20 @@ export async function submitAssignment(args: {
     { text: args.text, hasFile },
     assignment.workSample.submissionKind,
   );
-  if (args.file && !fileTypeAllowed(args.file.name, assignment.workSample.allowedFileTypes)) {
+  // A written task takes no file. The creation route only demands an
+  // allowlist when the task asks for a file, so a TEXT sample carries an empty
+  // one — and storing whatever arrived regardless of `submissionKind` turned
+  // that omission into "accepts anything", executables included.
+  if (args.file && assignment.workSample.submissionKind === "TEXT") {
+    errors.push("This task is written only. There is nowhere to attach a file.");
+  } else if (
+    args.file &&
+    !fileTypeAllowed(args.file.name, assignment.workSample.allowedFileTypes)
+  ) {
     errors.push(
-      `That file type is not accepted. This task takes: ${assignment.workSample.allowedFileTypes.join(", ")}.`,
+      assignment.workSample.allowedFileTypes.length > 0
+        ? `That file type is not accepted. This task takes: ${assignment.workSample.allowedFileTypes.join(", ")}.`
+        : "This task does not accept file uploads.",
     );
   }
   if (errors.length > 0) return { ok: false, errors };
@@ -257,21 +270,6 @@ export async function submitAssignment(args: {
   return { ok: true };
 }
 
-/**
- * Close assignments whose start window has passed.
- *
- * Nobody is rejected by this. The assignment stops accepting a start; the
- * application stays exactly where it is, and a recruiter decides what that
- * means.
- */
-export async function expireOverdueAssignments(): Promise<number> {
-  const result = await prisma.workSampleAssignment.updateMany({
-    where: { status: "ASSIGNED", dueAt: { lt: new Date() } },
-    data: { status: "EXPIRED" },
-  });
-  return result.count;
-}
-
 // ---------------------------------------------------------------------------
 // Grading
 // ---------------------------------------------------------------------------
@@ -294,12 +292,12 @@ export function toCriterionLike(rows: {
   }));
 }
 
-export async function loadGrades(assignmentId: string): Promise<GradeLike[]> {
-  const grades = await prisma.workSampleGrade.findMany({
-    where: { assignmentId },
-    include: { grader: { select: { name: true } }, ratings: true },
-  });
-  return grades.map((g) => ({
+type GradeRow = Prisma.WorkSampleGradeGetPayload<{
+  include: { grader: { select: { name: true } }; ratings: true };
+}>;
+
+function toGradeLike(g: GradeRow): GradeLike {
+  return {
     id: g.id,
     graderId: g.graderId,
     graderName: g.grader.name,
@@ -313,7 +311,42 @@ export async function loadGrades(assignmentId: string): Promise<GradeLike[]> {
       level: r.level,
       note: r.note,
     })),
-  }));
+  };
+}
+
+export async function loadGrades(assignmentId: string): Promise<GradeLike[]> {
+  const grades = await prisma.workSampleGrade.findMany({
+    where: { assignmentId },
+    include: { grader: { select: { name: true } }, ratings: true },
+  });
+  return grades.map(toGradeLike);
+}
+
+/**
+ * The same thing for a whole page of submissions, in one query.
+ *
+ * The listing that shows grading progress for every assignment on a work
+ * sample used to call `loadGrades` in an awaited loop: three queries per row,
+ * serially, so a popular task turned a page render into thousands of round
+ * trips. Nothing about the per-row shape needed that — the grades are one
+ * `IN` away.
+ */
+export async function loadGradesFor(
+  assignmentIds: string[],
+): Promise<Map<string, GradeLike[]>> {
+  const byAssignment = new Map<string, GradeLike[]>();
+  if (assignmentIds.length === 0) return byAssignment;
+
+  const grades = await prisma.workSampleGrade.findMany({
+    where: { assignmentId: { in: assignmentIds } },
+    include: { grader: { select: { name: true } }, ratings: true },
+  });
+  for (const g of grades) {
+    const list = byAssignment.get(g.assignmentId);
+    if (list) list.push(toGradeLike(g));
+    else byAssignment.set(g.assignmentId, [toGradeLike(g)]);
+  }
+  return byAssignment;
 }
 
 /**
