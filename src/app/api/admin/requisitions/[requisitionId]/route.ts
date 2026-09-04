@@ -7,6 +7,7 @@ import { z } from "zod";
 import { prisma } from "@/lib/db";
 import { apiError, apiOk, parseBody, withErrorHandling } from "@/lib/api";
 import { getCurrentUser } from "@/lib/auth/session";
+import { assertRequisitionAccess } from "@/lib/auth/scope";
 import { can } from "@/lib/auth/rbac";
 import { audit, AUDIT_ACTIONS } from "@/lib/audit";
 import { canDecide, chainStatus, type ApprovalStep } from "@/lib/ats/approvals";
@@ -94,6 +95,10 @@ export const POST = withErrorHandling(async (req, ctx) => {
   const user = await getCurrentUser();
   if (!user) return apiError("Not signed in.", 401);
   const { requisitionId } = await ctx.params;
+  // MANAGE_PIPELINE and its siblings are held globally by HIRING_MANAGER, so
+  // the permission answers "may you do this?" and nothing answered "to whose
+  // candidate?". The scope check is what answers that.
+  await assertRequisitionAccess(user, requisitionId);
   const body = await parseBody(req, schema);
 
   const requisition = await prisma.requisition.findUnique({

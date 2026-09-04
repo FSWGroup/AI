@@ -11,6 +11,7 @@ import { z } from "zod";
 import { prisma } from "@/lib/db";
 import { apiError, apiOk, parseBody, withErrorHandling } from "@/lib/api";
 import { getCurrentUser } from "@/lib/auth/session";
+import { assertApplicationAccess } from "@/lib/auth/scope";
 import { can } from "@/lib/auth/rbac";
 import { audit, AUDIT_ACTIONS } from "@/lib/audit";
 import { generateToken, hashToken } from "@/lib/crypto";
@@ -34,6 +35,10 @@ export const POST = withErrorHandling(async (req, ctx) => {
     return apiError("You cannot start a social media review.", 403);
   }
   const { applicationId } = await ctx.params;
+  // MANAGE_PIPELINE and its siblings are held globally by HIRING_MANAGER, so
+  // the permission answers "may you do this?" and nothing answered "to whose
+  // candidate?". The scope check is what answers that.
+  await assertApplicationAccess(user, applicationId);
   const body = await parseBody(req, schema);
 
   const [application, settings] = await Promise.all([

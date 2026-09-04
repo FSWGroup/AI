@@ -78,3 +78,34 @@ describe("recording access (configurable, least privilege by default)", () => {
     expect(canAccessRecordings("HR_ADMIN", ["SUPER_ADMIN"])).toBe(false);
   });
 });
+
+/**
+ * The permissions a job-scoped role holds GLOBALLY.
+ *
+ * Each of these reads as "may you do this?" and says nothing about whose
+ * candidate. A hiring manager holds every one of them over every requisition
+ * in the company, so each is only safe next to a scope check — that is the
+ * whole reason `isJobScoped` exists. This test is a reminder at the point
+ * where somebody would add the next one.
+ */
+describe("permissions that mean nothing without a job scope", () => {
+  const NEEDS_SCOPE = [
+    "MANAGE_PIPELINE",
+    "MANAGE_INTERVIEWS",
+    "GRADE_WORK_SAMPLES",
+    "SUBMIT_SCORECARD",
+    "VIEW_REQUISITIONS",
+  ] as const;
+
+  it("are held globally by the job-scoped role, so the route must scope them", () => {
+    expect(isJobScoped("HIRING_MANAGER")).toBe(true);
+    for (const permission of NEEDS_SCOPE) {
+      expect(can("HIRING_MANAGER", permission)).toBe(true);
+    }
+  });
+
+  it("does not job-scope the roles whose remit is the whole company", () => {
+    expect(isJobScoped("HR_ADMIN")).toBe(false);
+    expect(isJobScoped("SUPER_ADMIN")).toBe(false);
+  });
+});

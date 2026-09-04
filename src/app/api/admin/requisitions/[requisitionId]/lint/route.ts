@@ -3,11 +3,16 @@
 import { prisma } from "@/lib/db";
 import { apiError, apiOk, withErrorHandling } from "@/lib/api";
 import { requirePermission } from "@/lib/auth/session";
+import { assertRequisitionAccess } from "@/lib/auth/scope";
 import { lintJobDescription } from "@/lib/ats/jd-linter";
 
 export const GET = withErrorHandling(async (_req, ctx) => {
-  await requirePermission("VIEW_REQUISITIONS");
+  const user = await requirePermission("VIEW_REQUISITIONS");
   const { requisitionId } = await ctx.params;
+  // MANAGE_PIPELINE and its siblings are held globally by HIRING_MANAGER, so
+  // the permission answers "may you do this?" and nothing answered "to whose
+  // candidate?". The scope check is what answers that.
+  await assertRequisitionAccess(user, requisitionId);
 
   const requisition = await prisma.requisition.findUnique({
     where: { id: requisitionId },
