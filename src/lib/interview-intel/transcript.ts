@@ -37,6 +37,14 @@ const CUE_LINE = /^(.+?)\s*-->\s*(.+?)(?:\s+.*)?$/;
 /** "Ana Cruz: I rewrote the import" — a label, then a colon. */
 const SPEAKER_PREFIX = /^([A-Za-z][\w .'-]{0,40}):\s*(.*)$/;
 
+/** A cue line whose two halves actually parse as timestamps. */
+function isCueLine(line: string): boolean {
+  const m = line.match(CUE_LINE);
+  return (
+    m !== null && parseTimestamp(m[1]) !== null && parseTimestamp(m[2]) !== null
+  );
+}
+
 /**
  * Parse WebVTT or SRT.
  *
@@ -65,9 +73,23 @@ export function parseCueFormat(input: string): Segment[] {
     i++;
     if (startMs === null || endMs === null) continue;
 
+    // Stop at the next cue as well as at a blank line.
+    //
+    // Some tools emit no blank line between cues. Stopping only at a blank
+    // one then swallowed the next cue's timestamp line and everything after
+    // it, collapsing the whole file into a single segment whose text was the
+    // remaining transcript with raw timestamps embedded in it — all timing
+    // lost, all speaker attribution after the first lost, and the model fed
+    // timestamps as dialogue.
     const textLines: string[] = [];
     while (i < lines.length && lines[i].trim() !== "") {
-      textLines.push(lines[i].trim());
+      const next = lines[i].trim();
+      if (isCueLine(next)) break;
+      // An SRT cue index, when it directly precedes a cue line.
+      if (/^\d+$/.test(next) && i + 1 < lines.length && isCueLine(lines[i + 1].trim())) {
+        break;
+      }
+      textLines.push(next);
       i++;
     }
     if (textLines.length === 0) continue;
@@ -107,13 +129,20 @@ export function parsePlainText(input: string): Segment[] {
     .filter(Boolean);
 
   return paragraphs.map((p, index) => {
-    const withSpeaker = p.match(SPEAKER_PREFIX);
+    // Flattened BEFORE the speaker match, not after.
+    //
+    // SPEAKER_PREFIX ends `(.*)$` with no `s` flag, so `.` cannot cross a
+    // newline: any turn that ran to a second line failed to match, and the
+    // label stayed in the quotable text with speakerLabel null. Attribution
+    // is the thing this layer exists to carry.
+    const flat = p.replace(/\s+/g, " ").trim();
+    const withSpeaker = flat.match(SPEAKER_PREFIX);
     return {
       orderIndex: index,
       speakerLabel: withSpeaker ? withSpeaker[1].trim() : null,
       startMs: -1,
       endMs: -1,
-      text: (withSpeaker ? withSpeaker[2] : p).replace(/\s+/g, " ").trim(),
+      text: (withSpeaker ? withSpeaker[2] : flat).trim(),
     };
   });
 }
@@ -126,11 +155,17 @@ export function detectFormat(input: string): TranscriptFormat {
 
   // Line by line: CUE_LINE is anchored, so testing it against a whole
   // multi-line document never matches and every cue format looks like prose.
+  //
+  // And the captured halves have to parse as timestamps. CUE_LINE is a loose
+  // shape — anything, an arrow, anything — so a sentence like "we moved the
+  // build from Jenkins --> GitHub Actions" made a plain-text transcript
+  // detect as WebVTT, and the cue parser then produced zero segments from it.
+  // The whole transcript uploaded as nothing at all.
   const cue = head
     .replace(/\r\n/g, "\n")
     .split("\n")
     .map((l) => l.trim())
-    .find((l) => l.includes("-->") && CUE_LINE.test(l));
+    .find(isCueLine);
   if (!cue) return "text";
 
   // SRT writes milliseconds after a comma, WebVTT after a dot. Look at the
@@ -159,7 +194,14 @@ export function transcriptDurationSeconds(segments: Segment[]): number | null {
   return Math.round(Math.max(...timed.map((s) => s.endMs)) / 1000);
 }
 
-/** Render for the model, with positions it can cite back. */
+/**
+ * Render for the model, with positions it can cite back.
+ *
+ * A transcript longer than `maxChars` is cut, and the cut is marked — without
+ * the marker the model has no way to know it was handed a partial interview,
+ * and neither does anyone reading what came back. Evidence still cannot be
+ * drawn from the part that was dropped; the caller has to know that.
+ */
 export function transcriptForPrompt(segments: Segment[], maxChars = 120_000): string {
   const lines: string[] = [];
   let used = 0;
@@ -167,7 +209,12 @@ export function transcriptForPrompt(segments: Segment[], maxChars = 120_000): st
     const stamp = s.startMs >= 0 ? msToClock(s.startMs) : `#${s.orderIndex}`;
     const who = s.speakerLabel ? `${s.speakerLabel}` : "Unknown speaker";
     const line = `[${stamp}] ${who}: ${s.text}`;
-    if (used + line.length > maxChars) break;
+    if (used + line.length > maxChars) {
+      lines.push(
+        `[…] The transcript continues past this point and has been cut here to fit. ${segments.length - lines.length} further lines are not shown, and nothing from them can be quoted.`,
+      );
+      break;
+    }
     lines.push(line);
     used += line.length + 1;
   }
@@ -193,6 +240,12 @@ export function msToClock(ms: number): string {
  * text in the transcript is what makes a quote checkable — and a quote that
  * cannot be located is one this platform refuses to show, because an
  * unlocatable quote attributed to a candidate is a fabrication.
+ *
+ * A sentence said twice resolves to the FIRST occurrence. The model is asked
+ * for a position and may well have meant the later one, so a reviewer can be
+ * sent to a real utterance of the words that is not the one being cited.
+ * Nothing here can tell them apart from the text alone; it is the known limit
+ * of matching on words rather than on position.
  */
 export function locateQuote(
   segments: Segment[],
@@ -207,8 +260,16 @@ export function locateQuote(
     }
   }
   // A quote can legitimately run across a pause and therefore across segments.
-  for (let i = 0; i < segments.length - 1; i++) {
-    for (let span = 2; span <= 4 && i + span <= segments.length; span++) {
+  //
+  // Span is the OUTER loop, so the tightest window that contains the quote
+  // wins. With the start outermost, the first hit was whatever the earliest
+  // segment could reach by growing its span to four — a quote spoken at 1:00
+  // located at 0:00 with a 94-second window, and a reviewer clicking the
+  // citation sent to the wrong place to look for it. A located quote is
+  // supposed to be checkable, and a citation pointing at the wrong minute
+  // only looks checkable.
+  for (let span = 2; span <= 4; span++) {
+    for (let i = 0; i + span <= segments.length; i++) {
       const window = segments.slice(i, i + span);
       if (normalize(window.map((s) => s.text).join(" ")).includes(needle)) {
         return {

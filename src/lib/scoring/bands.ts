@@ -45,7 +45,26 @@ export const BAND_LABELS: Record<number, string> = {
   9: "Very high",
 };
 
+/**
+ * A score that is not a number is not banded.
+ *
+ * Both banding functions walk their thresholds looking for the first one the
+ * score falls under, and fall through to band 9 when none matches. NaN and
+ * Infinity compare false against every threshold, so they fell through — and
+ * came out as band 9, "Very high", on a candidate's report. Failing loudly is
+ * the only safe direction here: the alternative is a broken computation
+ * upstream being published as the best possible result.
+ */
+function assertBandable(value: number, what: string): void {
+  if (!Number.isFinite(value)) {
+    throw new RangeError(
+      `Cannot band a ${what} of ${value}. A non-finite score means the scorer produced nothing usable, and reporting a band for it would report a number nobody computed.`,
+    );
+  }
+}
+
 export function provisionalBand(scaledScore: number): BandResult {
+  assertBandable(scaledScore, "scaled score");
   const clamped = Math.max(0, Math.min(100, scaledScore));
   for (const t of PROVISIONAL_BAND_THRESHOLDS) {
     if (clamped < t.maxExclusive) {
@@ -60,6 +79,7 @@ export function stanineFromNormTable(
   rawScore: number,
   table: NormTableData,
 ): BandResult {
+  assertBandable(rawScore, "raw score");
   // Prefer the norming sample's own raw-to-percentile curve. Without it the
   // only percentile available is the midpoint of the band, which would
   // report everyone in band 5 as exactly the 50th percentile.

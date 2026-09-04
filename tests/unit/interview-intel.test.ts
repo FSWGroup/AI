@@ -10,6 +10,7 @@ import {
   detectFormat,
   locateQuote,
   msToClock,
+  parsePlainText,
   parseTimestamp,
   parseTranscript,
   transcriptDurationSeconds,
@@ -355,5 +356,30 @@ describe("the evidence schema", () => {
     expect(
       containsEvaluativeLanguage("Describes rolling back two failed migrations."),
     ).toEqual([]);
+  });
+});
+
+describe("transcript parsing, the cases that used to lose the transcript", () => {
+  it("cues with no blank line between them", () => {
+    const vtt = ["WEBVTT","00:00:00.000 --> 00:00:02.000","Ana Cruz: Hello there","00:00:02.000 --> 00:00:05.000","Ben Ito: Hello back","00:00:05.000 --> 00:00:09.000","Ana Cruz: Right, so about the deploy"].join("\n");
+    const out = parseTranscript(vtt).segments;
+    expect(out).toHaveLength(3);
+    expect(out.map((s) => s.startMs)).toEqual([0, 2000, 5000]);
+    expect(out.map((s) => s.speakerLabel)).toEqual(["Ana Cruz", "Ben Ito", "Ana Cruz"]);
+  });
+  it("prose containing an arrow is not a cue file", () => {
+    const text = "Ana Cruz: We moved the build from Jenkins --> GitHub Actions last quarter.\n\nBen Ito: How long did that take?\n\nAna Cruz: About six weeks.";
+    expect(detectFormat(text)).toBe("text");
+    expect(parseTranscript(text).segments).toHaveLength(3);
+  });
+  it("multi-line turn keeps its speaker", () => {
+    const out = parsePlainText("Ana Cruz: I rewrote the import\nand it took about two days.\n\nBen Ito: What broke?");
+    expect(out[0].speakerLabel).toBe("Ana Cruz");
+    expect(out[0].text).toBe("I rewrote the import and it took about two days.");
+  });
+  it("locateQuote returns the tightest window", () => {
+    const segs = [0, 30000, 60000, 90000].map((startMs, i) => ({ orderIndex: i, speakerLabel: null, startMs, endMs: startMs + 4000, text: `sentence number ${i} here` }));
+    const q = locateQuote(segs, "sentence number 2 here sentence number 3 here");
+    expect(q).toEqual({ startMs: 60000, endMs: 94000, orderIndex: 2 });
   });
 });

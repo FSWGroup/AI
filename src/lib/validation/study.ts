@@ -136,6 +136,10 @@ export function computeStudy(
       warnings.push(
         "The reliability analysis produced a negative variance estimate, which means raters disagreed more within a hire than hires differed from each other. It has been reported as zero.",
       );
+    } else if (icc?.undefinedVariance) {
+      warnings.push(
+        "Every performance rating in this study is the same number, so there is no variance to analyse and reliability is undefined rather than zero. That usually means the rating form is not discriminating between people — the finding is about the form, not about the assessment.",
+      );
     }
   }
 

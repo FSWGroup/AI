@@ -258,3 +258,47 @@ describe("oneWayIcc", () => {
     expect(oneWayIcc([[5], [4], [3]])).toBeNull();
   });
 });
+
+describe("oneWayIcc edge cases", () => {
+  it("drops a non-finite rating instead of reporting reliability zero", () => {
+    const clean = oneWayIcc([[1, 2], [3, 4], [5, 6]])!;
+    const dirty = oneWayIcc([[1, 2, NaN], [3, 4], [5, 6]])!;
+    expect(dirty.icc1).toBeCloseTo(clean.icc1, 10);
+    expect(dirty.clampedToZero).toBe(false);
+  });
+  it("tells perfect agreement apart from disagreement", () => {
+    const flat = oneWayIcc([[3, 3], [3, 3], [3, 3]])!;
+    expect(flat.undefinedVariance).toBe(true);
+    expect(flat.clampedToZero).toBe(false);
+  });
+  it("still reports a genuinely negative estimate as clamped", () => {
+    const noisy = oneWayIcc([[1, 5], [1, 5], [1, 5], [3, 3]])!;
+    expect(noisy.clampedToZero).toBe(true);
+    expect(noisy.undefinedVariance).toBe(false);
+  });
+});
+
+describe("the boundary cases that used to come back as NaN", () => {
+  it("gives a perfect correlation a p of 0, not NaN", () => {
+    // NaN here made a perfect predictor read as NOT_SUPPORTED, and dropped it
+    // from the Benjamini-Hochberg family so every other predictor was
+    // under-corrected.
+    expect(correlationInference(1, 120).pValue).toBe(0);
+    expect(correlationInference(-1, 120).pValue).toBe(0);
+    expect(studentTTwoTailedP(Infinity, 118)).toBe(0);
+  });
+
+  it("returns log|Gamma| where Gamma is negative", () => {
+    expect(logGamma(-0.5)).toBeCloseTo(1.2655121234846454, 10);
+    expect(logGamma(-1.5)).toBeCloseTo(0.86004701537648, 10);
+  });
+
+  it("refuses an r outside [-1, 1] rather than clamping it into a plausible interval", () => {
+    expect(Number.isNaN(correlationInference(2, 30).ciLow)).toBe(true);
+  });
+
+  it("refuses a confidence level of 0 or 1", () => {
+    expect(() => correlationInference(0.3, 50, 1)).toThrow(RangeError);
+    expect(() => correlationInference(0.3, 50, 0)).toThrow(RangeError);
+  });
+});

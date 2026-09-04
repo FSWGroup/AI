@@ -81,3 +81,32 @@ describe("clampBand", () => {
     expect(clampBand(12)).toBe(9);
   });
 });
+
+describe("non-finite scores", () => {
+  it("never reports a broken computation as the top band", () => {
+    expect(() => provisionalBand(NaN)).toThrow(/non-finite/i);
+    expect(() => provisionalBand(Infinity)).toThrow();
+    expect(() => bandScore(NaN, NaN, null)).toThrow();
+  });
+  it("still bands real scores", () => {
+    expect(provisionalBand(50).band).toBe(5);
+  });
+});
+
+import { percentileFromCurve } from "@/lib/scoring/percentile-curve";
+import { percentileOf } from "@/lib/validation/stats";
+
+describe("percentileFromCurve tie convention", () => {
+  it("uses the midpoint of a tie block, like percentileOf", () => {
+    const curve = [ {raw:4,percentile:1}, {raw:5,percentile:23}, {raw:5,percentile:35}, {raw:5,percentile:47}, {raw:6,percentile:60} ];
+    expect(percentileFromCurve(curve, 5)).toBe(35);
+  });
+  it("agrees with percentileOf on a coarse sample", () => {
+    const sample = [1,1,2,2,2,3,3,4,4,4,4,5];
+    const sorted = [...sample].sort((a,b)=>a-b);
+    const curve = Array.from({length:99},(_,i)=>{ const p=i+1; const idx=Math.min(sorted.length-1,Math.floor((p/100)*sorted.length)); return {raw:sorted[idx],percentile:p}; });
+    for (const v of [2,3,4]) {
+      expect(Math.abs(percentileFromCurve(curve, v) - percentileOf(sorted, v))).toBeLessThan(12);
+    }
+  });
+});

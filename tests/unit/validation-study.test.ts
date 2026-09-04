@@ -438,7 +438,7 @@ describe("buildNormTable", () => {
   it("produces roughly the classic stanine proportions", () => {
     const table = buildNormTable(spread)!;
     const counts = new Array(9).fill(0);
-    for (const v of spread) counts[previewBand(table, v).band - 1]++;
+    for (const v of spread) counts[previewBand(table, v)!.band - 1]++;
     expect(counts[4] / spread.length).toBeGreaterThan(0.15);
     expect(counts[0] / spread.length).toBeLessThan(0.1);
     expect(counts[8] / spread.length).toBeLessThan(0.1);
@@ -459,13 +459,13 @@ describe("buildNormTable", () => {
 
   it("reads a percentile off the curve rather than the band midpoint", () => {
     const table = buildNormTable(spread)!;
-    const low = previewBand(table, 5);
-    const mid = previewBand(table, 25);
-    const high = previewBand(table, 48);
+    const low = previewBand(table, 5)!;
+    const mid = previewBand(table, 25)!;
+    const high = previewBand(table, 48)!;
     expect(low.percentile).toBeLessThan(mid.percentile);
     expect(mid.percentile).toBeLessThan(high.percentile);
     // Two people in the same band do not get the same percentile.
-    expect(previewBand(table, 24).percentile).not.toBe(previewBand(table, 26).percentile);
+    expect(previewBand(table, 24)!.percentile).not.toBe(previewBand(table, 26)!.percentile);
   });
 
   it("counts how many people would change band before the table is activated", () => {
@@ -475,5 +475,35 @@ describe("buildNormTable", () => {
     expect(shift.unchanged + shift.moved).toBe(100);
     expect(shift.moved).toBeGreaterThan(0);
     expect(shift.distribution.reduce((a, b) => a + b, 0)).toBe(100);
+  });
+});
+
+function lcg(seed: number) { let s = seed; return () => ((s = (s * 1103515245 + 12345) % 2147483648) / 2147483648); }
+describe("collapsed bands", () => {
+  it("catches distinct cut points that enclose no attainable score", () => {
+    const r = lcg(5);
+    const values = Array.from({ length: 250 }, () => {
+      let k = 0; for (let i = 0; i < 15; i++) if (r() < 0.5) k++; return k;
+    });
+    const t = buildNormTable(values)!;
+    const counts = new Array(9).fill(0);
+    for (const v of values) counts[previewBand(t, v)!.band - 1]++;
+    const empties = counts.map((c, i) => (c === 0 ? i + 1 : 0)).filter(Boolean);
+    expect(empties.length).toBeGreaterThan(0);
+    expect(t.hasCollapsedBands).toBe(true);
+  });
+  it("catches an unreachable band 9", () => {
+    const values = [ ...Array.from({ length: 270 }, (_, i) => (i % 9) + 1), ...Array(30).fill(10) ];
+    const t = buildNormTable(values)!;
+    const counts = new Array(9).fill(0);
+    for (const v of values) counts[previewBand(t, v)!.band - 1]++;
+    expect(counts[8]).toBe(0);
+    expect(t.hasCollapsedBands).toBe(true);
+    expect(t.warnings.join(" ")).toContain("9");
+  });
+  it("does not band a non-finite score as the top band", () => {
+    const t = buildNormTable(Array.from({ length: 250 }, (_, i) => i % 40))!;
+    expect(previewBand(t, NaN)).toBeNull();
+    expect(previewBand(t, Infinity)).toBeNull();
   });
 });

@@ -426,3 +426,28 @@ describe("slotStillAvailable holds the same line findSlots does", () => {
     expect(gate.ok).toBe(false);
   });
 });
+
+const localDate = (d: { year: number; month: number; day: number }) =>
+  `${d.year}-${String(d.month).padStart(2, "0")}-${String(d.day).padStart(2, "0")}`;
+
+describe("localDatesBetween across a midnight DST transition", () => {
+  it("Havana 2026-03-08", () => {
+    expect(
+      localDatesBetween(new Date("2026-03-06T12:00:00Z"), new Date("2026-03-10T12:00:00Z"), "America/Havana").map(localDate),
+    ).toEqual(["2026-03-06", "2026-03-07", "2026-03-08", "2026-03-09", "2026-03-10"]);
+  });
+  it("Santiago 2026-09-06", () => {
+    expect(
+      localDatesBetween(new Date("2026-09-04T12:00:00Z"), new Date("2026-09-08T12:00:00Z"), "America/Santiago").map(localDate),
+    ).toEqual(["2026-09-04", "2026-09-05", "2026-09-06", "2026-09-07", "2026-09-08"]);
+  });
+  it("Azores 2026-03-29", () => {
+    expect(
+      localDatesBetween(new Date("2026-03-27T12:00:00Z"), new Date("2026-03-31T12:00:00Z"), "Atlantic/Azores").map(localDate),
+    ).toEqual(["2026-03-27", "2026-03-28", "2026-03-29", "2026-03-30", "2026-03-31"]);
+  });
+  it("day of week stays right across a transition", () => {
+    const d = localDatesBetween(new Date("2026-03-08T12:00:00Z"), new Date("2026-03-08T13:00:00Z"), "America/Havana");
+    expect(d).toEqual([{ year: 2026, month: 3, day: 8, dayOfWeek: 0 }]);
+  });
+});

@@ -102,26 +102,71 @@ export function utcFromWallClock(
 }
 
 /** Midnight, in the given zone, of the day a UTC instant falls on there. */
+/**
+ * The instant at which a local calendar day begins.
+ *
+ * Where the clocks go forward at midnight — Havana, Santiago and the Azores
+ * do — that wall-clock time does not exist, and this returns 23:00 on the
+ * PREVIOUS local date. Do not use it to enumerate dates; `localDatesBetween`
+ * walks the calendar instead, for exactly that reason.
+ */
 export function startOfLocalDay(instant: Date, timeZone: string): Date {
   const w = wallClockIn(instant, timeZone);
   return utcFromWallClock(timeZone, w.year, w.month, w.day, 0);
 }
 
-/** Every local calendar date, as [year, month, day], between two instants. */
+export interface LocalDate {
+  year: number;
+  month: number;
+  day: number;
+  /** 0 = Sunday. */
+  dayOfWeek: number;
+}
+
+/** The most days this will enumerate before giving up on a pathological range. */
+export const MAX_LOCAL_DATES = 400;
+
+/**
+ * Every local calendar date between two instants.
+ *
+ * Walked as calendar arithmetic rather than by stepping an instant, because a
+ * date is a date — it does not need an instant to represent it, and choosing
+ * one is where this went wrong.
+ *
+ * It used to anchor each day at local midnight. In a zone where the clocks go
+ * forward AT midnight, that wall-clock time does not exist, so resolving it
+ * landed on the previous local date: the date before was emitted twice and
+ * the transition date was never emitted at all. Sweeping every IANA zone this
+ * runtime knows across 2026 finds three — America/Havana on 8 March,
+ * America/Santiago on 6 September, Atlantic/Azores on 29 March. Downstream,
+ * an interviewer in any of them simply could not be booked on that day: the
+ * available-intervals expansion iterates these dates, so it returned nothing,
+ * and ignored an explicit opening exception written for the missing date too.
+ */
 export function localDatesBetween(
   from: Date,
   to: Date,
   timeZone: string,
-): { year: number; month: number; day: number; dayOfWeek: number }[] {
-  const days: { year: number; month: number; day: number; dayOfWeek: number }[] = [];
-  let cursor = startOfLocalDay(from, timeZone);
-  // Guard against a pathological range rather than looping forever.
-  for (let i = 0; i < 400 && cursor.getTime() <= to.getTime(); i++) {
-    const w = wallClockIn(cursor, timeZone);
-    days.push({ year: w.year, month: w.month, day: w.day, dayOfWeek: w.dayOfWeek });
-    // Step 26 hours and re-anchor: adding exactly 24 lands on the same local
-    // day when the clocks go back.
-    cursor = startOfLocalDay(new Date(cursor.getTime() + 26 * 3600_000), timeZone);
+): LocalDate[] {
+  const days: LocalDate[] = [];
+  if (to.getTime() < from.getTime()) return days;
+
+  const start = wallClockIn(from, timeZone);
+  const end = wallClockIn(to, timeZone);
+  const last = Date.UTC(end.year, end.month - 1, end.day);
+
+  // A UTC instant used purely as a calendar cursor. UTC has no transitions,
+  // so incrementing the date here is exact.
+  let cursor = Date.UTC(start.year, start.month - 1, start.day);
+  for (let i = 0; i < MAX_LOCAL_DATES && cursor <= last; i++) {
+    const d = new Date(cursor);
+    days.push({
+      year: d.getUTCFullYear(),
+      month: d.getUTCMonth() + 1,
+      day: d.getUTCDate(),
+      dayOfWeek: d.getUTCDay(),
+    });
+    cursor += 86_400_000;
   }
   return days;
 }

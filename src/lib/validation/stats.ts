@@ -146,8 +146,16 @@ const LANCZOS = [
 export function logGamma(z: number): number {
   if (z < 0.5) {
     // Reflection formula, for arguments the series does not cover.
+    //
+    // Returns log|Gamma(z)|. Gamma is negative on (-1,0), (-3,-2) and so on,
+    // so sin(pi*z) is negative there and the log of the quotient is the log
+    // of a negative number: logGamma(-0.5) came back NaN rather than
+    // 1.26551... Nothing in this file reaches it (the t distribution only
+    // ever asks for df/2 > 0 and 1/2), but the function is exported.
     return (
-      Math.log(Math.PI / Math.sin(Math.PI * z)) - logGamma(1 - z)
+      Math.log(Math.PI) -
+      Math.log(Math.abs(Math.sin(Math.PI * z))) -
+      logGamma(1 - z)
     );
   }
   const x = z - 1;
@@ -209,16 +217,34 @@ export function incompleteBeta(a: number, b: number, x: number): number {
   return 1 - (front * betaContinuedFraction(b, a, 1 - x)) / b;
 }
 
-/** Two-tailed p for a t statistic: p = I_{df/(df+t^2)}(df/2, 1/2). */
+/**
+ * Two-tailed p for a t statistic: p = I_{df/(df+t^2)}(df/2, 1/2).
+ *
+ * An infinite t is a real answer, not a bad input: it is what a perfect
+ * correlation produces, and its p is exactly 0. Rejecting it as non-finite
+ * turned r = 1.00 into `pValue: NaN`, which the study layer then reported as
+ * NOT_SUPPORTED — "a sample large enough to have detected a relationship of
+ * practical size did not find one" — for a predictor that perfectly predicts
+ * the criterion. Worse, computeStudy drops non-finite p values before the
+ * Benjamini-Hochberg adjustment, so the whole family shrank by one and every
+ * other predictor was under-corrected for multiple comparisons.
+ */
 export function studentTTwoTailedP(t: number, df: number): number {
-  if (!Number.isFinite(t) || df <= 0) return Number.NaN;
+  if (Number.isNaN(t) || df <= 0) return Number.NaN;
+  if (!Number.isFinite(t)) return 0;
   return incompleteBeta(df / 2, 0.5, df / (df + t * t));
 }
 
 /**
- * Inverse standard normal CDF (Acklam's rational approximation, refined by
- * one Halley step against the error function). Accurate to about 1e-15,
- * which is far more than a confidence interval needs.
+ * Inverse standard normal CDF: Acklam's rational approximation, unrefined.
+ *
+ * Accurate to about 1.2e-8 relative across the range — Acklam's published
+ * bound, and measured at 8.2e-8 absolute in the far tail. There is no Halley
+ * refinement step, whatever an earlier version of this comment claimed; the
+ * accuracy is six orders of magnitude off the 1e-15 it promised. It is still
+ * far more than a confidence interval needs, which is why the step is not
+ * worth adding — but a future reader should not rely on precision that is
+ * not here.
  */
 export function normalQuantile(p: number): number {
   if (p <= 0 || p >= 1) return Number.NaN;
@@ -267,7 +293,23 @@ export function normalQuantile(p: number): number {
 // Inference about a correlation
 // ---------------------------------------------------------------------------
 
-export const fisherZ = (r: number): number => Math.atanh(Math.max(-0.999999, Math.min(0.999999, r)));
+/**
+ * Fisher's z transform, with |r| clamped just short of 1.
+ *
+ * atanh(±1) is infinite, so the clamp is what keeps a perfect correlation's
+ * confidence interval finite. The cost is that at |r| = 1 the interval is
+ * built around atanh(0.999999) and so does not contain r itself — the bounds
+ * come back as .9999979 and .9999995 for r = 1. That is a display artefact
+ * of an interval around a boundary value rather than a wrong answer, but any
+ * caller testing `ciLow <= r <= ciHigh` needs to know it.
+ *
+ * An r outside [-1, 1] is not a correlation at all, and used to clamp to the
+ * same value as r = 1 and produce a plausible-looking interval from it.
+ */
+export const fisherZ = (r: number): number =>
+  Math.abs(r) > 1
+    ? Number.NaN
+    : Math.atanh(Math.max(-0.999999, Math.min(0.999999, r)));
 export const inverseFisherZ = (z: number): number => Math.tanh(z);
 
 export interface CorrelationInference {
@@ -293,13 +335,20 @@ export function correlationInference(
   n: number,
   confidence = 0.95,
 ): CorrelationInference {
+  if (!(confidence > 0 && confidence < 1)) {
+    // confidence = 1 silently produced NaN bounds via normalQuantile(1);
+    // confidence = 0 produced a zero-width interval that read as certainty.
+    throw new RangeError("confidence must be strictly between 0 and 1.");
+  }
   const z = fisherZ(r);
   const se = n > 3 ? 1 / Math.sqrt(n - 3) : Number.NaN;
   const zCrit = normalQuantile(1 - (1 - confidence) / 2);
-  const ciLow = Number.isFinite(se) ? inverseFisherZ(z - zCrit * se) : Number.NaN;
-  const ciHigh = Number.isFinite(se) ? inverseFisherZ(z + zCrit * se) : Number.NaN;
+  const usable = Number.isFinite(se) && Number.isFinite(z);
+  const ciLow = usable ? inverseFisherZ(z - zCrit * se) : Number.NaN;
+  const ciHigh = usable ? inverseFisherZ(z + zCrit * se) : Number.NaN;
   const df = n - 2;
   const denom = 1 - r * r;
+  // denom === 0 means |r| = 1: t is infinite and p is exactly 0.
   const t = denom > 0 ? r * Math.sqrt(df / denom) : Infinity;
   const pValue = df > 0 ? studentTTwoTailedP(t, df) : Number.NaN;
   return {
@@ -405,7 +454,11 @@ export interface IccResult {
   targets: number;
   meanRaters: number;
   /** True when the ANOVA produced a negative estimate, clamped to zero. */
-  clampedToZero: boolean;
+  clampedToZero: boolean;  /**
+   * True when there was no variance to analyse — every rating identical — so
+   * the ratio was 0/0. Reported as zero, but it is not disagreement.
+   */
+  undefinedVariance: boolean;
 }
 
 /**
@@ -421,7 +474,12 @@ export interface IccResult {
  * and the second is how corrected coefficients become fiction.
  */
 export function oneWayIcc(groups: number[][]): IccResult | null {
-  const usable = groups.filter((g) => g.length >= 2);
+  // Non-finite ratings dropped before anything else, as `pearson` does.
+  // One NaN rating anywhere used to poison every sum and come back as
+  // "reliability zero" with a warning saying the raters had disagreed.
+  const usable = groups
+    .map((g) => g.filter((v) => Number.isFinite(v)))
+    .filter((g) => g.length >= 2);
   const k = usable.length;
   if (k < 2) return null;
   const all = usable.flat();
@@ -448,8 +506,18 @@ export function oneWayIcc(groups: number[][]): IccResult | null {
 
   const rawIcc1 =
     (msBetween - msWithin) / (msBetween + (n0 - 1) * msWithin);
-  const clampedToZero = !Number.isFinite(rawIcc1) || rawIcc1 < 0;
-  const icc1 = clampedToZero ? 0 : Math.min(1, rawIcc1);
+
+  // Two different zeros, told apart.
+  //
+  // A genuinely negative ICC means the raters disagreed more within a hire
+  // than hires differed from each other, which is a real and reportable
+  // finding. A 0/0 means there was no variance at all to analyse — every
+  // rater gave every hire the same number — which is perfect agreement, not
+  // disagreement. Both used to come back as `clampedToZero: true`, and the
+  // study layer printed the disagreement sentence for both.
+  const undefinedVariance = !Number.isFinite(rawIcc1);
+  const clampedToZero = !undefinedVariance && rawIcc1 < 0;
+  const icc1 = undefinedVariance || clampedToZero ? 0 : Math.min(1, rawIcc1);
   // Spearman-Brown step-up to the mean of n0 raters.
   const iccK =
     icc1 === 0 ? 0 : Math.min(1, (n0 * icc1) / (1 + (n0 - 1) * icc1));
@@ -460,5 +528,6 @@ export function oneWayIcc(groups: number[][]): IccResult | null {
     targets: k,
     meanRaters: n0,
     clampedToZero,
+    undefinedVariance,
   };
 }

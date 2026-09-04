@@ -175,12 +175,64 @@ function median(values: number[]): number | null {
 
 const HOUR_MS = 60 * 60 * 1000;
 
+/**
+ * One row per (rater, candidate).
+ *
+ * The source rows are a union of two tables — scorecards keyed on the
+ * application, and independent-review rows keyed on the review round's
+ * application — so one person can produce two rows about the same candidate:
+ * a scorecard and a review, or scorecards from two rounds they both ran.
+ * Nothing collapsed them, and four separate things went wrong as a result.
+ *
+ * `sharedSubjects` counted assessments and was rendered as "candidates
+ * assessed alongside someone else". A doubly-rated candidate was weighted
+ * twice in leniency, mean gap and agreement. `panelDisagreement` paired a
+ * rater against HERSELF — her own scorecard-versus-review inconsistency was
+ * published as disagreement between people. And a candidate seen by one
+ * person who filed twice counted as shared rather than solo, weakening the
+ * warning that exists to say nobody checked that rating.
+ *
+ * Collapsed by taking the MEAN of the duplicates. Their disagreement is a
+ * real signal, but it is a signal about one person's own consistency, and
+ * this module measures how people compare with each other; averaging keeps
+ * the candidate's weight at one, which is what every statistic here assumes.
+ * The latest submission carries the timestamps.
+ */
+export function collapseDuplicateAssessments(
+  rows: AssessmentRow[],
+): AssessmentRow[] {
+  const byPair = new Map<string, AssessmentRow[]>();
+  for (const row of rows) {
+    const key = `${row.raterId}\u0000${row.subjectId}`;
+    const list = byPair.get(key);
+    if (list) list.push(row);
+    else byPair.set(key, [row]);
+  }
+
+  const collapsed: AssessmentRow[] = [];
+  for (const group of byPair.values()) {
+    if (group.length === 1) {
+      collapsed.push(group[0]);
+      continue;
+    }
+    const latest = group.reduce((a, b) =>
+      b.submittedAt.getTime() > a.submittedAt.getTime() ? b : a,
+    );
+    collapsed.push({
+      ...latest,
+      value: mean(group.map((g) => g.value)),
+    });
+  }
+  return collapsed;
+}
+
 export function calibrateRater(
   raterId: string,
   raterName: string,
-  all: AssessmentRow[],
+  rows: AssessmentRow[],
   outcomes: OutcomeRow[] = [],
 ): RaterCalibration | null {
+  const all = collapseDuplicateAssessments(rows);
   const mine = all.filter((a) => a.raterId === raterId);
   if (mine.length === 0) return null;
 
@@ -421,9 +473,10 @@ export interface TeamCalibration {
 }
 
 export function calibrateTeam(
-  all: AssessmentRow[],
+  rows: AssessmentRow[],
   outcomes: OutcomeRow[] = [],
 ): TeamCalibration {
+  const all = collapseDuplicateAssessments(rows);
   const raterNames = new Map<string, string>();
   for (const a of all) raterNames.set(a.raterId, a.raterName);
 
@@ -468,7 +521,14 @@ export function calibrateTeam(
       `Some interviewers have fewer than ${MIN_ASSESSMENTS} assessments. Nothing is reported for them beyond the count.`,
     );
   }
-  if (outcomes.length > 0 && raters.every((r) => r.predictiveR === null)) {
+  // `raters.length > 0` because [].every() is true: with no raters at all
+  // this announced that "no interviewer yet has 10 people they assessed…",
+  // which describes a shortfall in data that does not exist.
+  if (
+    raters.length > 0 &&
+    outcomes.length > 0 &&
+    raters.every((r) => r.predictiveR === null)
+  ) {
     warnings.push(
       `No interviewer yet has ${MIN_OUTCOMES} people they assessed who were hired and have since been rated on the job, so predictive value is not reported for anyone. It becomes available as performance reviews accumulate.`,
     );

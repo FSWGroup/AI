@@ -145,6 +145,11 @@ export interface GradeScore {
   /** Criteria the grader could not assess from what was submitted. */
   unassessed: string[];
   assessedCount: number;
+  /**
+   * Criteria this grade rates that the rubric no longer contains, because it
+   * was edited after the grade was filed. Excluded from the score.
+   */
+  stale: string[];
 }
 
 /**
@@ -159,25 +164,42 @@ export function scoreGrade(
   grade: GradeLike,
   criteria: CriterionLike[],
 ): GradeScore {
-  const weightById = new Map(criteria.map((c) => [c.id, c.weight]));
+  // Driven by the RUBRIC, not by the rows that happen to be stored.
+  //
+  // Iterating grade.ratings had it both ways. A rating whose criterion is no
+  // longer in the rubric — deleted after the grade was filed — entered the
+  // weighted mean at an invented weight of 1, dragging a 4.0 down to 3.25 with
+  // a weight nobody ever chose. And a criterion ADDED after the grade was
+  // filed had no rating row, so it was neither scored nor listed as
+  // unassessed: a grade covering one of three criteria read as complete.
+  // validateGradeSubmission rejects unknown ids at submit time, but scoring
+  // runs later, and the rubric can move in between.
+  const ratingById = new Map(grade.ratings.map((r) => [r.criterionId, r]));
   let weighted = 0;
   let totalWeight = 0;
   const unassessed: string[] = [];
 
-  for (const r of grade.ratings) {
-    const weight = weightById.get(r.criterionId) ?? 1;
-    if (r.level === null || r.level === undefined) {
-      unassessed.push(r.criterionName);
+  for (const c of criteria) {
+    const r = ratingById.get(c.id);
+    if (!r || r.level === null || r.level === undefined) {
+      unassessed.push(c.name);
       continue;
     }
-    weighted += r.level * weight;
-    totalWeight += weight;
+    weighted += r.level * c.weight;
+    totalWeight += c.weight;
   }
+
+  // Rows for criteria the rubric no longer contains. Reported rather than
+  // folded in, so a stale grade is visible as stale.
+  const stale = grade.ratings
+    .filter((r) => !criteria.some((c) => c.id === r.criterionId))
+    .map((r) => r.criterionName);
 
   return {
     score: totalWeight > 0 ? weighted / totalWeight : null,
     unassessed,
-    assessedCount: grade.ratings.length - unassessed.length,
+    assessedCount: criteria.length - unassessed.length,
+    stale,
   };
 }
 
@@ -233,9 +255,15 @@ export function summarizeGrades(
     reconciled: g.reconciled,
   }));
 
+  // A grader who marked every criterion unassessable has no score, and the
+  // "mean of the graders' scores" cannot be the mean of one of them.
+  // Reporting 4.0 as a two-grader mean when the second grader assessed
+  // nothing reads as agreement where there was no second opinion at all.
   const numeric = scores.map((s) => s.score).filter((s): s is number => s !== null);
   const meanScore =
-    numeric.length > 0 ? numeric.reduce((a, b) => a + b, 0) / numeric.length : null;
+    numeric.length >= 2
+      ? numeric.reduce((a, b) => a + b, 0) / numeric.length
+      : null;
   const scoreRange =
     numeric.length >= 2 ? Math.max(...numeric) - Math.min(...numeric) : null;
 
@@ -357,8 +385,18 @@ export function validateGradeSubmission(
       errors.push("A rating refers to a criterion that is not in this rubric.");
       continue;
     }
-    if (r.level !== null && (r.level < MIN_LEVEL || r.level > MAX_LEVEL)) {
-      errors.push(`"${criterion.name}" has a level outside ${MIN_LEVEL}-${MAX_LEVEL}.`);
+    // Integer, and a real number. `2.5` passed the range check despite this
+    // file's own "no midpoint" rule, and NaN passed it too — because NaN
+    // fails both comparisons — producing a filed grade with no score and no
+    // explanation of why it had none.
+    if (
+      r.level !== null &&
+      r.level !== undefined &&
+      (!Number.isInteger(r.level) || r.level < MIN_LEVEL || r.level > MAX_LEVEL)
+    ) {
+      errors.push(
+        `"${criterion.name}" needs a whole level from ${MIN_LEVEL} to ${MAX_LEVEL}. There is no midpoint: if the work sits between two anchors, pick the one it actually meets and say why in your comment.`,
+      );
     }
   }
   if (!submission.comment || submission.comment.trim().length < 20) {

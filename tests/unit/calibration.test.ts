@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   calibrateRater,
   calibrateTeam,
+  collapseDuplicateAssessments,
   MIN_ASSESSMENTS,
   MIN_OUTCOMES,
   MIN_SHARED,
@@ -265,5 +266,42 @@ describe("calibrateTeam", () => {
   it("says predictive value is unavailable rather than showing nothing", () => {
     const team = calibrateTeam(panel(12), [{ subjectId: "c0", criterion: 3 }]);
     expect(team.warnings.join(" ")).toContain("predictive value is not reported");
+  });
+});
+
+const dupRow = (
+  raterId: string,
+  subjectId: string,
+  value: number,
+  source: "SCORECARD" | "REVIEW" = "SCORECARD",
+): AssessmentRow => ({
+  raterId,
+  raterName: raterId,
+  subjectId,
+  value,
+  submittedAt: new Date("2026-01-01"),
+  eventAt: null,
+  source,
+});
+describe("duplicate (rater, candidate) rows", () => {
+  const rows: AssessmentRow[] = [
+    dupRow("a", "s1", 4), dupRow("a", "s1", 2, "REVIEW"), dupRow("b", "s1", 3),
+    ...["s2","s3","s4","s5"].flatMap((s) => [dupRow("a", s, 4), dupRow("b", s, 3)]),
+  ];
+  it("collapses to one row per pair", () => {
+    const out = collapseDuplicateAssessments(rows);
+    expect(out).toHaveLength(10);
+    expect(out.find((r) => r.raterId === "a" && r.subjectId === "s1")!.value).toBe(3);
+  });
+  it("counts candidates, not assessments, and never pairs a rater with herself", () => {
+    const team = calibrateTeam(rows);
+    expect(team.sharedSubjects).toBe(5);
+    // Mean |gap| between two DIFFERENT people: s1 is now 3 vs 3 = 0, s2-s5 are 1 each.
+    expect(team.panelDisagreement).toBeCloseTo(0.8, 10);
+    expect(team.raters.find((r) => r.raterId === "a")!.sharedSubjects).toBe(5);
+  });
+  it("says nothing about predictive value when there are no raters", () => {
+    const empty = calibrateTeam([], [{ subjectId: "s1", criterion: 3 }]);
+    expect(empty.warnings.join(" ")).not.toContain("No interviewer yet");
   });
 });

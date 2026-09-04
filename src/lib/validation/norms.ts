@@ -81,20 +81,30 @@ export function buildNormTable(values: number[]): BuiltNormTable | null {
     };
   });
 
-  // Coarse raw scales (a 12-item section scores 0-12) can put two cut points
-  // on the same value. Bands then collapse: nobody can land in the band
-  // between two identical boundaries. Saying so is better than pretending
-  // there are nine bands when the data supports six.
-  let hasCollapsedBands = false;
-  for (let i = 1; i < thresholds.length; i++) {
-    if (thresholds[i].maxRaw <= thresholds[i - 1].maxRaw) {
-      hasCollapsedBands = true;
-      break;
-    }
+  // Coarse raw scales (a 12-item section scores 0-12) can leave a band with
+  // no attainable score in it. Saying so is better than pretending there are
+  // nine bands when the data supports six.
+  //
+  // Tested by banding the norming sample and looking for a band nobody landed
+  // in, rather than by comparing adjacent cut points for equality. Two
+  // DISTINCT cuts can still enclose nothing on a discrete scale — boundaries
+  // at 5 and 5.39 admit no integer, and neither did 10 and 10.04 in a
+  // measured 250-case binomial sample, where two bands were unreachable and
+  // the old test reported no warning at all. The old loop also ran over
+  // `thresholds`, which covers bands 1 to 8, so a table where band 9 was
+  // unreachable was never examined.
+  const bandCounts = new Array<number>(10).fill(0);
+  for (const value of sorted) {
+    bandCounts[bandFromThresholds(thresholds, value)]++;
   }
+  const emptyBands: number[] = [];
+  for (let band = 1; band <= 9; band++) {
+    if (bandCounts[band] === 0) emptyBands.push(band);
+  }
+  const hasCollapsedBands = emptyBands.length > 0;
   if (hasCollapsedBands) {
     warnings.push(
-      "Two or more band boundaries fall on the same raw score, so some bands are unreachable. The raw scale is too coarse for nine bands at this sample size — report the percentile alongside the band, and treat neighbouring bands as one.",
+      `${emptyBands.length === 1 ? `Band ${emptyBands[0]} contains` : `Bands ${emptyBands.join(", ")} contain`} no attainable score, so ${emptyBands.length === 1 ? "it is" : "they are"} unreachable: this table promises nine bands and delivers ${9 - emptyBands.length}. The raw scale is too coarse for nine bands at this sample size — report the percentile alongside the band, and treat neighbouring bands as one.`,
     );
   }
 
@@ -134,22 +144,40 @@ export function buildNormTable(values: number[]): BuiltNormTable | null {
   };
 }
 
+/**
+ * The band a raw score falls in, given the cut points.
+ *
+ * The one place this rule lives on the norm-building side; `bands.ts` runs the
+ * identical rule against a stored table on the live scoring path, and the two
+ * are checked against each other so a preview can never disagree with what a
+ * candidate is actually told.
+ *
+ * A non-finite score is not banded at all. Falling through the loop returns
+ * band 9, so NaN and Infinity used to come back as the TOP band with a
+ * percentile of 99 — a fail-open in exactly the wrong direction for a report
+ * that then reads "very high".
+ */
+export function bandFromThresholds(
+  thresholds: NormThreshold[],
+  rawScore: number,
+): number {
+  if (!Number.isFinite(rawScore)) return 0;
+  const sorted = [...thresholds].sort((a, b) => a.band - b.band);
+  for (const t of sorted) {
+    if (rawScore <= t.maxRaw) return t.band;
+  }
+  return 9;
+}
+
 /** Where one raw score sits in a built table, for previewing the effect. */
 export function previewBand(
   table: BuiltNormTable,
   rawScore: number,
-): { band: number; percentile: number } {
-  const sortedThresholds = [...table.thresholds].sort((a, b) => a.band - b.band);
-  for (const t of sortedThresholds) {
-    if (rawScore <= t.maxRaw) {
-      return {
-        band: t.band,
-        percentile: percentileFromCurve(table.percentileCurve, rawScore),
-      };
-    }
-  }
+): { band: number; percentile: number } | null {
+  const band = bandFromThresholds(table.thresholds, rawScore);
+  if (band === 0) return null;
   return {
-    band: 9,
+    band,
     percentile: percentileFromCurve(table.percentileCurve, rawScore),
   };
 }
@@ -171,6 +199,9 @@ export function bandShiftPreview(
   let maxShift = 0;
   for (const row of current) {
     const next = previewBand(table, row.rawScore);
+    // A non-finite raw score is not banded and is not counted. It cannot be
+    // shown as "unchanged" or as a move, because it has no band either way.
+    if (!next) continue;
     distribution[next.band - 1]++;
     const shift = Math.abs(next.band - row.band);
     if (shift === 0) unchanged++;
