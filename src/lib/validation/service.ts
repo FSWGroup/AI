@@ -8,7 +8,7 @@
  */
 
 import "server-only";
-import type { Construct, Prisma, ValidationStudy } from "@prisma/client";
+import type { Construct, PerformanceCycle, Prisma, ValidationStudy } from "@prisma/client";
 import { prisma } from "@/lib/db";
 import { audit } from "@/lib/audit";
 import { dimensionMeta } from "@/content/narratives/dimension-meta";
@@ -194,6 +194,28 @@ export async function computeStudyResult(studyId: string): Promise<StudyResult> 
       metrics: true,
     },
   });
+
+  // No sample, no study.
+  //
+  // The applicant-pool query below is scoped by the form versions and job
+  // profile the SAMPLE used — and with no hires those scopes collapse to
+  // nothing, leaving a bare "every non-invalidated score ever" that loads the
+  // entire Score table to produce n = 0. Measured at 19,594 rows and 233 ms
+  // warm on a small fixture, against a result that is empty by definition.
+  if (hires.length === 0) {
+    return computeStudy(
+      buildCriterion(specFor(study), { hires: [], reviews: [], metrics: [] }),
+      [],
+      {
+        correctRangeRestriction: study.correctRangeRestriction,
+        correctAttenuation: study.correctAttenuation,
+        confidence: 0.95,
+      },
+      [
+        "No hire matches this study's job profile and date window, so there is nothing to correlate. Widen the window, or check that hires are being linked to their assessment attempts.",
+      ],
+    );
+  }
 
   const hireRows: HireRow[] = hires.map((h) => ({
     hireId: h.id,
@@ -718,18 +740,32 @@ export interface PendingReview {
   status: "NOT_STARTED" | "DRAFT" | "SUBMITTED";
 }
 
-/** Reviews this user is on the hook for, with anything already saved. */
-export async function pendingReviewsFor(userId: string): Promise<PendingReview[]> {
+/**
+ * Reviews this user is on the hook for, with anything already saved.
+ *
+ * Returns the open cycles alongside, because the caller needs them and
+ * re-fetching them by id was a third round trip for rows already in hand.
+ */
+export async function pendingReviewsFor(
+  userId: string,
+): Promise<{ pending: PendingReview[]; cycles: PerformanceCycle[] }> {
   const cycles = await prisma.performanceCycle.findMany({ where: { status: "OPEN" } });
-  if (cycles.length === 0) return [];
+  if (cycles.length === 0) return { pending: [], cycles: [] };
 
   const hires = await prisma.hire.findMany({
     where: { managerId: userId, status: { in: ["ACTIVE", "ON_LEAVE"] } },
-    include: {
-      candidate: true,
-      reviews: { where: { raterId: userId } },
+    select: {
+      id: true,
+      jobTitle: true,
+      hiredAt: true,
+      candidate: { select: { firstName: true, lastName: true } },
+      reviews: {
+        where: { raterId: userId },
+        select: { id: true, cycleId: true, status: true },
+      },
     },
     orderBy: { hiredAt: "asc" },
+    take: 500,
   });
 
   const now = Date.now();
@@ -754,5 +790,5 @@ export async function pendingReviewsFor(userId: string): Promise<PendingReview[]
       });
     }
   }
-  return out;
+  return { pending: out, cycles };
 }

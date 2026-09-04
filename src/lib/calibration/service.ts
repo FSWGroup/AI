@@ -33,6 +33,9 @@ export interface CalibrationScope {
   since?: Date | null;
 }
 
+/** A ceiling on either source, so one runaway table cannot swamp a page. */
+const MAX_ASSESSMENT_ROWS = 20_000;
+
 async function loadAssessments(scope: CalibrationScope): Promise<AssessmentRow[]> {
   const submittedSince = scope.since ? { gte: scope.since } : undefined;
 
@@ -54,6 +57,8 @@ async function loadAssessments(scope: CalibrationScope): Promise<AssessmentRow[]
         author: { select: { name: true } },
         interview: { select: { scheduledAt: true } },
       },
+      orderBy: { submittedAt: "desc" },
+      take: MAX_ASSESSMENT_ROWS,
     }),
     prisma.candidateReview.findMany({
       where: {
@@ -71,6 +76,8 @@ async function loadAssessments(scope: CalibrationScope): Promise<AssessmentRow[]
         reviewer: { select: { name: true } },
         round: { select: { applicationId: true } },
       },
+      orderBy: { submittedAt: "desc" },
+      take: MAX_ASSESSMENT_ROWS,
     }),
   ]);
 
@@ -115,6 +122,8 @@ async function loadAssessments(scope: CalibrationScope): Promise<AssessmentRow[]
 async function loadOutcomes(): Promise<OutcomeRow[]> {
   const hires = await prisma.hire.findMany({
     where: { applicationId: { not: null } },
+    orderBy: { hiredAt: "desc" },
+    take: MAX_ASSESSMENT_ROWS,
     select: {
       id: true,
       applicationId: true,
@@ -174,14 +183,47 @@ async function loadOutcomes(): Promise<OutcomeRow[]> {
   return out;
 }
 
+/**
+ * How far back calibration looks by default.
+ *
+ * Calibration is about how somebody is rating NOW, so an unbounded load is
+ * not just slow — it averages this year's behaviour with a habit they were
+ * coached out of two years ago. The paired-comparison maths is unaffected by
+ * a window as long as both sides of every pair use the same one, which they
+ * do: the window is applied once, to the whole set.
+ */
+export const DEFAULT_CALIBRATION_WINDOW_DAYS = 365;
+
+function defaultScope(scope: CalibrationScope): CalibrationScope {
+  if (scope.since !== undefined) return scope;
+  return {
+    ...scope,
+    since: new Date(Date.now() - DEFAULT_CALIBRATION_WINDOW_DAYS * 86_400_000),
+  };
+}
+
+/**
+ * The two loads both cards are built from.
+ *
+ * Exposed so a page showing an own-card and a team view can load once. Doing
+ * it through `ownCalibration` and `teamCalibration` ran `loadAssessments` and
+ * `loadOutcomes` twice per render — every scorecard, review, hire and
+ * performance review fetched a second time to produce identical rows.
+ */
+export async function loadCalibrationData(scope: CalibrationScope = {}) {
+  const scoped = defaultScope(scope);
+  const [assessments, outcomes] = await Promise.all([
+    loadAssessments(scoped),
+    loadOutcomes(),
+  ]);
+  return { assessments, outcomes };
+}
+
 /** The whole interviewing team. Requires the oversight permission. */
 export async function teamCalibration(
   scope: CalibrationScope = {},
 ): Promise<TeamCalibration> {
-  const [assessments, outcomes] = await Promise.all([
-    loadAssessments(scope),
-    loadOutcomes(),
-  ]);
+  const { assessments, outcomes } = await loadCalibrationData(scope);
   return calibrateTeam(assessments, outcomes);
 }
 
@@ -197,9 +239,6 @@ export async function ownCalibration(
   raterName: string,
   scope: CalibrationScope = {},
 ): Promise<RaterCalibration | null> {
-  const [assessments, outcomes] = await Promise.all([
-    loadAssessments(scope),
-    loadOutcomes(),
-  ]);
+  const { assessments, outcomes } = await loadCalibrationData(scope);
   return calibrateRater(raterId, raterName, assessments, outcomes);
 }

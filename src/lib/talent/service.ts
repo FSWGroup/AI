@@ -469,8 +469,54 @@ export async function matchesForRequisition(
   });
   if (!requisition) return [];
 
+  // Narrowed in SQL to the people findMatches could actually surface.
+  //
+  // This runs on every requisition pipeline page load. Loading every
+  // opted-in profile with seven nested relations and then discarding
+  // everyone without a shared role type, a shared tag or a late stage —
+  // which is what findMatches does first — means materializing hundreds of
+  // thousands of rows to keep a few dozen. All four of its entry conditions
+  // are expressible as a `where`, so they are expressed as one.
+  const LATE_STAGES = ["INTERVIEW", "REFERENCE", "OFFER", "HIRED"];
+  const surfaceable: Prisma.TalentProfileWhereInput[] = [
+    ...(requisition.jobProfileId
+      ? [
+          {
+            candidate: {
+              applications: {
+                some: {
+                  requisitionId: { not: requisitionId },
+                  requisition: { jobProfileId: requisition.jobProfileId },
+                },
+              },
+            },
+          },
+        ]
+      : []),
+    ...(extraTags.length > 0
+      ? [{ tags: { some: { tag: { label: { in: extraTags } } } } }]
+      : []),
+    {
+      candidate: {
+        applications: {
+          some: {
+            requisitionId: { not: requisitionId },
+            stageEvents: { some: { stageKind: { in: LATE_STAGES as never } } },
+          },
+        },
+      },
+    },
+  ];
+
   const profiles = await prisma.talentProfile.findMany({
-    where: { consentStatus: "OPTED_IN", expiresAt: { gt: new Date() } },
+    where: {
+      consentStatus: "OPTED_IN",
+      expiresAt: { gt: new Date() },
+      // findMatches drops current employees outright, so do not load them.
+      candidate: { hires: { none: { status: { in: ["ACTIVE", "ON_LEAVE"] } } } },
+      OR: surfaceable,
+    },
+    take: 200,
     include: {
       candidate: {
         select: {
@@ -503,10 +549,18 @@ export async function matchesForRequisition(
   });
 
   // The suppression list is the backstop, checked here as well as at the ask.
+  // Scoped to the addresses actually in hand: the table is designed never to
+  // shrink, and loading all of it to check a couple of hundred people gets
+  // steadily worse forever.
   const suppressed = new Set(
-    (await prisma.talentSuppression.findMany({ select: { emailHash: true } })).map(
-      (r) => r.emailHash,
-    ),
+    (
+      await prisma.talentSuppression.findMany({
+        where: {
+          emailHash: { in: profiles.map((p) => suppressionKey(p.candidate.email)) },
+        },
+        select: { emailHash: true },
+      })
+    ).map((r) => r.emailHash),
   );
 
   const candidates: MatchCandidate[] = profiles

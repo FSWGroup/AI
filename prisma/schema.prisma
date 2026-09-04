@@ -1643,6 +1643,8 @@ model Scorecard {
 
   @@unique([interviewId, authorId])
   @@index([applicationId])
+  /// Calibration's assessment load: submitted rows within a date window.
+  @@index([status, submittedAt])
 }
 
 model ScorecardRating {
@@ -2163,6 +2165,8 @@ model Hire {
   @@index([jobProfileId])
   @@index([status])
   @@index([hiredAt])
+  /// pendingReviewsFor: manager's own reports, filtered by status, ordered by hire date.
+  @@index([managerId, status])
 }
 
 enum PerformanceCycleKind {
@@ -2272,7 +2276,6 @@ model PerformanceMetric {
   createdAt   DateTime @default(now())
 
   @@unique([hireId, key, periodStart, periodEnd])
-  @@index([key])
 }
 
 enum ValidationCriterionKind {
@@ -2334,8 +2337,6 @@ model ValidationStudy {
   coefficients ValidityCoefficient[]
   normTables   NormTable[]
 
-  @@index([status])
-  @@index([jobProfileId])
 }
 
 /// One predictor's relationship with the study's criterion.
@@ -2368,7 +2369,6 @@ model ValidityCoefficient {
   createdAt DateTime @default(now())
 
   @@unique([studyId, construct, compositeKey])
-  @@index([studyId])
 }
 
 // ---------------------------------------------------------------------------
@@ -2494,7 +2494,8 @@ model WorkSampleAssignment {
 
   @@unique([workSampleId, applicationId])
   @@index([applicationId])
-  @@index([status])
+  /// The grading queue: status IN (SUBMITTED, GRADED) ordered by submittedAt.
+  @@index([status, submittedAt])
 }
 
 enum WorkSampleGradeStatus {
@@ -2597,8 +2598,10 @@ model TalentProfile {
   memberships TalentPoolMember[]
   outreach    TalentOutreach[]
 
-  @@index([consentStatus])
-  @@index([expiresAt])
+  /// searchTalent: filters on consentStatus, orders by updatedAt, takes 100.
+  @@index([consentStatus, updatedAt])
+  /// matchesForRequisition and the retention sweep: both predicates at once.
+  @@index([consentStatus, expiresAt])
 }
 
 model TalentTag {
@@ -2610,7 +2613,6 @@ model TalentTag {
 
   profiles TalentProfileTag[]
 
-  @@index([category])
 }
 
 model TalentProfileTag {
@@ -2642,7 +2644,6 @@ model TalentPool {
 
   members TalentPoolMember[]
 
-  @@index([active])
 }
 
 model TalentPoolMember {
@@ -2785,7 +2786,6 @@ model SchedulingRequest {
   panelists SchedulingPanelist[]
 
   @@index([applicationId])
-  @@index([status])
 }
 
 model SchedulingPanelist {
@@ -2799,7 +2799,6 @@ model SchedulingPanelist {
   required  Boolean @default(true)
 
   @@unique([requestId, userId])
-  @@index([userId])
 }
 
 enum ReminderKind {
@@ -2946,7 +2945,6 @@ model TranscriptSegment {
   text        String
 
   @@unique([recordingId, orderIndex])
-  @@index([recordingId, startMs])
 }
 
 /// A quote from the transcript, against a competency the kit asks about.
@@ -2977,5 +2975,5 @@ model InterviewEvidence {
   promptVersion String
   createdAt   DateTime @default(now())
 
-  @@index([recordingId, competencyName])
+  @@index([recordingId, startMs])
 }

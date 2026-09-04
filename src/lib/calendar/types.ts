@@ -45,6 +45,18 @@ export interface CalendarProvider {
    */
   getBusy(userId: string, from: Date, to: Date): Promise<BusyInterval[]>;
   /**
+   * The same thing for a whole panel, in one round trip where the provider
+   * supports it. Slot generation asks about every panelist over the same
+   * window, and doing that one call at a time is one connection per person on
+   * a page a candidate loads. Providers that cannot batch may implement this
+   * as a parallel fan-out of `getBusy`.
+   */
+  getBusyMany(
+    userIds: string[],
+    from: Date,
+    to: Date,
+  ): Promise<Map<string, BusyInterval[]>>;
+  /**
    * Write the event to the user's calendar. Returns a provider-side id, or
    * null when the provider does not maintain one (the internal case, where
    * the .ics file is the whole mechanism).

@@ -14,17 +14,16 @@ export default async function ReviewQueuePage() {
   const user = await getCurrentUser();
   if (!user || !can(user.role, "SUBMIT_PERFORMANCE_REVIEW")) redirect("/admin");
 
-  const pending = await pendingReviewsFor(user.id);
-  const cycleIds = [...new Set(pending.map((p) => p.cycleId))];
-  const cycles = await prisma.performanceCycle.findMany({
-    where: { id: { in: cycleIds } },
-  });
+  // The cycles come back from pendingReviewsFor, which already loaded them —
+  // fetching them again by id was a round trip for rows we were handed.
+  const [{ pending, cycles }, drafts] = await Promise.all([
+    pendingReviewsFor(user.id),
+    prisma.performanceReview.findMany({
+      where: { raterId: user.id, status: "DRAFT" },
+      include: { ratings: true },
+    }),
+  ]);
   const cycleById = new Map(cycles.map((c) => [c.id, c]));
-
-  const drafts = await prisma.performanceReview.findMany({
-    where: { raterId: user.id, status: "DRAFT" },
-    include: { ratings: true },
-  });
   const draftByKey = new Map(drafts.map((d) => [`${d.hireId}::${d.cycleId}`, d]));
 
   const outstanding = pending.filter((p) => p.status !== "SUBMITTED");
@@ -72,7 +71,7 @@ export default async function ReviewQueuePage() {
               cycleName={p.cycleName}
               instructions={cycle.instructions}
               criteria={cycle.criterionKeys
-                .map((k) => CRITERION_BY_KEY.get(k))
+                .map((k: string) => CRITERION_BY_KEY.get(k))
                 .filter((c): c is NonNullable<typeof c> => c !== undefined)}
               initial={
                 draft

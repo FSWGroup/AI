@@ -65,14 +65,34 @@ export async function loadPanelistAvailability(
   const zoneById = new Map(users.map((u) => [u.id, u.timeZone]));
   const calendar = getCalendar();
 
+  // One calendar query for the whole panel, and one lookup of the interview
+  // being rescheduled — both were per-panelist, so a four-person reschedule
+  // spent eleven round trips where five would do, on a page a candidate
+  // loads.
+  const [busyByUser, excluded] = await Promise.all([
+    calendar.getBusyMany(
+      panelists.map((p) => p.userId),
+      window.start,
+      window.end,
+    ),
+    excludeInterviewId ? ownInterval(excludeInterviewId) : Promise.resolve(null),
+  ]);
+
   return Promise.all(
     panelists.map(async (p) => {
       const timeZone = zoneById.get(p.userId) ?? "Asia/Manila";
-      const busy = (await calendar.getBusy(p.userId, window.start, window.end)).map(
-        (b) => ({ start: b.start, end: b.end }),
-      );
-      const ownBusy = excludeInterviewId
-        ? await excludeOwn(busy, excludeInterviewId)
+      const busy = (busyByUser.get(p.userId) ?? []).map((b) => ({
+        start: b.start,
+        end: b.end,
+      }));
+      const ownBusy = excluded
+        ? busy.filter(
+            (b) =>
+              !(
+                b.start.getTime() === excluded.start &&
+                b.end.getTime() === excluded.end
+              ),
+          )
         : busy;
       return {
         userId: p.userId,
@@ -105,21 +125,22 @@ export async function loadPanelistAvailability(
   );
 }
 
-/** Drop the interview being rescheduled from its own panelists' busy time. */
-async function excludeOwn(
-  busy: Interval[],
+/**
+ * The interval occupied by the interview being rescheduled.
+ *
+ * Dropped from its own panelists' busy time, so moving an interview does not
+ * find its current slot blocked by itself.
+ */
+async function ownInterval(
   interviewId: string,
-): Promise<Interval[]> {
+): Promise<{ start: number; end: number } | null> {
   const own = await prisma.interview.findUnique({
     where: { id: interviewId },
     select: { scheduledAt: true, durationMinutes: true },
   });
-  if (!own) return busy;
+  if (!own) return null;
   const start = own.scheduledAt.getTime();
-  const end = start + own.durationMinutes * 60_000;
-  return busy.filter(
-    (b) => !(b.start.getTime() === start && b.end.getTime() === end),
-  );
+  return { start, end: start + own.durationMinutes * 60_000 };
 }
 
 // ---------------------------------------------------------------------------

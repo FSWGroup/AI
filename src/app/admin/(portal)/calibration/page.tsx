@@ -3,13 +3,15 @@ import { getCurrentUser } from "@/lib/auth/session";
 import { can } from "@/lib/auth/rbac";
 import { Badge, Card, SectionHeading } from "@/components/ui";
 import {
+  calibrateRater,
+  calibrateTeam,
   HEADLINE_LABEL,
   HEADLINE_TONE,
   MIN_ASSESSMENTS,
   type CalibrationObservation,
   type RaterCalibration,
 } from "@/lib/calibration/calibration";
-import { ownCalibration, teamCalibration } from "@/lib/calibration/service";
+import { loadCalibrationData } from "@/lib/calibration/service";
 
 export const dynamic = "force-dynamic";
 
@@ -20,10 +22,11 @@ export default async function CalibrationPage() {
   const canRate = can(user.role, "SUBMIT_SCORECARD");
   if (!canSeeEveryone && !canRate) redirect("/admin");
 
-  const [own, team] = await Promise.all([
-    ownCalibration(user.id, user.name),
-    canSeeEveryone ? teamCalibration() : Promise.resolve(null),
-  ]);
+  // Loaded once and shared. Both cards are computed from the same two sets,
+  // and calling the two service functions ran each load twice.
+  const { assessments, outcomes } = await loadCalibrationData();
+  const own = canRate ? calibrateRater(user.id, user.name, assessments, outcomes) : null;
+  const team = canSeeEveryone ? calibrateTeam(assessments, outcomes) : null;
 
   return (
     <div className="mx-auto max-w-4xl">
