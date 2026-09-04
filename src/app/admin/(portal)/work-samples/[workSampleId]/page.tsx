@@ -180,6 +180,13 @@ export default async function WorkSampleDetailPage({
       <h3 className="mt-8 text-sm font-bold uppercase tracking-wide text-navy-500">
         Sent to
       </h3>
+      {!showNames && (
+        <p className="mt-1 text-sm text-navy-500">
+          Candidates appear here by reference only, because you can grade this
+          work. The names are on each candidate&apos;s application, where
+          knowing who they are is the point.
+        </p>
+      )}
       <Card className="mt-3 overflow-x-auto">
         {sample.assignments.length === 0 ? (
           <p className="p-4 text-sm text-navy-500">

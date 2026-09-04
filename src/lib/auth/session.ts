@@ -131,12 +131,22 @@ const PLATFORM_IP_HEADERS = [
 ];
 
 /**
- * How many proxies sit in front of this app. Used to pick the right entry out
- * of X-Forwarded-For.
+ * How many proxies sit in front of this app and APPEND to X-Forwarded-For.
+ *
+ * Zero by default, which means no X-Forwarded-For entry is believed at all.
+ * That is the only safe default: with N configured but no proxy actually in
+ * front, a client sending a single forged entry has that entry sitting at
+ * exactly the position the Nth-from-the-right rule reads, and the forgery
+ * wins — which is the bug this whole function exists to fix, reintroduced by
+ * a default that assumes an architecture nobody declared.
+ *
+ * The recognised platform headers below need no configuration and cover the
+ * deployments this actually ships on. Anything else — a self-hosted nginx,
+ * say — must state its hop count, because only the operator knows it.
  */
 const TRUSTED_PROXY_HOPS = Math.max(
-  1,
-  Number(process.env.TRUSTED_PROXY_HOPS ?? "1") || 1,
+  0,
+  Number(process.env.TRUSTED_PROXY_HOPS ?? "0") || 0,
 );
 
 /**
@@ -150,10 +160,14 @@ const TRUSTED_PROXY_HOPS = Math.max(
  * turned the limits off entirely. It also meant an attacker chose what the
  * audit log recorded about them.
  *
- * The order here is: a header the edge sets and overwrites, then the
- * X-Forwarded-For entry contributed by our own outermost proxy (counting from
- * the right, which is the end proxies append to), then the socket peer.
- * Nothing falls back to the leftmost entry.
+ * The order here is: a header the edge sets and overwrites, then — only when
+ * TRUSTED_PROXY_HOPS says a proxy is really there — the X-Forwarded-For entry
+ * our own outermost proxy contributed, counting from the right, which is the
+ * end proxies append to. Nothing falls back to the leftmost entry.
+ *
+ * Returning undefined is a deliberate outcome, not a failure: callers key
+ * their rate limits on it, and one shared bucket for callers we cannot tell
+ * apart is the right answer. Pretending to tell them apart is not.
  */
 export function clientIpFrom(get: (name: string) => string | null): string | undefined {
   for (const name of PLATFORM_IP_HEADERS) {
@@ -161,7 +175,7 @@ export function clientIpFrom(get: (name: string) => string | null): string | und
     if (value) return value.split(",")[0].trim();
   }
 
-  const forwarded = get("x-forwarded-for");
+  const forwarded = TRUSTED_PROXY_HOPS > 0 ? get("x-forwarded-for") : null;
   if (forwarded) {
     const hops = forwarded
       .split(",")

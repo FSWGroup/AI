@@ -169,14 +169,33 @@ export async function recordDecision(args: {
   ip?: string | null;
   userAgent?: string | null;
 }): Promise<void> {
-  await prisma.interviewRecordingConsent.update({
+  // Upsert, for the interviewer who answers before anybody pressed "ask".
+  //
+  // The candidate's row is always created by requestConsent, because their
+  // link is what carries them here. An interviewer's is too — but they see
+  // the statement and the button on the interview page whether or not the
+  // asking has been opened, and a plain update turned answering early into
+  // "that record does not exist". Saying no, in particular, should never
+  // depend on somebody else having started the process first.
+  await prisma.interviewRecordingConsent.upsert({
     where: {
       interviewId_partyKey: {
         interviewId: args.interviewId,
         partyKey: partyKeyFor(args.userId),
       },
     },
-    data: {
+    create: {
+      interviewId: args.interviewId,
+      party: args.party,
+      userId: args.userId,
+      partyKey: partyKeyFor(args.userId),
+      statementVersion: CANDIDATE_CONSENT_VERSION,
+      status: args.status,
+      decidedAt: new Date(),
+      ip: args.ip ?? null,
+      userAgent: args.userAgent?.slice(0, 400) ?? null,
+    },
+    update: {
       status: args.status,
       decidedAt: new Date(),
       ip: args.ip ?? null,

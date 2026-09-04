@@ -79,6 +79,43 @@ never paused or reset** by camera state.
 - Deletion removes both the database manifest and the storage objects, and
   is blocked while a matching legal hold is active.
 
+## Interview recordings are a separate thing
+
+The above is about the assessment webcam. Audio recording of an interview is
+a different feature with a different consent model, and the two share only
+their access-role setting.
+
+- **All-party consent, not two-party.** Every person in the room — the
+  candidate and every interviewer — must have granted before anything can be
+  recorded. A missing row is treated as a refusal: "we never asked them" is
+  not consent. A single withdrawal ends it for everyone and destroys what was
+  captured, transcript and extracted quotes included, because those are the
+  recording in another form. This is not configurable, because there is no
+  lawful configuration of it: RA 4200 makes recording a private communication
+  without everyone's consent a criminal offence in the Philippines, and
+  California, Pennsylvania, Illinois and Florida require the same.
+- **An interview with no interviewers listed cannot be recorded.** The
+  interviewer list comes from the interview's participants, and an interview
+  created by hand often has none — in which case the gate would ask the
+  candidate alone and then report that everyone present had agreed.
+- **The candidate's consent link goes to the candidate, by email.** It is
+  never returned to the employee who opened the asking. That link is the sole
+  authenticator for their answer, and a consent an employer can enter on your
+  behalf is not consent.
+- **The candidate can withdraw themselves.** Their link stays live after a
+  yes, precisely so the promise that they may change their mind afterwards is
+  something they can act on without asking anyone.
+- **Answering and handling are separate permissions.** Anyone on the panel can
+  grant, decline or withdraw their own consent — a hiring manager is usually
+  on the panel and is not in `recordingAccessRoles` by default, and gating
+  their own answer on media access would make the all-party gate impossible to
+  satisfy. Reading the audio, the transcript or the extracted quotes, and
+  deleting any of it, needs `recordingAccessRoles` plus job scope.
+- **Audio only.** Video is refused with a 415. Nothing about a voice, tone,
+  accent or manner is analysed — only the words, and only against the
+  competencies of the interview kit. The evidence schema has no field a rating
+  could live in.
+
 ## Retention
 
 Recording retention is a configurable policy (`WEBCAM_RECORDINGS`), applied
