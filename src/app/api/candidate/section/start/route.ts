@@ -1,15 +1,14 @@
 import { z } from "zod";
 import { prisma } from "@/lib/db";
 import { apiError, apiOk, parseBody, withErrorHandling } from "@/lib/api";
-import { getAttemptFromCookie } from "@/lib/attempt/candidate-auth";
+import { requireAttempt } from "@/lib/attempt/candidate-auth";
 import { startSection, sectionRemainingSeconds } from "@/lib/attempt/engine";
 import { getSectionQuestions } from "@/lib/attempt/state";
 
 const schema = z.object({ sectionKey: z.string().min(1).max(50) });
 
 export const POST = withErrorHandling(async (req) => {
-  const attempt = await getAttemptFromCookie();
-  if (!attempt) return apiError("No active assessment session.", 401);
+  const attempt = await requireAttempt();
   if (attempt.status !== "IN_PROGRESS") {
     return apiError("The assessment is not in progress.", 409);
   }

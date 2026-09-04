@@ -9,8 +9,9 @@
 
 import { z } from "zod";
 import { prisma } from "@/lib/db";
+import { getCompanyName } from "@/lib/org-settings";
 import { apiError, apiOk, parseBody, withErrorHandling } from "@/lib/api";
-import { getCurrentUser } from "@/lib/auth/session";
+import { requireAnyUser } from "@/lib/auth/session";
 import { can } from "@/lib/auth/rbac";
 import { audit, AUDIT_ACTIONS } from "@/lib/audit";
 import { sendEmail } from "@/lib/email/index";
@@ -39,8 +40,7 @@ const schema = z.discriminatedUnion("action", [
 ]);
 
 export const POST = withErrorHandling(async (req, ctx) => {
-  const user = await getCurrentUser();
-  if (!user) return apiError("Not signed in.", 401);
+  const user = await requireAnyUser();
   if (!can(user.role, "MANAGE_BACKGROUND_CHECKS")) {
     return apiError("You cannot manage background checks.", 403);
   }
@@ -60,8 +60,7 @@ export const POST = withErrorHandling(async (req, ctx) => {
   });
   if (!check) return apiError("Background check not found.", 404);
 
-  const settings = await prisma.orgSettings.findUnique({ where: { id: "org" } });
-  const companyName = settings?.companyName ?? "FSW Group";
+  const companyName = await getCompanyName();
   const state = {
     stage: check.adverseStage,
     preAdverseSentAt: check.preAdverseSentAt,

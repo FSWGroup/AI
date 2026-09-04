@@ -1,9 +1,18 @@
 "use client";
 
 import { useState } from "react";
-import { useRouter } from "next/navigation";
-import { api, ApiError } from "@/lib/client/api";
-import { Badge, Button, Card, Input, Label, Select } from "@/components/ui";
+import { api } from "@/lib/client/api";
+import { useAction } from "@/lib/client/use-action";
+import {
+  Badge,
+  Button,
+  Card,
+  ErrorText,
+  Input,
+  Label,
+  Select,
+} from "@/components/ui";
+import { OneTimeLink } from "./OneTimeLink";
 
 /**
  * Send a candidate a link to pick their own time.
@@ -31,7 +40,7 @@ export function SelfSchedulePanel({
     interviewId: string | null;
   }[];
 }) {
-  const router = useRouter();
+  const { busy, error, run } = useAction();
   const [open, setOpen] = useState(false);
   const [title, setTitle] = useState("Interview");
   const [duration, setDuration] = useState(45);
@@ -42,8 +51,6 @@ export function SelfSchedulePanel({
   const [meetingDetail, setMeetingDetail] = useState("");
   const [notes, setNotes] = useState("");
   const [panel, setPanel] = useState<Record<string, "required" | "optional" | "no">>({});
-  const [busy, setBusy] = useState(false);
-  const [error, setError] = useState<string | null>(null);
   const [link, setLink] = useState<string | null>(null);
 
   const requiredCount = Object.values(panel).filter((v) => v === "required").length;
@@ -94,19 +101,7 @@ export function SelfSchedulePanel({
         </ul>
       )}
 
-      {link && (
-        <div className="mt-3 rounded-lg bg-emerald-50 p-3">
-          <p className="text-xs font-semibold text-emerald-900">
-            Send this to the candidate:
-          </p>
-          <input
-            readOnly
-            className="mt-2 w-full rounded border border-emerald-200 bg-white px-2 py-1 font-mono text-xs text-navy-800"
-            value={link}
-            onFocus={(e) => e.currentTarget.select()}
-          />
-        </div>
-      )}
+      {link && <OneTimeLink url={link} />}
 
       {!open ? (
         <Button variant="secondary" className="mt-4 w-full" onClick={() => setOpen(true)}>
@@ -224,15 +219,13 @@ export function SelfSchedulePanel({
             ))}
           </div>
 
-          {error && <p className="mt-3 text-sm text-red-700">{error}</p>}
+          {error && <ErrorText className="mt-3">{error}</ErrorText>}
           <div className="mt-4 flex gap-2">
             <Button
               className="px-3 py-1.5 text-xs"
               disabled={busy || requiredCount === 0}
               onClick={async () => {
-                setBusy(true);
-                setError(null);
-                try {
+                await run(async () => {
                   const out = await api<{ url: string }>(
                     "/api/admin/scheduling/requests",
                     {
@@ -258,14 +251,7 @@ export function SelfSchedulePanel({
                   );
                   setLink(out.url);
                   setOpen(false);
-                  router.refresh();
-                } catch (err) {
-                  setError(
-                    err instanceof ApiError ? err.message : "Could not create the link.",
-                  );
-                } finally {
-                  setBusy(false);
-                }
+                }, { fallback: "Could not create the link." });
               }}
             >
               {busy ? "Creating…" : "Create the link"}

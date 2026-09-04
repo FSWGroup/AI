@@ -1,5 +1,6 @@
 import { redirect } from "next/navigation";
 import { prisma } from "@/lib/db";
+import { DEFAULT_COMPANY_NAME, getOrgSettings } from "@/lib/org-settings";
 import { getCurrentUser } from "@/lib/auth/session";
 import { can } from "@/lib/auth/rbac";
 import { SectionHeading } from "@/components/ui";
@@ -13,7 +14,7 @@ export default async function SettingsPage() {
   if (!user || !can(user.role, "MANAGE_RETENTION")) redirect("/admin");
 
   const [settings, retention, holds] = await Promise.all([
-    prisma.orgSettings.findUnique({ where: { id: "org" } }),
+    getOrgSettings(),
     prisma.retentionPolicy.findMany(),
     prisma.legalHold.findMany({ orderBy: { createdAt: "desc" } }),
   ]);
@@ -33,7 +34,7 @@ export default async function SettingsPage() {
       </p>
       <SettingsForm
         settings={{
-          companyName: settings?.companyName ?? "FSW Group",
+          companyName: settings?.companyName ?? DEFAULT_COMPANY_NAME,
           privacyContactEmail: settings?.privacyContactEmail ?? null,
           accommodationContactEmail: settings?.accommodationContactEmail ?? null,
           hrNotificationEmail: settings?.hrNotificationEmail ?? null,

@@ -1,9 +1,9 @@
 "use client";
 
 import { useState } from "react";
-import { useRouter } from "next/navigation";
-import { api, ApiError } from "@/lib/client/api";
-import { Button, Card, Input, Label, Select } from "@/components/ui";
+import { api } from "@/lib/client/api";
+import { useAction } from "@/lib/client/use-action";
+import { Button, Card, ErrorText, Input, Label, Select } from "@/components/ui";
 
 interface Rule {
   dayOfWeek: number;
@@ -64,12 +64,10 @@ export function AvailabilityEditor({
   exceptions: Exception[];
   upcoming: Upcoming[];
 }) {
-  const router = useRouter();
+  const { busy, error, run } = useAction();
   const [timeZone, setTimeZone] = useState(initialZone);
   const [rules, setRules] = useState<Rule[]>(initialRules);
-  const [busy, setBusy] = useState(false);
   const [saved, setSaved] = useState(false);
-  const [error, setError] = useState<string | null>(null);
   const [exDate, setExDate] = useState("");
   const [exReason, setExReason] = useState("");
 
@@ -78,21 +76,14 @@ export function AvailabilityEditor({
     : [timeZone, ...COMMON_ZONES];
 
   const save = async (extra: Record<string, unknown> = {}) => {
-    setBusy(true);
-    setError(null);
     setSaved(false);
-    try {
+    await run(async () => {
       await api("/api/admin/availability", {
         method: "POST",
         body: { timeZone, rules, ...extra },
       });
       setSaved(true);
-      router.refresh();
-    } catch (err) {
-      setError(err instanceof ApiError ? err.message : "Could not save.");
-    } finally {
-      setBusy(false);
-    }
+    }, { fallback: "Could not save." });
   };
 
   return (
@@ -179,7 +170,7 @@ export function AvailabilityEditor({
           })}
         </div>
 
-        {error && <p className="mt-4 text-sm text-red-700">{error}</p>}
+        {error && <ErrorText className="mt-4">{error}</ErrorText>}
         <div className="mt-5 flex items-center gap-3">
           <Button disabled={busy} onClick={() => save()}>
             {busy ? "Saving…" : "Save"}

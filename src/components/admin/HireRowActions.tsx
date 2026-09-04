@@ -1,8 +1,8 @@
 "use client";
 
 import { useState } from "react";
-import { useRouter } from "next/navigation";
-import { api, ApiError } from "@/lib/client/api";
+import { api } from "@/lib/client/api";
+import { useAction } from "@/lib/client/use-action";
 import { Button, Input, Label, Select } from "@/components/ui";
 
 export function HireRowActions({
@@ -16,14 +16,12 @@ export function HireRowActions({
   managerId: string | null;
   managers: { id: string; name: string }[];
 }) {
-  const router = useRouter();
+  const { busy, error, run } = useAction();
   const [open, setOpen] = useState(false);
   const [nextStatus, setNextStatus] = useState(status);
   const [nextManager, setNextManager] = useState(managerId ?? "");
   const [endedAt, setEndedAt] = useState("");
   const [endReason, setEndReason] = useState("");
-  const [busy, setBusy] = useState(false);
-  const [error, setError] = useState<string | null>(null);
 
   const departing = nextStatus.startsWith("DEPARTED");
 
@@ -100,9 +98,7 @@ export function HireRowActions({
           className="px-3 py-1.5 text-xs"
           disabled={busy}
           onClick={async () => {
-            setBusy(true);
-            setError(null);
-            try {
+            await run(async () => {
               await api(`/api/admin/hires/${hireId}`, {
                 method: "PATCH",
                 body: {
@@ -113,12 +109,7 @@ export function HireRowActions({
                 },
               });
               setOpen(false);
-              router.refresh();
-            } catch (err) {
-              setError(err instanceof ApiError ? err.message : "Could not save.");
-            } finally {
-              setBusy(false);
-            }
+            }, { fallback: "Could not save." });
           }}
         >
           {busy ? "Saving…" : "Save"}

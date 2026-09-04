@@ -4,7 +4,7 @@ import { z } from "zod";
 import { prisma } from "@/lib/db";
 import { apiError, apiOk, parseBody, withErrorHandling } from "@/lib/api";
 import { requirePermission } from "@/lib/auth/session";
-import { audit } from "@/lib/audit";
+import { audit, AUDIT_ACTIONS } from "@/lib/audit";
 
 export const runtime = "nodejs";
 
@@ -65,7 +65,7 @@ export const PATCH = withErrorHandling(async (req, ctx) => {
 
   await audit({
     userId: user.id,
-    action: "hire.updated",
+    action: AUDIT_ACTIONS.HIRE_UPDATED,
     entityType: "Hire",
     entityId: hireId,
     previousValue: { status: existing.status, endedAt: existing.endedAt },

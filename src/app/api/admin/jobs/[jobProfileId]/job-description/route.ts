@@ -11,12 +11,12 @@
  */
 
 import { z } from "zod";
-import type { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/db";
 import { apiError, apiOk, parseBody, rateLimit, withErrorHandling } from "@/lib/api";
 import { requirePermission, requestMeta } from "@/lib/auth/session";
 import { audit, AUDIT_ACTIONS } from "@/lib/audit";
 import { AI_MODEL, AiNotConfiguredError, isAiConfigured } from "@/lib/ai/client";
+import { recordAnalysis } from "@/lib/ai/analysis-record";
 import {
   JOB_DESCRIPTION_PROMPT_VERSION,
   analyzeJobDescription,
@@ -78,66 +78,45 @@ export const POST = withErrorHandling(async (req, ctx) => {
   });
   if (!profile) return apiError("Job profile not found.", 404);
 
-  const pending = await prisma.aiAnalysis.create({
-    data: {
+  const { output: proposal, record: saved } = await recordAnalysis({
+    create: {
       kind: "JOB_DESCRIPTION",
-      status: "PENDING",
       jobProfileId,
       model: AI_MODEL,
       promptVersion: JOB_DESCRIPTION_PROMPT_VERSION,
       requestedById: user.id,
     },
-  });
-
-  try {
-    const { proposal, inputTokens, outputTokens } = await analyzeJobDescription({
-      jobTitle: body.jobTitle || profile.openings[0]?.title || profile.name,
-      jobDescription: body.jobDescription,
-    });
-
+    run: async () => {
+      const result = await analyzeJobDescription({
+        jobTitle: body.jobTitle || profile.openings[0]?.title || profile.name,
+        jobDescription: body.jobDescription,
+      });
+      return { ...result, output: result.proposal };
+    },
     // Persist the description alongside the proposal so the benchmark's
     // job-relevance rationale is always recoverable.
-    await prisma.jobProfile.update({
-      where: { id: jobProfileId },
-      data: { jobDescription: body.jobDescription },
-    });
+    onSuccess: async () => {
+      await prisma.jobProfile.update({
+        where: { id: jobProfileId },
+        data: { jobDescription: body.jobDescription },
+      });
+    },
+  });
 
-    const saved = await prisma.aiAnalysis.update({
-      where: { id: pending.id },
-      data: {
-        status: "READY",
-        output: proposal as unknown as Prisma.InputJsonValue,
-        inputTokens,
-        outputTokens,
-        completedAt: new Date(),
-      },
-    });
+  const meta = await requestMeta();
+  await audit({
+    userId: user.id,
+    action: AUDIT_ACTIONS.AI_JOB_DESCRIPTION_ANALYSIS,
+    entityType: "AiAnalysis",
+    entityId: saved.id,
+    newValue: {
+      jobProfileId,
+      model: AI_MODEL,
+      promptVersion: JOB_DESCRIPTION_PROMPT_VERSION,
+      applied: false,
+    },
+    ip: meta.ip,
+  });
 
-    const meta = await requestMeta();
-    await audit({
-      userId: user.id,
-      action: AUDIT_ACTIONS.AI_JOB_DESCRIPTION_ANALYSIS,
-      entityType: "AiAnalysis",
-      entityId: saved.id,
-      newValue: {
-        jobProfileId,
-        model: AI_MODEL,
-        promptVersion: JOB_DESCRIPTION_PROMPT_VERSION,
-        applied: false,
-      },
-      ip: meta.ip,
-    });
-
-    return apiOk({ analysisId: saved.id, proposal });
-  } catch (err) {
-    await prisma.aiAnalysis.update({
-      where: { id: pending.id },
-      data: {
-        status: "FAILED",
-        error: err instanceof Error ? err.message.slice(0, 500) : "Unknown error",
-        completedAt: new Date(),
-      },
-    });
-    throw err;
-  }
+  return apiOk({ analysisId: saved.id, proposal });
 });

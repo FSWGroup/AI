@@ -9,13 +9,7 @@
  */
 
 import { z } from "zod/v4";
-import { zodOutputFormat } from "@anthropic-ai/sdk/helpers/zod";
-import {
-  AI_MODEL,
-  PROMPT_VERSIONS,
-  SHARED_GUARDRAILS,
-  getAiClient,
-} from "./client";
+import { PROMPT_VERSIONS, runGuardedAnalysis } from "./client";
 import type { ReportPayload } from "@/lib/report/generate";
 
 export const CandidateFitSchema = z.object({
@@ -160,8 +154,6 @@ export async function analyzeCandidateFit(input: CandidateFitInput): Promise<{
   inputTokens: number;
   outputTokens: number;
 }> {
-  const client = getAiClient();
-
   const sections: string[] = [
     `<role>\nJob title: ${input.jobTitle}\nProfile: ${input.jobProfileName}\n${
       input.jobDescription
@@ -188,30 +180,14 @@ How to work:
 Remember: no verdicts, no ranking, no scoring, no protected characteristics.
 `.trim();
 
-  const response = await client.messages.parse({
-    model: AI_MODEL,
-    max_tokens: 16000,
-    thinking: { type: "adaptive" },
-    system: SHARED_GUARDRAILS,
-    messages: [{ role: "user", content: `${sections.join("\n\n")}\n\n${task}` }],
-    output_config: { format: zodOutputFormat(CandidateFitSchema) },
+  const { parsed, inputTokens, outputTokens } = await runGuardedAnalysis({
+    schema: CandidateFitSchema,
+    content: `${sections.join("\n\n")}\n\n${task}`,
+    refusalMessage:
+      "The analysis could not be generated for this input. Review the source material and try again.",
   });
 
-  if (response.stop_reason === "refusal") {
-    throw new Error(
-      "The analysis could not be generated for this input. Review the source material and try again.",
-    );
-  }
-  const parsed = response.parsed_output;
-  if (!parsed) {
-    throw new Error("The analysis returned an unreadable result. Please try again.");
-  }
-
-  return {
-    analysis: parsed,
-    inputTokens: response.usage.input_tokens,
-    outputTokens: response.usage.output_tokens,
-  };
+  return { analysis: parsed, inputTokens, outputTokens };
 }
 
 export const CANDIDATE_FIT_PROMPT_VERSION = PROMPT_VERSIONS.candidateFit;

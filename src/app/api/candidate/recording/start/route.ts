@@ -8,15 +8,14 @@ import { z } from "zod";
 import { randomUUID } from "crypto";
 import { prisma } from "@/lib/db";
 import { apiError, apiOk, parseBody, withErrorHandling } from "@/lib/api";
-import { getAttemptFromCookie } from "@/lib/attempt/candidate-auth";
+import { requireAttempt } from "@/lib/attempt/candidate-auth";
 
 const schema = z.object({
   mimeType: z.string().max(100).optional(),
 });
 
 export const POST = withErrorHandling(async (req) => {
-  const attempt = await getAttemptFromCookie();
-  if (!attempt) return apiError("No active assessment session.", 401);
+  const attempt = await requireAttempt();
   if (attempt.cameraExempt) {
     return apiError("This attempt has a camera exemption on file.", 409);
   }

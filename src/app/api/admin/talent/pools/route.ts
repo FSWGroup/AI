@@ -4,7 +4,7 @@ import { z } from "zod";
 import { prisma } from "@/lib/db";
 import { apiOk, parseBody, withErrorHandling } from "@/lib/api";
 import { requirePermission } from "@/lib/auth/session";
-import { audit } from "@/lib/audit";
+import { audit, AUDIT_ACTIONS } from "@/lib/audit";
 
 export const runtime = "nodejs";
 
@@ -39,7 +39,7 @@ export const POST = withErrorHandling(async (req) => {
   });
   await audit({
     userId: user.id,
-    action: "talent_pool.created",
+    action: AUDIT_ACTIONS.TALENT_POOL_CREATED,
     entityType: "TalentPool",
     entityId: pool.id,
     newValue: { name: pool.name },

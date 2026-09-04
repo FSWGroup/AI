@@ -12,13 +12,12 @@
 
 import { prisma } from "@/lib/db";
 import { apiError, apiOk, withErrorHandling } from "@/lib/api";
-import { getAttemptFromCookie } from "@/lib/attempt/candidate-auth";
+import { requireAttempt } from "@/lib/attempt/candidate-auth";
 import { buildCandidateFeedback } from "@/lib/report/candidate-feedback";
 import type { ReportPayload } from "@/lib/report/generate";
 
 export const GET = withErrorHandling(async () => {
-  const attempt = await getAttemptFromCookie();
-  if (!attempt) return apiError("No active assessment session.", 401);
+  const attempt = await requireAttempt();
   if (attempt.status !== "COMPLETED") {
     return apiError("Your summary is available once you submit.", 409);
   }

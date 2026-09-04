@@ -11,9 +11,9 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
-import { api, ApiError } from "@/lib/client/api";
-import { Badge, Button, Card, Input, Select } from "@/components/ui";
+import { api } from "@/lib/client/api";
+import { useAction } from "@/lib/client/use-action";
+import { Badge, Button, Card, Checkbox, Input, Select } from "@/components/ui";
 import { RECOMMENDATION_LABEL, RATING_LABEL } from "@/lib/ats/scorecards";
 
 export interface PanelReview {
@@ -77,29 +77,20 @@ export function ReviewPanel({
   teamOptions: { id: string; name: string; role: string }[];
   kitOptions: { id: string; name: string }[];
 }) {
-  const router = useRouter();
+  const { busy, error, run } = useAction();
   const [opening, setOpening] = useState(false);
-  const [busy, setBusy] = useState(false);
-  const [error, setError] = useState<string | null>(null);
   const [name, setName] = useState("Team review");
   const [kitId, setKitId] = useState("");
   const [selected, setSelected] = useState<string[]>([]);
 
   async function openRound(): Promise<void> {
-    setBusy(true);
-    setError(null);
-    try {
+    await run(async () => {
       await api(`/api/admin/applications/${applicationId}/reviews`, {
         body: { name, reviewerIds: selected, kitId: kitId || null, blind: true },
       });
       setOpening(false);
       setSelected([]);
-      router.refresh();
-    } catch (err) {
-      setError(err instanceof ApiError ? err.message : "Could not open the round.");
-    } finally {
-      setBusy(false);
-    }
+    }, { fallback: "Could not open the round." });
   }
 
   return (
@@ -142,9 +133,7 @@ export function ReviewPanel({
           <div className="space-y-1.5">
             {teamOptions.map((t) => (
               <label key={t.id} className="flex items-center gap-2 text-sm">
-                <input
-                  type="checkbox"
-                  className="h-4 w-4 accent-fsw-600"
+                <Checkbox
                   checked={selected.includes(t.id)}
                   onChange={(e) =>
                     setSelected((prev) =>

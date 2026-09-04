@@ -4,7 +4,7 @@ import { z } from "zod";
 import { prisma } from "@/lib/db";
 import { apiError, apiOk, parseBody, withErrorHandling } from "@/lib/api";
 import { requirePermission } from "@/lib/auth/session";
-import { audit } from "@/lib/audit";
+import { audit, AUDIT_ACTIONS } from "@/lib/audit";
 import { CRITERION_BY_KEY } from "@/content/performance-criteria";
 
 export const runtime = "nodejs";
@@ -110,7 +110,7 @@ export const POST = withErrorHandling(async (req) => {
 
   await audit({
     userId: user.id,
-    action: "validation_study.created",
+    action: AUDIT_ACTIONS.VALIDATION_STUDY_CREATED,
     entityType: "ValidationStudy",
     entityId: study.id,
     newValue: { name: study.name, criterionKind: study.criterionKind },

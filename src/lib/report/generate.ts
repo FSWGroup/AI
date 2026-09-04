@@ -12,6 +12,7 @@
 
 import type { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/db";
+import { getCompanyName } from "@/lib/org-settings";
 import {
   APTITUDE_CONSTRUCTS,
   BEHAVIORAL_CONSTRUCTS,
@@ -149,7 +150,7 @@ export async function generateReport(attemptId: string): Promise<string> {
       integrityEvents: true,
     },
   });
-  const orgSettings = await prisma.orgSettings.findUnique({ where: { id: "org" } });
+  const companyName = await getCompanyName();
   const narrativeVersion = attempt.assessmentVersion.narrativeVersion;
 
   const templates = await prisma.narrativeTemplate.findMany({
@@ -410,7 +411,7 @@ export async function generateReport(attemptId: string): Promise<string> {
     meta: {
       candidateName: `${attempt.candidate.firstName} ${attempt.candidate.lastName}`,
       position: attempt.jobOpening.title,
-      company: orgSettings?.companyName ?? "FSW Group",
+      company: companyName,
       completedAt: attempt.completedAt?.toISOString() ?? null,
       assessmentVersionName: `${attempt.assessmentVersion.name} v${attempt.assessmentVersion.versionNumber}`,
       scoringVersion: attempt.assessmentVersion.scoringVersion,

@@ -9,7 +9,7 @@
 import { z } from "zod";
 import { prisma } from "@/lib/db";
 import { apiError, apiOk, parseBody, withErrorHandling } from "@/lib/api";
-import { getCurrentUser } from "@/lib/auth/session";
+import { requireAnyUser } from "@/lib/auth/session";
 import { audit, AUDIT_ACTIONS } from "@/lib/audit";
 import { validateFinding } from "@/lib/ats/social-check";
 import { logRequisitionEvent } from "@/lib/ats/service";
@@ -37,8 +37,7 @@ const schema = z.discriminatedUnion("action", [
 ]);
 
 export const POST = withErrorHandling(async (req, ctx) => {
-  const user = await getCurrentUser();
-  if (!user) return apiError("Not signed in.", 401);
+  const user = await requireAnyUser();
   const { checkId } = await ctx.params;
   const body = await parseBody(req, schema);
 

@@ -7,7 +7,7 @@
 import { z } from "zod";
 import { prisma } from "@/lib/db";
 import { apiError, apiOk, parseBody, rateLimit, withErrorHandling } from "@/lib/api";
-import { getAttemptFromCookie } from "@/lib/attempt/candidate-auth";
+import { requireAttempt } from "@/lib/attempt/candidate-auth";
 import { INTEGRITY_EVENT_TYPES } from "@/lib/scoring/integrity";
 
 const CLIENT_EVENTS = [
@@ -35,8 +35,7 @@ const schema = z.object({
 });
 
 export const POST = withErrorHandling(async (req) => {
-  const attempt = await getAttemptFromCookie();
-  if (!attempt) return apiError("No active assessment session.", 401);
+  const attempt = await requireAttempt();
   if (!rateLimit(`event:${attempt.id}`, 240, 60_000)) {
     return apiOk({ recorded: false });
   }

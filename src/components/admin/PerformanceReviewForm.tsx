@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { api, ApiError } from "@/lib/client/api";
-import { Button, Card, Textarea } from "@/components/ui";
+import { Button, Card, ErrorText, Textarea } from "@/components/ui";
 import type { PerformanceCriterion } from "@/content/performance-criteria";
 
 interface Initial {
@@ -186,7 +186,7 @@ export function PerformanceReviewForm({
             />
           </div>
 
-          {error && <p className="mb-3 text-sm text-red-700">{error}</p>}
+          {error && <ErrorText className="mb-3">{error}</ErrorText>}
           <div className="flex flex-wrap gap-3">
             <Button variant="secondary" disabled={busy} onClick={() => save(false)}>
               Save draft

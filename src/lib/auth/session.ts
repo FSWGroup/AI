@@ -1,7 +1,7 @@
 import "server-only";
 import { cookies, headers } from "next/headers";
 import { cache } from "react";
-import type { User, UserRole } from "@prisma/client";
+import type { User } from "@prisma/client";
 import { prisma } from "@/lib/db";
 import { generateToken, hashToken } from "@/lib/crypto";
 import { env } from "@/lib/env";
@@ -100,23 +100,6 @@ export async function requireAnyUser(): Promise<User> {
   const user = await getCurrentUser();
   if (!user) throw new AuthError("Not signed in.", 401);
   return user;
-}
-
-/**
- * Job-profile scoping: HIRING_MANAGER (and scoped viewers) can only touch
- * candidates/attempts belonging to job profiles they are assigned to.
- */
-export async function assertJobProfileAccess(
-  user: User,
-  jobProfileId: string,
-): Promise<void> {
-  if (user.role !== ("HIRING_MANAGER" as UserRole)) return;
-  const assignment = await prisma.jobProfileAssignment.findUnique({
-    where: { userId_jobProfileId: { userId: user.id, jobProfileId } },
-  });
-  if (!assignment) {
-    throw new AuthError("You do not have access to this job profile.", 403);
-  }
 }
 
 /**

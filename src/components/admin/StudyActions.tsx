@@ -1,8 +1,7 @@
 "use client";
 
-import { useState } from "react";
-import { useRouter } from "next/navigation";
-import { api, ApiError } from "@/lib/client/api";
+import { api } from "@/lib/client/api";
+import { useAction } from "@/lib/client/use-action";
 import { Button } from "@/components/ui";
 
 export function StudyActions({
@@ -14,9 +13,7 @@ export function StudyActions({
   canManage: boolean;
   computed: boolean;
 }) {
-  const router = useRouter();
-  const [busy, setBusy] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const { busy, error, run } = useAction();
 
   return (
     <div className="mt-5 flex flex-wrap items-center gap-3">
@@ -24,16 +21,9 @@ export function StudyActions({
         <Button
           disabled={busy}
           onClick={async () => {
-            setBusy(true);
-            setError(null);
-            try {
+            await run(async () => {
               await api(`/api/admin/validation/studies/${studyId}/run`, { method: "POST" });
-              router.refresh();
-            } catch (err) {
-              setError(err instanceof ApiError ? err.message : "Could not run the study.");
-            } finally {
-              setBusy(false);
-            }
+            }, { fallback: "Could not run the study." });
           }}
         >
           {busy ? "Computing…" : computed ? "Recompute" : "Run study"}

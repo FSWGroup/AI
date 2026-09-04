@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import { Button, Card } from "@/components/ui";
+import { Button, Card, ErrorText } from "@/components/ui";
 
 interface Payload {
   status: string;
@@ -145,7 +145,7 @@ export function SchedulePicker({
         </>
       )}
 
-      {error && <p className="mt-4 text-sm text-red-700">{error}</p>}
+      {error && <ErrorText className="mt-4">{error}</ErrorText>}
 
       {(!data.booked || data.canReschedule) && (
         <>

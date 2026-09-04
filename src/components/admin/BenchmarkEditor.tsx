@@ -10,7 +10,7 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { api, ApiError } from "@/lib/client/api";
 import { dimensionMeta } from "@/content/narratives/dimension-meta";
-import { Button, Card, Input } from "@/components/ui";
+import { Button, Card, Checkbox, Input } from "@/components/ui";
 import {
   JobDescriptionPanel,
   type ProposedDimension,
@@ -295,9 +295,7 @@ export function BenchmarkEditor({
                 className="flex items-center justify-between gap-2 rounded-lg border border-navy-100 p-3 text-sm"
               >
                 <span className="flex items-center gap-2">
-                  <input
-                    type="checkbox"
-                    className="h-4 w-4 accent-fsw-600"
+                  <Checkbox
                     disabled={readOnly}
                     checked={c.enabled}
                     onChange={(e) =>

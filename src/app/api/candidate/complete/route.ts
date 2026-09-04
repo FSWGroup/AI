@@ -1,11 +1,10 @@
 import { prisma } from "@/lib/db";
 import { apiError, apiOk, withErrorHandling } from "@/lib/api";
-import { getAttemptFromCookie } from "@/lib/attempt/candidate-auth";
+import { requireAttempt } from "@/lib/attempt/candidate-auth";
 import { completeAttempt } from "@/lib/attempt/complete";
 
 export const POST = withErrorHandling(async () => {
-  const attempt = await getAttemptFromCookie();
-  if (!attempt) return apiError("No active assessment session.", 401);
+  const attempt = await requireAttempt();
   if (attempt.status === "COMPLETED") return apiOk({ completed: true });
   if (attempt.status !== "IN_PROGRESS") {
     return apiError("The assessment is not in progress.", 409);

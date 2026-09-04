@@ -1,14 +1,17 @@
 import { notFound } from "next/navigation";
 import { prisma } from "@/lib/db";
 import { hashToken } from "@/lib/crypto";
+import { getCompanyName } from "@/lib/org-settings";
+import {
+  LinkExpired,
+  TokenPageShell,
+  noIndexMetadata,
+} from "@/components/careers/TokenPage";
 import { OfferResponse } from "@/components/careers/OfferResponse";
 
 export const dynamic = "force-dynamic";
 
-export const metadata = {
-  title: "Your offer",
-  robots: { index: false, follow: false },
-};
+export const metadata = noIndexMetadata("Your offer");
 
 export default async function OfferPage({
   params,
@@ -24,24 +27,16 @@ export default async function OfferPage({
     },
   });
 
-  const settings = await prisma.orgSettings.findUnique({ where: { id: "org" } });
-  const company = settings?.companyName ?? "FSW Group";
+  const company = await getCompanyName();
 
   if (!offer) {
     // A spent or wrong token. Deliberately vague: this page is public.
     return (
-      <main className="mx-auto flex min-h-screen w-full max-w-lg items-center px-6">
-        <div>
-          <h1 className="text-2xl font-bold text-navy-900">
-            This link is no longer active
-          </h1>
-          <p className="mt-3 leading-relaxed text-navy-600">
-            The link may have already been used, or the offer may have been
-            withdrawn. Please contact your recruiting contact at {company} and
-            they will help.
-          </p>
-        </div>
-      </main>
+      <LinkExpired>
+        The link may have already been used, or the offer may have been
+        withdrawn. Please contact your recruiting contact at {company} and they
+        will help.
+      </LinkExpired>
     );
   }
   if (!offer.letterBody) notFound();
@@ -50,25 +45,24 @@ export default async function OfferPage({
     offer.expiresAt != null && offer.expiresAt.getTime() < Date.now();
 
   return (
-    <main className="mx-auto min-h-screen w-full max-w-3xl px-6 py-14">
-      <p className="text-xs font-bold uppercase tracking-[0.2em] text-fsw-600">
-        {company}
-      </p>
-      <h1 className="mt-2 text-3xl font-bold text-navy-900">
-        Your offer of employment
-      </h1>
-      <p className="mt-2 text-navy-600">
-        {offer.jobTitle}
-        {offer.expiresAt && !expired && (
-          <>
-            {" · "}please respond by{" "}
-            {new Intl.DateTimeFormat("en-US", { dateStyle: "long" }).format(
-              offer.expiresAt,
-            )}
-          </>
-        )}
-      </p>
-
+    <TokenPageShell
+      company={company}
+      title="Your offer of employment"
+      subtitle={
+        <>
+          {offer.jobTitle}
+          {offer.expiresAt && !expired && (
+            <>
+              {" · "}please respond by{" "}
+              {new Intl.DateTimeFormat("en-US", { dateStyle: "long" }).format(
+                offer.expiresAt,
+              )}
+            </>
+          )}
+        </>
+      }
+      wide
+    >
       <article className="mt-8 whitespace-pre-line rounded-2xl border border-navy-100 bg-white p-8 text-[15px] leading-relaxed text-navy-800">
         {offer.letterBody}
       </article>
@@ -91,6 +85,6 @@ export default async function OfferPage({
         match what you discussed, contact your recruiting contact before
         responding.
       </p>
-    </main>
+    </TokenPageShell>
   );
 }

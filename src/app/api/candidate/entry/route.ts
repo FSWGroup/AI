@@ -9,10 +9,10 @@
  */
 
 import { z } from "zod";
-import { headers } from "next/headers";
 import { prisma } from "@/lib/db";
 import { apiError, apiOk, parseBody, withErrorHandling } from "@/lib/api";
-import { getAttemptFromCookie } from "@/lib/attempt/candidate-auth";
+import { requireAttempt } from "@/lib/attempt/candidate-auth";
+import { requestMeta } from "@/lib/auth/session";
 import { getCandidateState } from "@/lib/attempt/state";
 
 const schema = z.discriminatedUnion("step", [
@@ -46,16 +46,14 @@ const STEP_AFTER: Record<string, string> = {
 };
 
 export const POST = withErrorHandling(async (req) => {
-  const attempt = await getAttemptFromCookie();
-  if (!attempt) return apiError("No active assessment session.", 401);
+  const attempt = await requireAttempt();
   if (attempt.status !== "NOT_STARTED") {
     return apiError("The assessment has already started.", 409);
   }
   const body = await parseBody(req, schema);
-  const h = await headers();
-  const ip =
-    h.get("x-forwarded-for")?.split(",")[0]?.trim() ?? h.get("x-real-ip") ?? null;
-  const userAgent = h.get("user-agent")?.slice(0, 300) ?? null;
+  const meta = await requestMeta();
+  const ip = meta.ip ?? null;
+  const userAgent = meta.userAgent?.slice(0, 300) ?? null;
 
   if (body.step === "identify") {
     await prisma.candidate.update({

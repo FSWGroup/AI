@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { api, ApiError } from "@/lib/client/api";
+import { useAction } from "@/lib/client/use-action";
 import { Button } from "@/components/ui";
 import { MIN_N_NORM_ACTIVE } from "@/lib/validation/gates";
 
@@ -54,26 +55,17 @@ export function NormActions({
   status: string;
   sampleSize: number;
 }) {
-  const router = useRouter();
-  const [busy, setBusy] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const { busy, error, run } = useAction();
   const [confirming, setConfirming] = useState(false);
 
   const act = async (action: "activate" | "retire") => {
-    setBusy(true);
-    setError(null);
-    try {
+    await run(async () => {
       await api(`/api/admin/validation/norms/${normTableId}`, {
         method: "POST",
         body: { action },
       });
       setConfirming(false);
-      router.refresh();
-    } catch (err) {
-      setError(err instanceof ApiError ? err.message : "Could not update the table.");
-    } finally {
-      setBusy(false);
-    }
+    }, { fallback: "Could not update the table." });
   };
 
   if (status === "RETIRED") return null;

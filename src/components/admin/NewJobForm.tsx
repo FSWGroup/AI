@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { api, ApiError } from "@/lib/client/api";
-import { Button, Card, Input, Label } from "@/components/ui";
+import { Button, Card, Checkbox, Input, Label } from "@/components/ui";
 
 export function NewJobForm() {
   const router = useRouter();
@@ -42,18 +42,14 @@ export function NewJobForm() {
       </div>
       <div className="mt-3 flex gap-5 text-sm">
         <label className="flex items-center gap-2">
-          <input
-            type="checkbox"
-            className="h-4 w-4 accent-fsw-600"
+          <Checkbox
             checked={isSalesRole}
             onChange={(e) => setIsSalesRole(e.target.checked)}
           />
           Sales role (enables 11-trait sales analysis)
         </label>
         <label className="flex items-center gap-2">
-          <input
-            type="checkbox"
-            className="h-4 w-4 accent-fsw-600"
+          <Checkbox
             checked={leadership}
             onChange={(e) => setLeadership(e.target.checked)}
           />

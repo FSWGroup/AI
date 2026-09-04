@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import { Button, Card, Textarea } from "@/components/ui";
+import { Button, Card, ErrorText, Textarea } from "@/components/ui";
 
 /**
  * The candidate's work-sample screen.
@@ -153,7 +153,7 @@ export function WorkSampleRunner({
             </p>
           </div>
         )}
-        {error && <p className="mt-4 text-sm text-red-700">{error}</p>}
+        {error && <ErrorText className="mt-4">{error}</ErrorText>}
         <Button
           className="mt-6"
           disabled={busy}
@@ -277,7 +277,7 @@ export function WorkSampleRunner({
         </Card>
       )}
 
-      {error && <p className="mt-4 text-sm text-red-700">{error}</p>}
+      {error && <ErrorText className="mt-4">{error}</ErrorText>}
 
       <div className="mt-6 flex flex-wrap items-center gap-3">
         <Button

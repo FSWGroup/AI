@@ -2,13 +2,12 @@
 
 import { prisma } from "@/lib/db";
 import { apiError, apiOk, withErrorHandling } from "@/lib/api";
-import { getAttemptFromCookie } from "@/lib/attempt/candidate-auth";
+import { requireAttempt } from "@/lib/attempt/candidate-auth";
 import { sweepExpiredSections, sectionRemainingSeconds } from "@/lib/attempt/engine";
 import { getSectionQuestions } from "@/lib/attempt/state";
 
 export const GET = withErrorHandling(async (req) => {
-  const attempt = await getAttemptFromCookie();
-  if (!attempt) return apiError("No active assessment session.", 401);
+  const attempt = await requireAttempt();
   const url = new URL(req.url);
   const sectionKey = url.searchParams.get("key");
   if (!sectionKey) return apiError("Missing section key.", 422);

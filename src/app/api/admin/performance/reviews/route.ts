@@ -11,7 +11,7 @@ import { prisma } from "@/lib/db";
 import { apiError, apiOk, parseBody, withErrorHandling } from "@/lib/api";
 import { requirePermission } from "@/lib/auth/session";
 import { can } from "@/lib/auth/rbac";
-import { audit } from "@/lib/audit";
+import { audit, AUDIT_ACTIONS } from "@/lib/audit";
 import {
   CRITERION_BY_KEY,
   PERFORMANCE_RATING_MAX,
@@ -140,7 +140,7 @@ export const POST = withErrorHandling(async (req) => {
   if (body.submit) {
     await audit({
       userId: user.id,
-      action: "performance_review.submitted",
+      action: AUDIT_ACTIONS.PERFORMANCE_REVIEW_SUBMITTED,
       entityType: "PerformanceReview",
       entityId: review.id,
       newValue: { hireId: body.hireId, cycleId: body.cycleId },

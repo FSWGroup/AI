@@ -1,17 +1,15 @@
 "use client";
 
 import { useState } from "react";
-import { useRouter } from "next/navigation";
-import { api, ApiError } from "@/lib/client/api";
-import { Badge, Button, Card } from "@/components/ui";
-import { CONSENT_LABEL, type ConsentStatus } from "@/lib/talent/consent";
-
-const TONE: Record<ConsentStatus, "green" | "amber" | "neutral" | "red"> = {
-  OPTED_IN: "green",
-  INVITED: "amber",
-  NOT_ASKED: "neutral",
-  OPTED_OUT: "red",
-};
+import { api } from "@/lib/client/api";
+import { useAction } from "@/lib/client/use-action";
+import { Badge, Button, Card, ErrorText } from "@/components/ui";
+import { OneTimeLink } from "./OneTimeLink";
+import {
+  CONSENT_LABEL,
+  CONSENT_TONE,
+  type ConsentStatus,
+} from "@/lib/talent/consent";
 
 /**
  * Asking a candidate whether they want to be kept in mind.
@@ -31,17 +29,15 @@ export function KeepInTouchPanel({
   askedAt: string | null;
   expiresAt: string | null;
 }) {
-  const router = useRouter();
-  const [busy, setBusy] = useState(false);
+  const { busy, error, run } = useAction();
   const [link, setLink] = useState<string | null>(null);
-  const [error, setError] = useState<string | null>(null);
   const status = consentStatus ?? "NOT_ASKED";
 
   return (
     <Card className="p-5">
       <h3 className="text-sm font-bold text-navy-900">Keeping in touch</h3>
       <div className="mt-2">
-        <Badge tone={TONE[status]}>{CONSENT_LABEL[status]}</Badge>
+        <Badge tone={CONSENT_TONE[status]}>{CONSENT_LABEL[status]}</Badge>
       </div>
 
       {status === "OPTED_IN" && (
@@ -70,20 +66,8 @@ export function KeepInTouchPanel({
         </p>
       )}
 
-      {link && (
-        <div className="mt-3 rounded-lg bg-emerald-50 p-3">
-          <p className="text-xs font-semibold text-emerald-900">
-            Send this to the candidate:
-          </p>
-          <input
-            readOnly
-            className="mt-2 w-full rounded border border-emerald-200 bg-white px-2 py-1 font-mono text-xs text-navy-800"
-            value={link}
-            onFocus={(e) => e.currentTarget.select()}
-          />
-        </div>
-      )}
-      {error && <p className="mt-3 text-sm text-red-700">{error}</p>}
+      {link && <OneTimeLink url={link} />}
+      {error && <ErrorText className="mt-3">{error}</ErrorText>}
 
       <div className="mt-4 flex flex-wrap gap-2">
         {(status === "NOT_ASKED" || status === "INVITED") && (
@@ -92,20 +76,13 @@ export function KeepInTouchPanel({
             className="px-3 py-1.5 text-xs"
             disabled={busy}
             onClick={async () => {
-              setBusy(true);
-              setError(null);
-              try {
+              await run(async () => {
                 const out = await api<{ url: string }>("/api/admin/talent/profiles", {
                   method: "POST",
                   body: { action: "invite", candidateId },
                 });
                 setLink(out.url);
-                router.refresh();
-              } catch (err) {
-                setError(err instanceof ApiError ? err.message : "Could not ask.");
-              } finally {
-                setBusy(false);
-              }
+              }, { fallback: "Could not ask." });
             }}
           >
             {busy ? "Working…" : status === "INVITED" ? "Send the ask again" : "Ask them"}
@@ -117,9 +94,7 @@ export function KeepInTouchPanel({
             className="px-3 py-1.5 text-xs"
             disabled={busy}
             onClick={async () => {
-              setBusy(true);
-              setError(null);
-              try {
+              await run(async () => {
                 await api("/api/admin/talent/profiles", {
                   method: "POST",
                   body: {
@@ -128,12 +103,7 @@ export function KeepInTouchPanel({
                     reason: "requested_by_candidate",
                   },
                 });
-                router.refresh();
-              } catch (err) {
-                setError(err instanceof ApiError ? err.message : "Could not record it.");
-              } finally {
-                setBusy(false);
-              }
+              }, { fallback: "Could not record it." });
             }}
           >
             They asked not to be contacted

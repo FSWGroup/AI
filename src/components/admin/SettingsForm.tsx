@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { api, ApiError } from "@/lib/client/api";
-import { Badge, Button, Card, Input, Label } from "@/components/ui";
+import { Badge, Button, Card, Checkbox, Input, Label } from "@/components/ui";
 
 const RETENTION_TYPES = [
   { key: "ASSESSMENT_ANSWERS", label: "Assessment answers" },
@@ -127,9 +127,7 @@ export function SettingsForm({
             ] as const
           ).map(([key, label]) => (
             <label key={key} className="flex items-center gap-2">
-              <input
-                type="checkbox"
-                className="h-4 w-4 accent-fsw-600"
+              <Checkbox
                 checked={org[key]}
                 onChange={(e) => setOrg({ ...org, [key]: e.target.checked })}
               />
@@ -147,9 +145,7 @@ export function SettingsForm({
           <div className="mt-1 flex flex-wrap gap-3 text-sm">
             {ROLES.map((r) => (
               <label key={r} className="flex items-center gap-1.5">
-                <input
-                  type="checkbox"
-                  className="h-4 w-4 accent-fsw-600"
+                <Checkbox
                   checked={org.recordingAccessRoles.includes(r)}
                   onChange={(e) =>
                     setOrg({
@@ -178,9 +174,8 @@ export function SettingsForm({
         </p>
         <div className="mt-4 space-y-4">
           <label className="flex gap-3">
-            <input
-              type="checkbox"
-              className="mt-0.5 h-4 w-4 shrink-0 accent-fsw-600"
+            <Checkbox
+              className="mt-0.5 shrink-0"
               checked={org.eeoModuleEnabled}
               onChange={(e) =>
                 setOrg({ ...org, eeoModuleEnabled: e.target.checked })
@@ -200,9 +195,8 @@ export function SettingsForm({
             </span>
           </label>
           <label className="flex gap-3">
-            <input
-              type="checkbox"
-              className="mt-0.5 h-4 w-4 shrink-0 accent-fsw-600"
+            <Checkbox
+              className="mt-0.5 shrink-0"
               checked={org.socialCheckEnabled}
               onChange={(e) =>
                 setOrg({ ...org, socialCheckEnabled: e.target.checked })
@@ -222,9 +216,8 @@ export function SettingsForm({
             </span>
           </label>
           <label className="flex gap-3">
-            <input
-              type="checkbox"
-              className="mt-0.5 h-4 w-4 shrink-0 accent-fsw-600"
+            <Checkbox
+              className="mt-0.5 shrink-0"
               checked={org.candidateFeedbackEnabled}
               onChange={(e) =>
                 setOrg({ ...org, candidateFeedbackEnabled: e.target.checked })

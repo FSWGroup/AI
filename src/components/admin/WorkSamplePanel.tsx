@@ -1,10 +1,11 @@
 "use client";
 
 import { useState } from "react";
-import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { api, ApiError } from "@/lib/client/api";
-import { Badge, Button, Card, Select } from "@/components/ui";
+import { api } from "@/lib/client/api";
+import { useAction } from "@/lib/client/use-action";
+import { Badge, Button, Card, ErrorText, Select } from "@/components/ui";
+import { OneTimeLink } from "./OneTimeLink";
 
 interface Assigned {
   id: string;
@@ -37,10 +38,8 @@ export function WorkSamplePanel({
   available: { id: string; title: string }[];
   assigned: Assigned[];
 }) {
-  const router = useRouter();
+  const { busy, error, run } = useAction();
   const [choice, setChoice] = useState("");
-  const [busy, setBusy] = useState(false);
-  const [error, setError] = useState<string | null>(null);
   const [link, setLink] = useState<string | null>(null);
 
   if (!canManage && assigned.length === 0) return null;
@@ -101,24 +100,15 @@ export function WorkSamplePanel({
                 variant="secondary"
                 disabled={busy || choice === ""}
                 onClick={async () => {
-                  setBusy(true);
-                  setError(null);
                   setLink(null);
-                  try {
+                  await run(async () => {
                     const out = await api<{ url: string }>(
                       `/api/admin/work-samples/${choice}/assign`,
                       { method: "POST", body: { applicationId } },
                     );
                     setLink(out.url);
                     setChoice("");
-                    router.refresh();
-                  } catch (err) {
-                    setError(
-                      err instanceof ApiError ? err.message : "Could not send it.",
-                    );
-                  } finally {
-                    setBusy(false);
-                  }
+                  }, { fallback: "Could not send it." });
                 }}
               >
                 {busy ? "Sending…" : "Send"}
@@ -126,22 +116,8 @@ export function WorkSamplePanel({
             </>
           )}
 
-          {link && (
-            <div className="mt-3 rounded-lg bg-emerald-50 p-3">
-              <p className="text-xs font-semibold text-emerald-900">
-                Send this link to the candidate. It is shown once — the token is
-                stored only as a hash, so a lost link is reissued rather than
-                looked up.
-              </p>
-              <input
-                readOnly
-                className="mt-2 w-full rounded border border-emerald-200 bg-white px-2 py-1 font-mono text-xs text-navy-800"
-                value={link}
-                onFocus={(e) => e.currentTarget.select()}
-              />
-            </div>
-          )}
-          {error && <p className="mt-2 text-sm text-red-700">{error}</p>}
+          {link && <OneTimeLink url={link} />}
+          {error && <ErrorText className="mt-2">{error}</ErrorText>}
         </div>
       )}
     </Card>

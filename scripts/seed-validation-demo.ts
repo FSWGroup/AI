@@ -25,6 +25,10 @@
 
 import { PrismaClient, type Construct } from "@prisma/client";
 import { resolveDatabaseUrl } from "../src/lib/database-url";
+import {
+  APTITUDE_CONSTRUCTS,
+  BEHAVIORAL_CONSTRUCTS,
+} from "../src/content/types";
 
 resolveDatabaseUrl();
 const prisma = new PrismaClient();
@@ -67,22 +71,8 @@ function normal(rand: () => number, mean: number, sd: number): number {
 }
 
 const CONSTRUCTS: Construct[] = [
-  "MENTAL_ACUITY",
-  "BUSINESS_TERMS",
-  "AWARENESS_MEMORY",
-  "VOCABULARY",
-  "NUMERICAL_PERCEPTION",
-  "MECHANICAL_INTEREST",
-  "ENERGY",
-  "FLEXIBILITY",
-  "ORGANIZATION",
-  "COMMUNICATION",
-  "EMOTIONAL_DEVELOPMENT",
-  "ASSERTIVENESS",
-  "COMPETITIVENESS",
-  "MENTAL_TOUGHNESS",
-  "QUESTIONING_PROBING",
-  "MOTIVATION",
+  ...APTITUDE_CONSTRUCTS,
+  ...BEHAVIORAL_CONSTRUCTS,
 ];
 
 /**

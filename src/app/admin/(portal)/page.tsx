@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { prisma } from "@/lib/db";
+import { getCompanyName } from "@/lib/org-settings";
 import { getCurrentUser } from "@/lib/auth/session";
 import { attemptScopeWhere } from "@/lib/auth/scope";
 import { Card, Badge, SectionHeading } from "@/components/ui";
@@ -21,7 +22,7 @@ export default async function AdminDashboard() {
     completed,
     reviewRecommended,
     reportsReady,
-    settings,
+    companyName,
   ] = await Promise.all([
     prisma.jobOpening.count({ where: { status: "OPEN" } }),
     prisma.invitation.count(),
@@ -36,7 +37,7 @@ export default async function AdminDashboard() {
       _count: true,
     }),
     prisma.report.count({ where: { status: "READY" } }),
-    prisma.orgSettings.findUnique({ where: { id: "org" } }),
+    getCompanyName(),
   ]);
 
   const stats = [
@@ -67,7 +68,7 @@ export default async function AdminDashboard() {
     <div className="mx-auto max-w-6xl">
       <div className="flex flex-wrap items-end justify-between gap-4">
         <SectionHeading
-          eyebrow={settings?.companyName ?? "FSW Group"}
+          eyebrow={companyName}
           title="Dashboard"
           description="Assessment pipeline at a glance."
         />

@@ -68,6 +68,47 @@ export function Input({
   );
 }
 
+/**
+ * A checkbox at the product's one size and accent colour.
+ *
+ * Positioning (`mt-1`, `shrink-0`) stays with the caller, because it depends
+ * on the label it sits beside; the box itself does not.
+ */
+export function Checkbox({
+  className,
+  ...props
+}: Omit<React.InputHTMLAttributes<HTMLInputElement>, "type">) {
+  return (
+    <input
+      type="checkbox"
+      className={cx("h-4 w-4 accent-fsw-600", className)}
+      {...props}
+    />
+  );
+}
+
+/**
+ * An inline form error.
+ *
+ * `role="alert"` is not optional here, and that is the reason this exists:
+ * when each site wrote its own <p>, most of them left it off, so a screen
+ * reader user submitted a form and was told nothing had happened. Spacing is
+ * still the caller's, because it depends on what the error sits under.
+ */
+export function ErrorText({
+  className,
+  children,
+}: {
+  className?: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <p role="alert" className={cx("text-sm text-red-700", className)}>
+      {children}
+    </p>
+  );
+}
+
 export function Select({
   className,
   ...props

@@ -30,6 +30,17 @@ export const CONSENT_LABEL: Record<ConsentStatus, string> = {
   OPTED_OUT: "Asked not to be contacted",
 };
 
+/** Badge colour for each status, wherever one is shown. */
+export const CONSENT_TONE: Record<
+  ConsentStatus,
+  "green" | "amber" | "neutral" | "red"
+> = {
+  OPTED_IN: "green",
+  INVITED: "amber",
+  NOT_ASKED: "neutral",
+  OPTED_OUT: "red",
+};
+
 /** The wording the candidate sees. Plain, and honest about what it means. */
 export const CONSENT_STATEMENT = [
   "We would like to keep your details so we can get in touch if a role comes up that fits you better than the one you applied for.",

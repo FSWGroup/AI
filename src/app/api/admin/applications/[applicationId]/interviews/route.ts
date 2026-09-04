@@ -11,7 +11,7 @@
 import { z } from "zod";
 import { prisma } from "@/lib/db";
 import { apiError, apiOk, parseBody, withErrorHandling } from "@/lib/api";
-import { getCurrentUser } from "@/lib/auth/session";
+import { requireAnyUser } from "@/lib/auth/session";
 import { assertApplicationAccess } from "@/lib/auth/scope";
 import { can } from "@/lib/auth/rbac";
 import { audit, AUDIT_ACTIONS } from "@/lib/audit";
@@ -28,8 +28,7 @@ const schema = z.object({
 });
 
 export const POST = withErrorHandling(async (req, ctx) => {
-  const user = await getCurrentUser();
-  if (!user) return apiError("Not signed in.", 401);
+  const user = await requireAnyUser();
   if (!can(user.role, "MANAGE_INTERVIEWS")) {
     return apiError("You cannot schedule interviews.", 403);
   }

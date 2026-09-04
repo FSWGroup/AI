@@ -8,6 +8,7 @@
 
 import type { Attempt } from "@prisma/client";
 import { prisma } from "@/lib/db";
+import { DEFAULT_COMPANY_NAME, getOrgSettings } from "@/lib/org-settings";
 import { sweepExpiredSections, sectionRemainingSeconds } from "./engine";
 
 export interface CandidateSectionState {
@@ -67,7 +68,7 @@ export async function getCandidateState(
         where: { id: attempt.assessmentVersionId },
       }),
       prisma.consentRecord.findMany({ where: { attemptId: attempt.id } }),
-      prisma.orgSettings.findUnique({ where: { id: "org" } }),
+      getOrgSettings(),
     ]);
 
   const eeoSubmitted =
@@ -124,7 +125,7 @@ export async function getCandidateState(
     },
     job: {
       title: opening.title,
-      company: settings?.companyName ?? "FSW Group",
+      company: settings?.companyName ?? DEFAULT_COMPANY_NAME,
     },
     assessment: {
       name: version.name,

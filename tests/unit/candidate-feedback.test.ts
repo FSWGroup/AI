@@ -1,48 +1,24 @@
 import { describe, it, expect } from "vitest";
 import { buildCandidateFeedback } from "@/lib/report/candidate-feedback";
 import type { ReportPayload, ReportDimension } from "@/lib/report/generate";
+import { reportDimension, reportPayload } from "../fixtures/report";
 
+/** Every dimension here is benchmarked; feedback selection depends on it. */
 function dim(over: Partial<ReportDimension>): ReportDimension {
-  return {
-    construct: "MENTAL_ACUITY",
-    name: "Mental Acuity",
-    category: "APTITUDE",
-    shortDefinition: "",
-    lowDescriptor: "Deliberate",
-    highDescriptor: "Quick",
-    band: 5,
-    bandType: "PROVISIONAL",
-    bandLabel: "Mid",
+  return reportDimension({
     benchmark: { min: 5, max: 7, required: true },
     position: "WITHIN",
-    deviation: 0,
-    narrative: "",
-    rangeNarrative: null,
     ...over,
-  } as ReportDimension;
+  });
 }
 
+/**
+ * A report carrying an elevated distortion score, a flagged concern and
+ * integrity events — none of which may reach the candidate. That is what
+ * these tests are checking, so they are part of the fixture, not overrides.
+ */
 function payload(dimensions: ReportDimension[]): ReportPayload {
-  return {
-    meta: {
-      candidateName: "Alex Sample",
-      position: "Inside Sales",
-      company: "FSW Group",
-      completedAt: "2026-01-01T00:00:00.000Z",
-      assessmentVersionName: "Talent Scout v1",
-      scoringVersion: "1.0",
-      narrativeVersion: "1.0",
-      reportVersion: 1,
-      attemptNumber: 1,
-      recordId: "FSW-1",
-      bandTypeNote: "Provisional bands.",
-    },
-    executiveSummary: {
-      strongestAlignment: [],
-      investigate: [],
-      responseQuality: "Typical range.",
-      disclaimer: "Decision support only.",
-    },
+  return reportPayload({
     dimensions,
     validity: [
       {
@@ -55,10 +31,6 @@ function payload(dimensions: ReportDimension[]): ReportPayload {
       },
     ],
     concerns: [{ construct: "ENERGY", name: "Energy", band: 2, label: "Attention" }],
-    salesTraits: null,
-    leadership: null,
-    interviewGuide: [],
-    development: [],
     integrity: {
       level: "ELEVATED",
       label: "Notable events logged",
@@ -66,7 +38,7 @@ function payload(dimensions: ReportDimension[]): ReportPayload {
       notableCounts: [{ type: "TAB_BLUR", count: 3 }],
       reviewReminder: "",
     },
-  } as ReportPayload;
+  });
 }
 
 const templates = new Map<string, string[]>([

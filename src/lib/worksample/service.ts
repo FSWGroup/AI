@@ -11,8 +11,8 @@
 import "server-only";
 import type { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/db";
-import { audit } from "@/lib/audit";
-import { generateToken, hashToken } from "@/lib/crypto";
+import { audit, AUDIT_ACTIONS } from "@/lib/audit";
+import { generateToken, hashToken, reference } from "@/lib/crypto";
 import { getStorage } from "@/lib/storage";
 import {
   canResume,
@@ -26,8 +26,6 @@ import {
 
 export { effectiveAssignmentStatus } from "./rubric";
 
-const ALPHABET = "ABCDEFGHJKMNPQRSTUVWXYZ23456789";
-
 /**
  * The label graders see instead of a name.
  *
@@ -35,8 +33,7 @@ const ALPHABET = "ABCDEFGHJKMNPQRSTUVWXYZ23456789";
  * that lets a grader work out who they are looking at is the blind leaking.
  */
 export function workSampleReference(): string {
-  const bytes = crypto.getRandomValues(new Uint8Array(6));
-  return `WS-${Array.from(bytes, (b) => ALPHABET[b % ALPHABET.length]).join("")}`;
+  return reference("WS");
 }
 
 export function workSampleObjectKey(assignmentId: string, fileName: string): string {
@@ -112,7 +109,7 @@ export async function assignWorkSample(args: {
 
   await audit({
     userId: args.actorId,
-    action: "work_sample.assigned",
+    action: AUDIT_ACTIONS.WORK_SAMPLE_ASSIGNED,
     entityType: "WorkSampleAssignment",
     entityId: assignment.id,
     newValue: {
@@ -189,7 +186,7 @@ export async function startAssignment(
 
   await audit({
     actorLabel: "candidate",
-    action: "work_sample.started",
+    action: AUDIT_ACTIONS.WORK_SAMPLE_STARTED,
     entityType: "WorkSampleAssignment",
     entityId: assignmentId,
     newValue: { expiresAt },
@@ -267,7 +264,7 @@ export async function submitAssignment(args: {
 
   await audit({
     actorLabel: "candidate",
-    action: "work_sample.submitted",
+    action: AUDIT_ACTIONS.WORK_SAMPLE_SUBMITTED,
     entityType: "WorkSampleAssignment",
     entityId: assignment.id,
     newValue: {

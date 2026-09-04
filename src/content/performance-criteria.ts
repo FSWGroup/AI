@@ -273,7 +273,3 @@ export const CRITERION_BY_KEY = new Map(
 export const DEFAULT_CYCLE_CRITERIA = PERFORMANCE_CRITERIA.filter(
   (c) => c.appliesTo === "ALL",
 ).map((c) => c.key);
-
-export function criterionLabel(key: string): string {
-  return CRITERION_BY_KEY.get(key)?.label ?? key;
-}

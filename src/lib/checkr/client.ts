@@ -162,11 +162,3 @@ export async function createInvitation(params: {
 export async function getReport(reportId: string): Promise<CheckrReport> {
   return request<CheckrReport>(`/reports/${reportId}`, { method: "GET" });
 }
-
-export async function listPackages(): Promise<{ data: CheckrPackage[] }> {
-  return request<{ data: CheckrPackage[] }>("/packages", { method: "GET" });
-}
-
-export async function cancelInvitation(invitationId: string): Promise<void> {
-  await request(`/invitations/${invitationId}`, { method: "DELETE" });
-}

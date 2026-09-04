@@ -12,7 +12,7 @@ import { prisma } from "@/lib/db";
 import { apiError, withErrorHandling } from "@/lib/api";
 import { requirePermission } from "@/lib/auth/session";
 import { assertApplicationAccess } from "@/lib/auth/scope";
-import { audit } from "@/lib/audit";
+import { audit, AUDIT_ACTIONS } from "@/lib/audit";
 import { getStorage } from "@/lib/storage";
 
 export const runtime = "nodejs";
@@ -40,7 +40,7 @@ export const GET = withErrorHandling(async (req, ctx) => {
 
   await audit({
     userId: user.id,
-    action: "work_sample.file_downloaded",
+    action: AUDIT_ACTIONS.WORK_SAMPLE_FILE_DOWNLOADED,
     entityType: "WorkSampleAssignment",
     entityId: assignment.id,
     newValue: { reference: assignment.reference },

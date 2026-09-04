@@ -12,6 +12,7 @@
  */
 
 import type { PerformanceCycleKind } from "@prisma/client";
+import { mean } from "./stats";
 
 export interface ReviewRow {
   hireId: string;
@@ -97,10 +98,6 @@ function latestPerRater(
   return [...latest.values()];
 }
 
-function meanOf(values: number[]): number {
-  return values.reduce((a, b) => a + b, 0) / values.length;
-}
-
 function ratingValue(review: ReviewRow, spec: CriterionSpec): number | null {
   if (spec.kind === "OVERALL_RATING") {
     return review.overallRating ?? null;
@@ -110,13 +107,13 @@ function ratingValue(review: ReviewRow, spec: CriterionSpec): number | null {
   if (present.length === 0) return null;
   if (spec.kind === "COMPETENCY_RATING") {
     // A single named criterion; if several were somehow named, average them.
-    return meanOf(present.map((r) => r.value));
+    return mean(present.map((r) => r.value));
   }
   // COMPOSITE_RATING: require most of the composite to be present, otherwise
   // a review that rated one of five criteria would sit on the same scale as
   // one that rated all five.
   if (present.length < Math.ceil(spec.keys.length / 2)) return null;
-  return meanOf(present.map((r) => r.value));
+  return mean(present.map((r) => r.value));
 }
 
 export function buildCriterion(
@@ -204,7 +201,7 @@ export function buildCriterion(
       excluded.push({ hireId: hire.hireId, reason: "No submitted review covering this criterion." });
       continue;
     }
-    values.set(hire.hireId, meanOf(ratings));
+    values.set(hire.hireId, mean(ratings));
     raterValues.set(hire.hireId, ratings);
   }
 

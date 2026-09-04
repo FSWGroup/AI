@@ -13,7 +13,7 @@ import { z } from "zod";
 import { prisma } from "@/lib/db";
 import { apiError, apiOk, parseBody, withErrorHandling } from "@/lib/api";
 import { requirePermission } from "@/lib/auth/session";
-import { audit } from "@/lib/audit";
+import { audit, AUDIT_ACTIONS } from "@/lib/audit";
 
 export const runtime = "nodejs";
 
@@ -91,7 +91,7 @@ export const POST = withErrorHandling(async (req) => {
 
   await audit({
     userId: user.id,
-    action: "hire.recorded",
+    action: AUDIT_ACTIONS.HIRE_RECORDED,
     entityType: "Hire",
     entityId: hire.id,
     newValue: { jobTitle: hire.jobTitle, manual: true },

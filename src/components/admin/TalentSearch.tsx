@@ -3,8 +3,12 @@
 import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import { api, ApiError } from "@/lib/client/api";
-import { Badge, Button, Card, Input, Select } from "@/components/ui";
-import { CONSENT_LABEL, type ConsentStatus } from "@/lib/talent/consent";
+import { Badge, Button, Card, ErrorText, Input, Select } from "@/components/ui";
+import {
+  CONSENT_LABEL,
+  CONSENT_TONE,
+  type ConsentStatus,
+} from "@/lib/talent/consent";
 
 interface Profile {
   id: string;
@@ -30,13 +34,6 @@ interface Match {
   reasons: MatchReason[];
   matchedTags: string[];
 }
-
-const TONE: Record<ConsentStatus, "green" | "amber" | "neutral" | "red"> = {
-  OPTED_IN: "green",
-  INVITED: "amber",
-  NOT_ASKED: "neutral",
-  OPTED_OUT: "red",
-};
 
 export function TalentSearch({
   pools,
@@ -199,7 +196,7 @@ export function TalentSearch({
         </Card>
       )}
 
-      {error && <p className="mt-3 text-sm text-red-700">{error}</p>}
+      {error && <ErrorText className="mt-3">{error}</ErrorText>}
 
       {mode === "match" ? (
         <div className="mt-4 space-y-3">
@@ -285,7 +282,7 @@ export function TalentSearch({
                       )}
                     </td>
                     <td className="px-4 py-3">
-                      <Badge tone={TONE[p.consentStatus]}>
+                      <Badge tone={CONSENT_TONE[p.consentStatus]}>
                         {CONSENT_LABEL[p.consentStatus]}
                       </Badge>
                       {p.expiresAt && (

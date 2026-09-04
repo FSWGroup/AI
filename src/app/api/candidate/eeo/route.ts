@@ -15,7 +15,7 @@ import { z } from "zod";
 import type { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/db";
 import { apiError, apiOk, parseBody, withErrorHandling } from "@/lib/api";
-import { getAttemptFromCookie } from "@/lib/attempt/candidate-auth";
+import { requireAttempt } from "@/lib/attempt/candidate-auth";
 
 /** Categories mirror standard EEO-1 style reporting; all optional. */
 const schema = z.object({
@@ -37,8 +37,7 @@ const schema = z.object({
 });
 
 export const POST = withErrorHandling(async (req) => {
-  const attempt = await getAttemptFromCookie();
-  if (!attempt) return apiError("No active assessment session.", 401);
+  const attempt = await requireAttempt();
   if (attempt.status !== "COMPLETED") {
     return apiError(
       "Self-identification is only collected after the assessment is submitted.",

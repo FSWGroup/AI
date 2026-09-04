@@ -2,9 +2,10 @@
 
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
+import { getCompanyName } from "@/lib/org-settings";
 import { apiError, withErrorHandling } from "@/lib/api";
 import { requirePermission } from "@/lib/auth/session";
-import { audit } from "@/lib/audit";
+import { audit, AUDIT_ACTIONS } from "@/lib/audit";
 import { computeStudyResult } from "@/lib/validation/service";
 import { buildTechnicalReport } from "@/lib/validation/technical-report";
 
@@ -15,12 +16,12 @@ export const GET = withErrorHandling(async (_req, ctx) => {
   const user = await requirePermission("VIEW_VALIDATION");
   const { studyId } = await ctx.params;
 
-  const [study, settings] = await Promise.all([
+  const [study, organizationName] = await Promise.all([
     prisma.validationStudy.findUnique({
       where: { id: studyId },
       include: { jobProfile: { select: { name: true } } },
     }),
-    prisma.orgSettings.findUnique({ where: { id: "org" } }),
+    getCompanyName(),
   ]);
   if (!study) return apiError("That study does not exist.", 404);
 
@@ -48,13 +49,13 @@ export const GET = withErrorHandling(async (_req, ctx) => {
       correctAttenuation: study.correctAttenuation,
     },
     result,
-    organizationName: settings?.companyName ?? "FSW Group",
+    organizationName,
     preparedBy: user.name,
   });
 
   await audit({
     userId: user.id,
-    action: "validation_study.report_downloaded",
+    action: AUDIT_ACTIONS.VALIDATION_STUDY_REPORT_DOWNLOADED,
     entityType: "ValidationStudy",
     entityId: studyId,
   });

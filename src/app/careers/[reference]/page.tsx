@@ -1,6 +1,11 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { prisma } from "@/lib/db";
+import {
+  DEFAULT_COMPANY_NAME,
+  getCompanyName,
+  getOrgSettings,
+} from "@/lib/org-settings";
 import { env } from "@/lib/env";
 import { findPublicPosting } from "@/lib/ats/public-postings";
 import { jobPostingJsonLd, postingDescriptionHtml } from "@/lib/ats/postings";
@@ -16,8 +21,7 @@ export async function generateMetadata({
   const { reference } = await params;
   const posting = await findPublicPosting(reference);
   if (!posting) return { title: "Role not found" };
-  const settings = await prisma.orgSettings.findUnique({ where: { id: "org" } });
-  const company = settings?.companyName ?? "FSW Group";
+  const company = await getCompanyName();
   return {
     title: `${posting.title} — ${company}`,
     description: posting.summary ?? `Apply for ${posting.title} at ${company}.`,
@@ -33,7 +37,7 @@ export default async function CareersPostingPage({
   const { reference } = await params;
   const [posting, settings] = await Promise.all([
     findPublicPosting(reference),
-    prisma.orgSettings.findUnique({ where: { id: "org" } }),
+    getOrgSettings(),
   ]);
   if (!posting) notFound();
 
@@ -46,7 +50,7 @@ export default async function CareersPostingPage({
     orderBy: { orderIndex: "asc" },
   });
 
-  const company = settings?.companyName ?? "FSW Group";
+  const company = settings?.companyName ?? DEFAULT_COMPANY_NAME;
   const jsonLd = jobPostingJsonLd(posting, {
     companyName: company,
     baseUrl: env.appBaseUrl,

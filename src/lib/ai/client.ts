@@ -12,6 +12,8 @@
  */
 
 import Anthropic from "@anthropic-ai/sdk";
+import type * as z from "zod/v4";
+import { zodOutputFormat } from "@anthropic-ai/sdk/helpers/zod";
 
 /** Model used for all decision-support analyses. */
 export const AI_MODEL = "claude-opus-5";
@@ -46,7 +48,15 @@ export class AiNotConfiguredError extends Error {
  * deliberately restrictive: the product's defensibility depends on AI being
  * an aid to structured human judgment, not a selection mechanism.
  */
-export const SHARED_GUARDRAILS = `
+/**
+ * Not exported.
+ *
+ * The only way to reach the model is `runGuardedAnalysis`, which has no
+ * system-prompt parameter — so these rules cannot be replaced, appended to,
+ * or forgotten by a new caller. Keeping this module-private is what turns
+ * that from a convention into a property of the code.
+ */
+const SHARED_GUARDRAILS = `
 You are assisting FSW Group's hiring team with an employment assessment platform called FSW Talent Scout. Your output is DECISION SUPPORT for a human interviewer — never a decision.
 
 Absolute rules:
@@ -61,6 +71,61 @@ Absolute rules:
 
 Style: plain professional English, specific and concrete, no filler, no flattery. Refer to the person as "the candidate".
 `.trim();
+
+/** How long any one analysis may run. */
+const DEFAULT_MAX_TOKENS = 16000;
+
+/**
+ * Run one structured analysis under the shared guardrails.
+ *
+ * Every AI feature in the product goes through here, and that is the point:
+ * when each feature attached SHARED_GUARDRAILS at its own call site, the
+ * guardrail was a convention, and the fourth feature someone adds is the one
+ * that forgets it. Here it is not attachable and not omittable — there is no
+ * parameter for the system prompt.
+ *
+ * `refusalMessage` is per-feature because the person reading it needs to know
+ * which material to go and look at.
+ */
+export async function runGuardedAnalysis<S extends z.ZodType>(params: {
+  schema: S;
+  content: string;
+  refusalMessage: string;
+  unreadableMessage?: string;
+  maxTokens?: number;
+}): Promise<{
+  parsed: z.infer<S>;
+  inputTokens: number;
+  outputTokens: number;
+}> {
+  const client = getAiClient();
+
+  const response = await client.messages.parse({
+    model: AI_MODEL,
+    max_tokens: params.maxTokens ?? DEFAULT_MAX_TOKENS,
+    thinking: { type: "adaptive" },
+    system: SHARED_GUARDRAILS,
+    messages: [{ role: "user", content: params.content }],
+    output_config: { format: zodOutputFormat(params.schema) },
+  });
+
+  if (response.stop_reason === "refusal") {
+    throw new Error(params.refusalMessage);
+  }
+  const parsed = response.parsed_output;
+  if (!parsed) {
+    throw new Error(
+      params.unreadableMessage ??
+        "The analysis returned an unreadable result. Please try again.",
+    );
+  }
+
+  return {
+    parsed,
+    inputTokens: response.usage.input_tokens,
+    outputTokens: response.usage.output_tokens,
+  };
+}
 
 /** Bumped whenever a prompt changes, so stored outputs stay traceable. */
 export const PROMPT_VERSIONS = {

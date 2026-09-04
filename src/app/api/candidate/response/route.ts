@@ -5,7 +5,7 @@
 
 import { z } from "zod";
 import { apiError, apiOk, parseBody, withErrorHandling } from "@/lib/api";
-import { getAttemptFromCookie } from "@/lib/attempt/candidate-auth";
+import { requireAttempt } from "@/lib/attempt/candidate-auth";
 import { saveResponse } from "@/lib/attempt/engine";
 
 const schema = z.object({
@@ -15,8 +15,7 @@ const schema = z.object({
 });
 
 export const POST = withErrorHandling(async (req) => {
-  const attempt = await getAttemptFromCookie();
-  if (!attempt) return apiError("No active assessment session.", 401);
+  const attempt = await requireAttempt();
   if (attempt.status !== "IN_PROGRESS") {
     return apiError("The assessment is not in progress.", 409);
   }

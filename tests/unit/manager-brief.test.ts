@@ -1,64 +1,18 @@
 import { describe, it, expect } from "vitest";
 import { buildManagerBrief } from "@/lib/report/manager-brief";
-import type { ReportPayload, ReportDimension } from "@/lib/report/generate";
+import type { ReportDimension } from "@/lib/report/generate";
+import { reportDimension, reportPayload as payload } from "../fixtures/report";
 
+/** This suite reasons about behavioral dimensions; Energy is the stand-in. */
 function dim(over: Partial<ReportDimension>): ReportDimension {
-  return {
+  return reportDimension({
     construct: "ENERGY",
     name: "Energy",
     category: "BEHAVIORAL",
-    shortDefinition: "",
     lowDescriptor: "Measured",
     highDescriptor: "Driving",
-    band: 5,
-    bandType: "PROVISIONAL",
-    bandLabel: "Mid",
-    benchmark: null,
-    position: null,
-    deviation: 0,
-    narrative: "",
-    rangeNarrative: null,
     ...over,
-  } as ReportDimension;
-}
-
-function payload(over: Partial<ReportPayload> = {}): ReportPayload {
-  return {
-    meta: {
-      candidateName: "Alex Sample",
-      position: "Inside Sales",
-      company: "FSW Group",
-      completedAt: "2026-01-01T00:00:00.000Z",
-      assessmentVersionName: "Talent Scout v1",
-      scoringVersion: "1.0",
-      narrativeVersion: "1.0",
-      reportVersion: 1,
-      attemptNumber: 1,
-      recordId: "FSW-1",
-      bandTypeNote: "Provisional bands.",
-    },
-    executiveSummary: {
-      strongestAlignment: [],
-      investigate: [],
-      responseQuality: "Typical range.",
-      disclaimer: "Decision support only.",
-    },
-    dimensions: [],
-    validity: [],
-    concerns: [],
-    salesTraits: null,
-    leadership: null,
-    interviewGuide: [],
-    development: [],
-    integrity: {
-      level: "NONE",
-      label: "No notable events",
-      weightedScore: 0,
-      notableCounts: [],
-      reviewReminder: "",
-    },
-    ...over,
-  } as ReportPayload;
+  });
 }
 
 describe("buildManagerBrief", () => {

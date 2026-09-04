@@ -10,7 +10,7 @@
 import "server-only";
 import type { Construct, PerformanceCycle, Prisma, ValidationStudy } from "@prisma/client";
 import { prisma } from "@/lib/db";
-import { audit } from "@/lib/audit";
+import { audit, AUDIT_ACTIONS } from "@/lib/audit";
 import { dimensionMeta } from "@/content/narratives/dimension-meta";
 import {
   buildCriterion,
@@ -122,7 +122,7 @@ export async function recordHireFromOffer(
 
   await audit({
     userId: actorId ?? null,
-    action: "hire.recorded",
+    action: AUDIT_ACTIONS.HIRE_RECORDED,
     entityType: "Hire",
     entityId: hire.id,
     newValue: {
@@ -148,23 +148,24 @@ function specFor(study: ValidationStudy): CriterionSpec {
 }
 
 /**
- * Compute one study without writing anything.
+ * Which hires a study is about, before any other condition.
  *
- * Split out from `runStudy` so a reader can have fresh numbers without also
- * having a write. The technical report needs the first — a document quoting
- * figures older than its own date is the kind that gets a study thrown out —
- * and must not perform the second: it is served from a GET, held by a
- * read-only permission, and was rewriting every stored coefficient and
- * restamping the study's author as whoever last downloaded a PDF.
+ * A study scoped to a job profile is a study of that profile's hires, and
+ * every count in the report has to agree about that — the sample, the
+ * excluded-because-invalidated warning and the no-attempt-linked warning are
+ * all fractions of the same denominator. Written out three times, they could
+ * disagree, and the warnings would then be counting people the study never
+ * considered.
  */
-export async function computeStudyResult(studyId: string): Promise<StudyResult> {
-  const study = await prisma.validationStudy.findUniqueOrThrow({
-    where: { id: studyId },
-  });
+function studyScope(study: ValidationStudy): Prisma.HireWhereInput {
+  return study.jobProfileId ? { jobProfileId: study.jobProfileId } : {};
+}
 
-  const hires = await prisma.hire.findMany({
+/** The study's sample: hires in scope, with the material to score them on. */
+async function loadStudyHires(study: ValidationStudy) {
+  return prisma.hire.findMany({
     where: {
-      ...(study.jobProfileId ? { jobProfileId: study.jobProfileId } : {}),
+      ...studyScope(study),
       ...(study.hiredFrom || study.hiredTo
         ? {
             hiredAt: {
@@ -194,6 +195,26 @@ export async function computeStudyResult(studyId: string): Promise<StudyResult> 
       metrics: true,
     },
   });
+}
+
+type StudyHire = Awaited<ReturnType<typeof loadStudyHires>>[number];
+
+/**
+ * Compute one study without writing anything.
+ *
+ * Split out from `runStudy` so a reader can have fresh numbers without also
+ * having a write. The technical report needs the first — a document quoting
+ * figures older than its own date is the kind that gets a study thrown out —
+ * and must not perform the second: it is served from a GET, held by a
+ * read-only permission, and was rewriting every stored coefficient and
+ * restamping the study's author as whoever last downloaded a PDF.
+ */
+export async function computeStudyResult(studyId: string): Promise<StudyResult> {
+  const study = await prisma.validationStudy.findUniqueOrThrow({
+    where: { id: studyId },
+  });
+
+  const hires = await loadStudyHires(study);
 
   // No sample, no study.
   //
@@ -255,10 +276,38 @@ export async function computeStudyResult(studyId: string): Promise<StudyResult> 
     metrics: metricRows,
   });
 
-  // ---- Predictors ----------------------------------------------------------
-  // Raw scores throughout: they are the actual measurement, and they are what
-  // norm tables are keyed on. The 0-100 scaled score is a within-construct
-  // transform of the same information.
+  const { predictors, sampleVersionIds } = await buildPredictors(study, hires);
+
+  const result = computeStudy(
+    criterion,
+    predictors,
+    {
+      correctRangeRestriction: study.correctRangeRestriction,
+      correctAttenuation: study.correctAttenuation,
+      confidence: 0.95,
+    },
+    await sampleWarnings(study, sampleVersionIds),
+  );
+
+  return result;
+}
+
+/**
+ * The predictor side of the study: one series per construct and composite,
+ * each pairing the sample's scores with the applicant pool's.
+ *
+ * Raw scores throughout: they are the actual measurement, and they are what
+ * norm tables are keyed on. The 0-100 scaled score is a within-construct
+ * transform of the same information.
+ *
+ * Returns `sampleVersionIds` alongside the series because the warnings need
+ * the same list — a sample spanning several form versions is a caveat on the
+ * numbers, not a separate query.
+ */
+async function buildPredictors(
+  study: ValidationStudy,
+  hires: StudyHire[],
+): Promise<{ predictors: PredictorSeries[]; sampleVersionIds: string[] }> {
   const constructs = NORMABLE_CONSTRUCTS;
 
   // The unrestricted comparison group is every applicant assessed on the same
@@ -349,7 +398,21 @@ export async function computeStudyResult(studyId: string): Promise<StudyResult> 
     }
   }
 
-  // ---- Warnings the pure layer cannot see ------------------------------------
+  return { predictors, sampleVersionIds };
+}
+
+/**
+ * Caveats the pure statistics layer cannot see, because they are about who is
+ * NOT in the sample.
+ *
+ * A coefficient computed on the people who remain says nothing about the
+ * people who were dropped, so the report has to say how many were dropped and
+ * why. These are the exclusions a reader would otherwise have to go and find.
+ */
+async function sampleWarnings(
+  study: ValidationStudy,
+  sampleVersionIds: string[],
+): Promise<string[]> {
   const warnings: string[] = [];
   if (sampleVersionIds.length > 1) {
     warnings.push(
@@ -357,10 +420,7 @@ export async function computeStudyResult(studyId: string): Promise<StudyResult> 
     );
   }
   const invalidated = await prisma.hire.count({
-    where: {
-      ...(study.jobProfileId ? { jobProfileId: study.jobProfileId } : {}),
-      attempt: { status: "INVALIDATED" },
-    },
+    where: { ...studyScope(study), attempt: { status: "INVALIDATED" } },
   });
   if (invalidated > 0) {
     warnings.push(
@@ -369,10 +429,7 @@ export async function computeStudyResult(studyId: string): Promise<StudyResult> 
   }
 
   const withoutAttempt = await prisma.hire.count({
-    where: {
-      ...(study.jobProfileId ? { jobProfileId: study.jobProfileId } : {}),
-      attemptId: null,
-    },
+    where: { ...studyScope(study), attemptId: null },
   });
   if (withoutAttempt > 0) {
     warnings.push(
@@ -380,18 +437,7 @@ export async function computeStudyResult(studyId: string): Promise<StudyResult> 
     );
   }
 
-  const result = computeStudy(
-    criterion,
-    predictors,
-    {
-      correctRangeRestriction: study.correctRangeRestriction,
-      correctAttenuation: study.correctAttenuation,
-      confidence: 0.95,
-    },
-    warnings,
-  );
-
-  return result;
+  return warnings;
 }
 
 /**
@@ -471,7 +517,7 @@ export async function runStudy(
 
   await audit({
     userId: actorId ?? null,
-    action: "validation_study.computed",
+    action: AUDIT_ACTIONS.VALIDATION_STUDY_COMPUTED,
     entityType: "ValidationStudy",
     entityId: studyId,
     newValue: { n: result.n, supported: result.anySupported },
@@ -633,7 +679,7 @@ export async function generateNormTables(args: {
 
   await audit({
     userId: args.actorId ?? null,
-    action: "norm_table.generated",
+    action: AUDIT_ACTIONS.NORM_TABLE_CREATED,
     entityType: "NormTable",
     newValue: { population: populationLabel, created, skipped },
   });
@@ -694,7 +740,7 @@ export async function activateNormTable(
 
   await audit({
     userId: actorId ?? null,
-    action: "norm_table.activated",
+    action: AUDIT_ACTIONS.NORM_TABLE_ACTIVATED,
     entityType: "NormTable",
     entityId: normTableId,
     previousValue: previous ? { retiredId: previous.id } : undefined,
@@ -718,7 +764,7 @@ export async function retireNormTable(
   });
   await audit({
     userId: actorId ?? null,
-    action: "norm_table.retired",
+    action: AUDIT_ACTIONS.NORM_TABLE_RETIRED,
     entityType: "NormTable",
     entityId: normTableId,
   });

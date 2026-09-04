@@ -11,7 +11,7 @@ import { z } from "zod";
 import { prisma } from "@/lib/db";
 import { apiError, apiOk, parseBody, withErrorHandling } from "@/lib/api";
 import { requireAnyPermission, requirePermission } from "@/lib/auth/session";
-import { audit } from "@/lib/audit";
+import { audit, AUDIT_ACTIONS } from "@/lib/audit";
 import { MAX_LEVEL, MIN_LEVEL, validateRubric } from "@/lib/worksample/rubric";
 
 export const runtime = "nodejs";
@@ -119,7 +119,7 @@ export const POST = withErrorHandling(async (req) => {
 
   await audit({
     userId: user.id,
-    action: "work_sample.created",
+    action: AUDIT_ACTIONS.WORK_SAMPLE_CREATED,
     entityType: "WorkSample",
     entityId: sample.id,
     newValue: { title: sample.title, criteria: body.criteria.length },

@@ -9,8 +9,8 @@
  */
 
 import { useState } from "react";
-import { useRouter } from "next/navigation";
-import { api, ApiError } from "@/lib/client/api";
+import { api } from "@/lib/client/api";
+import { useAction } from "@/lib/client/use-action";
 import { Badge, Button, Card, Textarea } from "@/components/ui";
 import { dimensionMeta } from "@/content/narratives/dimension-meta";
 
@@ -65,36 +65,25 @@ export function JobDescriptionPanel({
   tailoredFormName: string | null;
   onApplyProposal: (dimensions: ProposedDimension[]) => void;
 }) {
-  const router = useRouter();
+  const { busy, error, run } = useAction();
   const [text, setText] = useState(initialJobDescription);
   const [proposal, setProposal] = useState<Proposal | null>(null);
-  const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
-  const [error, setError] = useState<string | null>(null);
   const [expanded, setExpanded] = useState(!initialJobDescription);
 
   async function save(): Promise<void> {
-    setBusy(true);
-    setError(null);
-    try {
+    await run(async () => {
       await api(`/api/admin/jobs/${jobProfileId}/job-description`, {
         method: "PUT",
         body: { jobDescription: text },
       });
       setMessage("Job description saved.");
-      router.refresh();
-    } catch (err) {
-      setError(err instanceof ApiError ? err.message : "Could not save.");
-    } finally {
-      setBusy(false);
-    }
+    }, { fallback: "Could not save." });
   }
 
   async function generate(): Promise<void> {
-    setBusy(true);
-    setError(null);
     setMessage(null);
-    try {
+    await run(async () => {
       const res = await api<{ proposal: Proposal }>(
         `/api/admin/jobs/${jobProfileId}/job-description`,
         { body: { jobDescription: text } },
@@ -103,21 +92,12 @@ export function JobDescriptionPanel({
       setMessage(
         "Proposal ready. Review it, then apply what you agree with — nothing changes until you save the benchmark.",
       );
-      router.refresh();
-    } catch (err) {
-      setError(
-        err instanceof ApiError ? err.message : "The proposal could not be generated.",
-      );
-    } finally {
-      setBusy(false);
-    }
+    }, { fallback: "The proposal could not be generated." });
   }
 
   async function buildForm(): Promise<void> {
     if (!proposal) return;
-    setBusy(true);
-    setError(null);
-    try {
+    await run(async () => {
       const res = await api<{
         name: string;
         warnings: string[];
@@ -135,27 +115,16 @@ export function JobDescriptionPanel({
         `Created ${res.name} (about ${res.estimatedMinutes} minutes). New invitations for this role will use it.` +
           (res.warnings.length ? ` Adjustments: ${res.warnings.join(" ")}` : ""),
       );
-      router.refresh();
-    } catch (err) {
-      setError(err instanceof ApiError ? err.message : "Could not create the form.");
-    } finally {
-      setBusy(false);
-    }
+    }, { fallback: "Could not create the form." });
   }
 
   async function revertForm(): Promise<void> {
-    setBusy(true);
-    try {
+    await run(async () => {
       await api(`/api/admin/jobs/${jobProfileId}/assessment-form`, {
         method: "DELETE",
       });
       setMessage("Reverted to the standard assessment form.");
-      router.refresh();
-    } catch (err) {
-      setError(err instanceof ApiError ? err.message : "Could not revert.");
-    } finally {
-      setBusy(false);
-    }
+    }, { fallback: "Could not revert." });
   }
 
   return (

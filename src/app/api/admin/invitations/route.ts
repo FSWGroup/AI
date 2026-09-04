@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { prisma } from "@/lib/db";
+import { DEFAULT_COMPANY_NAME, getOrgSettings } from "@/lib/org-settings";
 import { apiError, apiOk, parseBody, withErrorHandling } from "@/lib/api";
 import { requirePermission, requestMeta } from "@/lib/auth/session";
 import { audit, AUDIT_ACTIONS } from "@/lib/audit";
@@ -42,7 +43,7 @@ export const POST = withErrorHandling(async (req) => {
   }
 
   // Production-readiness gate for webcam assessments.
-  const settings = await prisma.orgSettings.findUnique({ where: { id: "org" } });
+  const settings = await getOrgSettings();
   if (env.isProduction) {
     const missing: string[] = [];
     if (!settings?.privacyNoticeConfigured) missing.push("privacy notice");
@@ -94,10 +95,10 @@ export const POST = withErrorHandling(async (req) => {
   await getEmailProvider().send({
     to: candidate.email,
     template: "invitation",
-    subject: `${settings?.companyName ?? "FSW Group"} — assessment invitation for ${opening.title}`,
+    subject: `${settings?.companyName ?? DEFAULT_COMPANY_NAME} — assessment invitation for ${opening.title}`,
     bodyText:
       `Hello ${candidate.firstName},\n\n` +
-      `${settings?.companyName ?? "FSW Group"} invites you to complete the FSW Talent Scout assessment ` +
+      `${settings?.companyName ?? DEFAULT_COMPANY_NAME} invites you to complete the FSW Talent Scout assessment ` +
       `as part of the evaluation process for: ${opening.title}.\n\n` +
       `Before you begin:\n` +
       `- Reserve approximately 1 hour and 10 minutes in one uninterrupted sitting.\n` +

@@ -8,32 +8,24 @@
  */
 
 import "server-only";
-import type { Prisma, StageKind } from "@prisma/client";
+import type { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/db";
 import { DEFAULT_PIPELINE, checkMove, type StageLike } from "./stages";
 import { evaluateKnockouts, summarizeKnockout, type ScreeningQuestionRule, type SubmittedAnswer } from "./screening";
 import { findDuplicates } from "./dedupe";
 import { resolveAttribution, type AttributionInput } from "./sources";
-
-/** Short, unambiguous references. No I/O/0/1 — they get read aloud on calls. */
-const ALPHABET = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
-
-function randomCode(length: number): string {
-  const bytes = new Uint8Array(length);
-  crypto.getRandomValues(bytes);
-  return Array.from(bytes, (b) => ALPHABET[b % ALPHABET.length]).join("");
-}
+import { reference } from "@/lib/crypto";
 
 export function requisitionReference(): string {
-  return `REQ-${randomCode(6)}`;
+  return reference("REQ");
 }
 
 export function applicationReference(): string {
-  return `APP-${randomCode(6)}`;
+  return reference("APP");
 }
 
 export function offerReference(): string {
-  return `OFF-${randomCode(6)}`;
+  return reference("OFF");
 }
 
 /** Create the default pipeline for a new requisition. */
@@ -427,34 +419,4 @@ export async function reopenApplication(params: {
       actorId: params.actorId,
     });
   });
-}
-
-export interface StageCount {
-  stageId: string;
-  name: string;
-  kind: StageKind;
-  orderIndex: number;
-  count: number;
-}
-
-/** Per-stage active counts for a requisition's board header. */
-export async function stageCounts(requisitionId: string): Promise<StageCount[]> {
-  const [stages, grouped] = await Promise.all([
-    prisma.pipelineStage.findMany({
-      where: { requisitionId },
-      orderBy: { orderIndex: "asc" },
-    }),
-    prisma.application.groupBy({
-      by: ["stageId"],
-      where: { requisitionId, status: "ACTIVE" },
-      _count: true,
-    }),
-  ]);
-  return stages.map((s) => ({
-    stageId: s.id,
-    name: s.name,
-    kind: s.kind,
-    orderIndex: s.orderIndex,
-    count: grouped.find((g) => g.stageId === s.id)?._count ?? 0,
-  }));
 }

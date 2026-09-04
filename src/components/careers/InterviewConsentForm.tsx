@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { Button, Card } from "@/components/ui";
+import { Button, Card, ErrorText } from "@/components/ui";
 
 type Decision = "GRANTED" | "DECLINED" | "WITHDRAWN";
 
@@ -72,7 +72,7 @@ export function InterviewConsentForm({
           and afterwards. Keep this link: it is yours, it stays live, and the
           button below does it without you having to ask anyone.
         </p>
-        {error && <p className="mt-4 text-sm text-red-700">{error}</p>}
+        {error && <ErrorText className="mt-4">{error}</ErrorText>}
         <div className="mt-4">
           <Button
             variant="secondary"
@@ -103,7 +103,7 @@ export function InterviewConsentForm({
 
   return (
     <div className="mt-8">
-      {error && <p className="mb-4 text-sm text-red-700">{error}</p>}
+      {error && <ErrorText className="mb-4">{error}</ErrorText>}
       <div className="flex flex-wrap gap-3">
         <Button disabled={busy} onClick={() => answer("GRANTED")}>
           {busy ? "Saving…" : "Yes, you may record it"}

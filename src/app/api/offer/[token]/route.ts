@@ -11,6 +11,7 @@ import { z } from "zod";
 import { prisma } from "@/lib/db";
 import { apiError, apiOk, parseBody, rateLimit, withErrorHandling } from "@/lib/api";
 import { hashToken } from "@/lib/crypto";
+import { clientIpFrom } from "@/lib/auth/session";
 import { audit, AUDIT_ACTIONS } from "@/lib/audit";
 import { recordHireFromOffer } from "@/lib/validation/service";
 import { canTransition } from "@/lib/ats/offers";
@@ -31,10 +32,7 @@ const schema = z.discriminatedUnion("action", [
 
 export const POST = withErrorHandling(async (req, ctx) => {
   const { token } = await ctx.params;
-  const ip =
-    req.headers.get("x-nf-client-connection-ip") ??
-    req.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ??
-    null;
+  const ip = clientIpFrom((name) => req.headers.get(name)) ?? null;
 
   if (!rateLimit(`offer:${ip ?? "unknown"}`, 20, 10 * 60_000)) {
     return apiError("Too many attempts. Please try again shortly.", 429);

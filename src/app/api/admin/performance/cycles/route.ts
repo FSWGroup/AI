@@ -10,7 +10,7 @@ import { z } from "zod";
 import { prisma } from "@/lib/db";
 import { apiOk, parseBody, withErrorHandling } from "@/lib/api";
 import { requirePermission } from "@/lib/auth/session";
-import { audit } from "@/lib/audit";
+import { audit, AUDIT_ACTIONS } from "@/lib/audit";
 import { DEFAULT_CYCLE_CRITERIA, CRITERION_BY_KEY } from "@/content/performance-criteria";
 
 export const runtime = "nodejs";
@@ -55,7 +55,7 @@ export const POST = withErrorHandling(async (req) => {
 
   await audit({
     userId: user.id,
-    action: "performance_cycle.created",
+    action: AUDIT_ACTIONS.PERFORMANCE_CYCLE_CREATED,
     entityType: "PerformanceCycle",
     entityId: cycle.id,
     newValue: { name: cycle.name, kind: cycle.kind },

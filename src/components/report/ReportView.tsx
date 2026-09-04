@@ -8,6 +8,7 @@
 import type { ReportPayload } from "@/lib/report/generate";
 import { ScoreScaleRow } from "@/components/admin/ScoreTable";
 import { Badge, Card } from "@/components/ui";
+import { POSITION_LABEL, POSITION_TONE } from "@/lib/scoring/benchmark";
 
 function P({ children }: { children: React.ReactNode }) {
   return <p className="mt-2 text-[13.5px] leading-relaxed text-navy-700">{children}</p>;
@@ -395,8 +396,8 @@ function DimensionBlock({
             {d.band}
           </span>
           {d.position && (
-            <Badge tone={d.position === "WITHIN" ? "green" : d.position === "BELOW" ? "amber" : "blue"}>
-              {d.position === "WITHIN" ? "In range" : d.position === "BELOW" ? "Below range" : "Above range"}
+            <Badge tone={POSITION_TONE[d.position]}>
+              {POSITION_LABEL[d.position]}
             </Badge>
           )}
         </div>

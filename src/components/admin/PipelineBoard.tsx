@@ -11,8 +11,8 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
-import { api, ApiError } from "@/lib/client/api";
+import { api } from "@/lib/client/api";
+import { useAction } from "@/lib/client/use-action";
 import { Badge, Card } from "@/components/ui";
 
 export interface BoardStage {
@@ -54,27 +54,18 @@ export function PipelineBoard({
   cards: BoardCard[];
   canMove: boolean;
 }) {
-  const router = useRouter();
-  const [busy, setBusy] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const { busy, error, run } = useAction();
   const [dragging, setDragging] = useState<string | null>(null);
   /** Card selected for a keyboard move, if any. */
   const [picked, setPicked] = useState<BoardCard | null>(null);
 
   async function move(applicationId: string, stageId: string): Promise<void> {
-    setBusy(true);
-    setError(null);
-    try {
+    await run(async () => {
       await api(`/api/admin/applications/${applicationId}`, {
         body: { action: "move_stage", stageId },
       });
       setPicked(null);
-      router.refresh();
-    } catch (err) {
-      setError(err instanceof ApiError ? err.message : "The move failed.");
-    } finally {
-      setBusy(false);
-    }
+    }, { fallback: "The move failed." });
   }
 
   return (

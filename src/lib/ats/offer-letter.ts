@@ -75,6 +75,39 @@ export function buildMergeContext(params: {
 }
 
 /**
+ * An offer loaded together with the two parties the letter names.
+ *
+ * The three places that build a letter — the preview page, the send route and
+ * the letter PDF — each need the same fourteen offer fields plus the
+ * candidate and the hiring manager off the requisition team. When each
+ * re-listed them by hand, a field dropped from one of them meant the preview
+ * and the letter the candidate actually received quietly disagreed. Widen the
+ * query, not the call site.
+ */
+export interface OfferWithParties extends OfferForLetter {
+  application: {
+    candidate: CandidateForLetter;
+    requisition: {
+      team: { role: string; user: { name: string } }[];
+    };
+  };
+}
+
+export function mergeContextForOffer(
+  offer: OfferWithParties,
+  companyName: string,
+): OfferMergeContext {
+  return buildMergeContext({
+    offer,
+    candidate: offer.application.candidate,
+    companyName,
+    hiringManagerName:
+      offer.application.requisition.team.find((t) => t.role === "HIRING_MANAGER")
+        ?.user.name ?? null,
+  });
+}
+
+/**
  * Render the frozen letter text as a PDF.
  *
  * Plain and unadorned on purpose: an offer letter is a legal document, and

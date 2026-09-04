@@ -2,39 +2,30 @@ import { describe, it, expect } from "vitest";
 import { getDocumentProxy, extractText } from "unpdf";
 import { buildFullReportPdf, type FullReportInput } from "@/lib/report/full-report-pdf";
 import type { ReportPayload, ReportDimension } from "@/lib/report/generate";
+import { REPORT_META, reportDimension, reportPayload } from "../fixtures/report";
 
+/**
+ * Unlike the other report suites, this one asserts on rendered TEXT, so every
+ * narrative field has to carry a string the assertions can look for.
+ */
 function dim(over: Partial<ReportDimension>): ReportDimension {
-  return {
-    construct: "MENTAL_ACUITY",
-    name: "Mental Acuity",
-    category: "APTITUDE",
+  return reportDimension({
     shortDefinition: "What this measures.",
-    lowDescriptor: "Deliberate",
-    highDescriptor: "Quick",
     band: 6,
-    bandType: "PROVISIONAL",
     bandLabel: "High average",
     benchmark: { min: 5, max: 7, required: true },
     position: "WITHIN",
-    deviation: 0,
     narrative: "Narrative for this dimension.",
     rangeNarrative: "Range narrative.",
     ...over,
-  } as ReportDimension;
+  });
 }
 
 function payload(over: Partial<ReportPayload> = {}): ReportPayload {
-  return {
+  return reportPayload({
     meta: {
-      candidateName: "Alex Sample",
-      position: "Inside Sales",
-      company: "FSW Group",
+      ...REPORT_META,
       completedAt: "2026-01-05T10:00:00.000Z",
-      assessmentVersionName: "Talent Scout v1",
-      scoringVersion: "1.0",
-      narrativeVersion: "1.0",
-      reportVersion: 1,
-      attemptNumber: 1,
       recordId: "FW-1234-AB",
       bandTypeNote: "All scores are provisional internal bands.",
     },
@@ -120,7 +111,7 @@ function payload(over: Partial<ReportPayload> = {}): ReportPayload {
       reviewReminder: "Review only for assessment-integrity concerns.",
     },
     ...over,
-  } as ReportPayload;
+  });
 }
 
 function input(over: Partial<FullReportInput> = {}): FullReportInput {

@@ -101,7 +101,6 @@ export function utcFromWallClock(
   return new Date(settled);
 }
 
-/** Midnight, in the given zone, of the day a UTC instant falls on there. */
 /**
  * The instant at which a local calendar day begins.
  *

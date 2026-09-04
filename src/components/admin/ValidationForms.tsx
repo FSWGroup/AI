@@ -1,23 +1,30 @@
 "use client";
 
 import { useState } from "react";
-import { useRouter } from "next/navigation";
-import { api, ApiError } from "@/lib/client/api";
-import { Button, Card, Input, Label, Select, Textarea } from "@/components/ui";
+import { api } from "@/lib/client/api";
+import { useAction } from "@/lib/client/use-action";
+import {
+  Button,
+  Card,
+  Checkbox,
+  ErrorText,
+  Input,
+  Label,
+  Select,
+  Textarea,
+} from "@/components/ui";
 import {
   DEFAULT_CYCLE_CRITERIA,
   PERFORMANCE_CRITERIA,
 } from "@/content/performance-criteria";
 
 export function NewCycleForm() {
-  const router = useRouter();
+  const { busy, error, run } = useAction();
   const [open, setOpen] = useState(false);
   const [name, setName] = useState("90-day review");
   const [kind, setKind] = useState("DAY_90");
   const [criteria, setCriteria] = useState<string[]>(DEFAULT_CYCLE_CRITERIA);
   const [instructions, setInstructions] = useState("");
-  const [busy, setBusy] = useState(false);
-  const [error, setError] = useState<string | null>(null);
 
   if (!open) {
     return (
@@ -66,9 +73,8 @@ export function NewCycleForm() {
       <div className="mt-3 grid gap-2 sm:grid-cols-2">
         {PERFORMANCE_CRITERIA.map((c) => (
           <label key={c.key} className="flex items-start gap-2 text-sm">
-            <input
-              type="checkbox"
-              className="mt-1 h-4 w-4 accent-fsw-600"
+            <Checkbox
+              className="mt-1"
               checked={criteria.includes(c.key)}
               onChange={() => toggle(c.key)}
             />
@@ -94,14 +100,12 @@ export function NewCycleForm() {
         />
       </div>
 
-      {error && <p className="mt-3 text-sm text-red-700">{error}</p>}
+      {error && <ErrorText className="mt-3">{error}</ErrorText>}
       <div className="mt-4 flex gap-3">
         <Button
           disabled={busy || criteria.length === 0}
           onClick={async () => {
-            setBusy(true);
-            setError(null);
-            try {
+            await run(async () => {
               await api("/api/admin/performance/cycles", {
                 method: "POST",
                 body: {
@@ -112,12 +116,7 @@ export function NewCycleForm() {
                 },
               });
               setOpen(false);
-              router.refresh();
-            } catch (err) {
-              setError(err instanceof ApiError ? err.message : "Could not create the cycle.");
-            } finally {
-              setBusy(false);
-            }
+            }, { fallback: "Could not create the cycle." });
           }}
         >
           {busy ? "Creating…" : "Create as draft"}
@@ -137,7 +136,7 @@ export function NewStudyForm({
   jobProfiles: { id: string; name: string }[];
   hasCycles: boolean;
 }) {
-  const router = useRouter();
+  const { busy, error, run, router } = useAction();
   const [open, setOpen] = useState(false);
   const [name, setName] = useState("");
   const [description, setDescription] = useState("");
@@ -151,8 +150,6 @@ export function NewStudyForm({
   const [retentionDays, setRetentionDays] = useState(365);
   const [correctRR, setCorrectRR] = useState(true);
   const [correctAtt, setCorrectAtt] = useState(true);
-  const [busy, setBusy] = useState(false);
-  const [error, setError] = useState<string | null>(null);
 
   if (!open) {
     return (
@@ -260,9 +257,7 @@ export function NewStudyForm({
         <div className="mt-3 grid gap-2 sm:grid-cols-2">
           {PERFORMANCE_CRITERIA.map((c) => (
             <label key={c.key} className="flex items-center gap-2 text-sm">
-              <input
-                type="checkbox"
-                className="h-4 w-4 accent-fsw-600"
+              <Checkbox
                 checked={compositeKeys.includes(c.key)}
                 onChange={() =>
                   setCompositeKeys((prev) =>
@@ -308,9 +303,8 @@ export function NewStudyForm({
 
       <div className="mt-5 space-y-2 text-sm">
         <label className="flex items-start gap-2">
-          <input
-            type="checkbox"
-            className="mt-1 h-4 w-4 accent-fsw-600"
+          <Checkbox
+            className="mt-1"
             checked={correctRR}
             onChange={(e) => setCorrectRR(e.target.checked)}
           />
@@ -324,9 +318,8 @@ export function NewStudyForm({
           </span>
         </label>
         <label className="flex items-start gap-2">
-          <input
-            type="checkbox"
-            className="mt-1 h-4 w-4 accent-fsw-600"
+          <Checkbox
+            className="mt-1"
             checked={correctAtt}
             onChange={(e) => setCorrectAtt(e.target.checked)}
           />
@@ -340,14 +333,12 @@ export function NewStudyForm({
         </label>
       </div>
 
-      {error && <p className="mt-3 text-sm text-red-700">{error}</p>}
+      {error && <ErrorText className="mt-3">{error}</ErrorText>}
       <div className="mt-5 flex gap-3">
         <Button
           disabled={busy || name.trim().length === 0}
           onClick={async () => {
-            setBusy(true);
-            setError(null);
-            try {
+            await run(async () => {
               const out = await api<{ id: string }>("/api/admin/validation/studies", {
                 method: "POST",
                 body: {
@@ -363,11 +354,7 @@ export function NewStudyForm({
                 },
               });
               router.push(`/admin/validation/studies/${out.id}`);
-            } catch (err) {
-              setError(err instanceof ApiError ? err.message : "Could not create the study.");
-            } finally {
-              setBusy(false);
-            }
+            }, { fallback: "Could not create the study.", refresh: false });
           }}
         >
           {busy ? "Creating…" : "Create study"}

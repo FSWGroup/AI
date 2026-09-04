@@ -74,30 +74,6 @@ export interface OfferMergeContext {
 
 export type MergeField = keyof OfferMergeContext;
 
-export const MERGE_FIELDS: MergeField[] = [
-  "candidateFirstName",
-  "candidateLastName",
-  "candidateFullName",
-  "candidateEmail",
-  "jobTitle",
-  "departmentName",
-  "locationName",
-  "employmentType",
-  "workArrangement",
-  "baseSalary",
-  "salaryCurrency",
-  "salaryPeriod",
-  "signingBonus",
-  "variablePay",
-  "benefitsSummary",
-  "startDate",
-  "offerExpiryDate",
-  "companyName",
-  "hiringManagerName",
-  "offerReference",
-  "todayDate",
-];
-
 /**
  * Replace {{field}} placeholders.
  *

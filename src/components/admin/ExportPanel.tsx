@@ -10,7 +10,7 @@
  */
 
 import { useState } from "react";
-import { Button, Card } from "@/components/ui";
+import { Button, Card, ErrorText } from "@/components/ui";
 
 const INCLUDED = [
   "Executive summary — strongest alignment, what to investigate, how much confidence the results deserve",
@@ -97,11 +97,7 @@ export function ExportPanel({
           <Button disabled={busy} onClick={() => void download()}>
             {busy ? "Building the PDF…" : "Download PDF"}
           </Button>
-          {error && (
-            <p role="alert" className="mt-3 text-sm text-red-700">
-              {error}
-            </p>
-          )}
+          {error && <ErrorText className="mt-3">{error}</ErrorText>}
         </div>
       </Card>
 

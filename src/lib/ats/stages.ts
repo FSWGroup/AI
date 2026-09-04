@@ -163,15 +163,3 @@ export function checkMove(params: {
 
   return { allowed: true, effects };
 }
-
-/** Human-readable label for a stage kind, used in reporting headers. */
-export const STAGE_KIND_LABEL: Record<StageKind, string> = {
-  APPLIED: "Applied",
-  SCREEN: "Screen",
-  ASSESSMENT: "Assessment",
-  WORK_SAMPLE: "Work sample",
-  INTERVIEW: "Interview",
-  REFERENCE: "Reference",
-  OFFER: "Offer",
-  HIRED: "Hired",
-};

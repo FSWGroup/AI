@@ -2,10 +2,11 @@
 
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
+import { getCompanyName } from "@/lib/org-settings";
 import { apiError, withErrorHandling } from "@/lib/api";
 import { requirePermission } from "@/lib/auth/session";
 import { audit, AUDIT_ACTIONS } from "@/lib/audit";
-import { renderOfferLetterPdf, buildMergeContext } from "@/lib/ats/offer-letter";
+import { renderOfferLetterPdf, mergeContextForOffer } from "@/lib/ats/offer-letter";
 import { renderTemplate } from "@/lib/ats/offers";
 
 export const runtime = "nodejs";
@@ -30,8 +31,7 @@ export const GET = withErrorHandling(async (_req, ctx) => {
   });
   if (!offer) return apiError("Offer not found.", 404);
 
-  const settings = await prisma.orgSettings.findUnique({ where: { id: "org" } });
-  const companyName = settings?.companyName ?? "FSW Group";
+  const companyName = await getCompanyName();
 
   // A sent offer uses its frozen letter; a draft renders a live preview so
   // the recruiter can see what will go out before committing to it.
@@ -42,29 +42,7 @@ export const GET = withErrorHandling(async (_req, ctx) => {
     }
     letterBody = renderTemplate(
       offer.template.body,
-      buildMergeContext({
-        offer: {
-          reference: offer.reference,
-          jobTitle: offer.jobTitle,
-          departmentName: offer.departmentName,
-          locationName: offer.locationName,
-          employmentType: offer.employmentType,
-          workArrangement: offer.workArrangement,
-          baseSalary: offer.baseSalary,
-          salaryCurrency: offer.salaryCurrency,
-          salaryPeriod: offer.salaryPeriod,
-          signingBonus: offer.signingBonus,
-          variablePay: offer.variablePay,
-          benefitsSummary: offer.benefitsSummary,
-          startDate: offer.startDate,
-          expiresAt: offer.expiresAt,
-        },
-        candidate: offer.application.candidate,
-        companyName,
-        hiringManagerName:
-          offer.application.requisition.team.find((t) => t.role === "HIRING_MANAGER")
-            ?.user.name ?? null,
-      }),
+      mergeContextForOffer(offer, companyName),
     );
   }
 

@@ -1,22 +1,20 @@
 "use client";
 
 import { useState } from "react";
-import { useRouter } from "next/navigation";
-import { api, ApiError } from "@/lib/client/api";
-import { Button, Card, Input, Label, Select } from "@/components/ui";
+import { api } from "@/lib/client/api";
+import { useAction } from "@/lib/client/use-action";
+import { Button, Card, ErrorText, Input, Label, Select } from "@/components/ui";
 
 export function NewPoolForm({
   jobProfiles,
 }: {
   jobProfiles: { id: string; name: string }[];
 }) {
-  const router = useRouter();
+  const { busy, error, run } = useAction();
   const [open, setOpen] = useState(false);
   const [name, setName] = useState("");
   const [description, setDescription] = useState("");
   const [jobProfileId, setJobProfileId] = useState("");
-  const [busy, setBusy] = useState(false);
-  const [error, setError] = useState<string | null>(null);
 
   if (!open) {
     return (
@@ -63,14 +61,12 @@ export function NewPoolForm({
           onChange={(e) => setDescription(e.target.value)}
         />
       </div>
-      {error && <p className="mt-3 text-sm text-red-700">{error}</p>}
+      {error && <ErrorText className="mt-3">{error}</ErrorText>}
       <div className="mt-5 flex gap-3">
         <Button
           disabled={busy || name.trim() === ""}
           onClick={async () => {
-            setBusy(true);
-            setError(null);
-            try {
+            await run(async () => {
               await api("/api/admin/talent/pools", {
                 method: "POST",
                 body: {
@@ -80,12 +76,7 @@ export function NewPoolForm({
                 },
               });
               setOpen(false);
-              router.refresh();
-            } catch (err) {
-              setError(err instanceof ApiError ? err.message : "Could not create it.");
-            } finally {
-              setBusy(false);
-            }
+            }, { fallback: "Could not create it." });
           }}
         >
           {busy ? "Creating…" : "Create pool"}

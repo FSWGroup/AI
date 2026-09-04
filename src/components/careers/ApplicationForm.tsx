@@ -14,7 +14,15 @@
  */
 
 import { useEffect, useState } from "react";
-import { Button, Card, Input, Label, Select, Textarea } from "@/components/ui";
+import {
+  Button,
+  Card,
+  Checkbox,
+  Input,
+  Label,
+  Select,
+  Textarea,
+} from "@/components/ui";
 
 export interface FormQuestion {
   id: string;
@@ -279,9 +287,7 @@ export function ApplicationForm({
                       const list = answers[q.id]?.list ?? [];
                       return (
                         <label key={c} className="flex items-center gap-2 text-sm">
-                          <input
-                            type="checkbox"
-                            className="h-4 w-4 accent-fsw-600"
+                          <Checkbox
                             checked={list.includes(c)}
                             onChange={(e) =>
                               setAnswer(q.id, {

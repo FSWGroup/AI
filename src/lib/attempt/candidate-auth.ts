@@ -4,6 +4,7 @@ import type { Attempt } from "@prisma/client";
 import { prisma } from "@/lib/db";
 import { hashToken } from "@/lib/crypto";
 import { env } from "@/lib/env";
+import { AuthError } from "@/lib/auth/session";
 
 /**
  * Candidate attempt authentication.
@@ -28,11 +29,6 @@ export async function setAttemptCookie(resumeToken: string): Promise<void> {
   });
 }
 
-export async function clearAttemptCookie(): Promise<void> {
-  const cookieStore = await cookies();
-  cookieStore.delete(ATTEMPT_COOKIE);
-}
-
 export async function getAttemptFromCookie(): Promise<Attempt | null> {
   const cookieStore = await cookies();
   const token = cookieStore.get(ATTEMPT_COOKIE)?.value;
@@ -40,6 +36,21 @@ export async function getAttemptFromCookie(): Promise<Attempt | null> {
   return prisma.attempt.findUnique({
     where: { resumeTokenHash: hashToken(token) },
   });
+}
+
+/**
+ * The attempt behind the current cookie, or a 401.
+ *
+ * The counterpart to `requireAnyUser` on the admin side: every candidate API
+ * route needs this same check, and `withErrorHandling` turns the AuthError
+ * into exactly the response the routes used to return by hand. Routes that
+ * must distinguish "no cookie" from "wrong cookie" — only /candidate/open —
+ * still call `getAttemptFromCookie` and decide for themselves.
+ */
+export async function requireAttempt(): Promise<Attempt> {
+  const attempt = await getAttemptFromCookie();
+  if (!attempt) throw new AuthError("No active assessment session.", 401);
+  return attempt;
 }
 
 export async function getAttemptByResumeToken(

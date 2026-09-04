@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import { prisma } from "@/lib/db";
+import { getCompanyName } from "@/lib/org-settings";
 import { getCurrentUser } from "@/lib/auth/session";
 import { can } from "@/lib/auth/rbac";
 import { Badge, Card, SectionHeading } from "@/components/ui";
@@ -13,7 +14,7 @@ import {
   unresolvedFields,
   whereToFill,
 } from "@/lib/ats/offers";
-import { buildMergeContext } from "@/lib/ats/offer-letter";
+import { mergeContextForOffer } from "@/lib/ats/offer-letter";
 
 export const dynamic = "force-dynamic";
 
@@ -49,33 +50,8 @@ export default async function OfferPage({
   });
   if (!offer) notFound();
 
-  const settings = await prisma.orgSettings.findUnique({ where: { id: "org" } });
-  const companyName = settings?.companyName ?? "FSW Group";
-  const hiringManager =
-    offer.application.requisition.team.find((t) => t.role === "HIRING_MANAGER")?.user
-      .name ?? null;
-
-  const context = buildMergeContext({
-    offer: {
-      reference: offer.reference,
-      jobTitle: offer.jobTitle,
-      departmentName: offer.departmentName,
-      locationName: offer.locationName,
-      employmentType: offer.employmentType,
-      workArrangement: offer.workArrangement,
-      baseSalary: offer.baseSalary,
-      salaryCurrency: offer.salaryCurrency,
-      salaryPeriod: offer.salaryPeriod,
-      signingBonus: offer.signingBonus,
-      variablePay: offer.variablePay,
-      benefitsSummary: offer.benefitsSummary,
-      startDate: offer.startDate,
-      expiresAt: offer.expiresAt,
-    },
-    candidate: offer.application.candidate,
-    companyName,
-    hiringManagerName: hiringManager,
-  });
+  const companyName = await getCompanyName();
+  const context = mergeContextForOffer(offer, companyName);
 
   const preview =
     offer.letterBody ??

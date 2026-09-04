@@ -3,7 +3,7 @@
 /** Pre-assessment entry flow screens (spec: candidate entry flow). */
 
 import { useEffect, useRef, useState } from "react";
-import { Button, Card, Input, Label } from "@/components/ui";
+import { Button, Card, Checkbox, Input, Label } from "@/components/ui";
 import { pickMimeType } from "@/lib/client/recording";
 import type { AttemptState } from "./types";
 
@@ -165,9 +165,8 @@ export function RulesScreen({
             key={i}
             className="flex cursor-pointer items-start gap-3 rounded-lg border border-navy-100 p-3 text-sm text-navy-800 hover:bg-navy-50"
           >
-            <input
-              type="checkbox"
-              className="mt-0.5 h-4 w-4 accent-fsw-600"
+            <Checkbox
+              className="mt-0.5"
               checked={checked[i]}
               onChange={(e) => {
                 const next = [...checked];
@@ -277,9 +276,8 @@ export function RecordingConsentScreen({
         </p>
       )}
       <label className="mt-5 flex cursor-pointer items-start gap-3 rounded-lg border border-navy-200 p-3 text-sm font-medium text-navy-900">
-        <input
-          type="checkbox"
-          className="mt-0.5 h-4 w-4 accent-fsw-600"
+        <Checkbox
+          className="mt-0.5"
           checked={consented}
           onChange={(e) => setConsented(e.target.checked)}
         />

@@ -14,6 +14,7 @@ import { apiError, apiOk, rateLimit, withErrorHandling } from "@/lib/api";
 import { createApplication } from "@/lib/ats/service";
 import { validateAnswers, type ScreeningQuestionRule } from "@/lib/ats/screening";
 import { extractText } from "@/lib/documents/extract";
+import { clientIpFrom } from "@/lib/auth/session";
 import type { Prisma } from "@prisma/client";
 
 export const runtime = "nodejs";
@@ -38,19 +39,11 @@ const bodySchema = z.object({
   attribution: z.record(z.string(), z.string().max(500)).default({}),
 });
 
-function clientIp(req: Request): string {
-  return (
-    req.headers.get("x-nf-client-connection-ip") ??
-    req.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ??
-    "unknown"
-  );
-}
-
 export const POST = withErrorHandling(async (req) => {
-  const ip = clientIp(req);
+  const ip = clientIpFrom((name) => req.headers.get(name));
   // Generous enough for a household behind one NAT, tight enough to stop a
   // script filling the pipeline with noise.
-  if (!rateLimit(`apply:${ip}`, 10, 10 * 60_000)) {
+  if (!rateLimit(`apply:${ip ?? "unknown"}`, 10, 10 * 60_000)) {
     return apiError("Too many applications from this connection. Try again shortly.", 429);
   }
 
@@ -84,7 +77,7 @@ export const POST = withErrorHandling(async (req) => {
       transport: "CAREERS_SITE",
       payload: {
         ...body,
-        ip,
+        ip: ip ?? null,
         userAgent: req.headers.get("user-agent") ?? null,
       } as unknown as Prisma.InputJsonValue,
     },

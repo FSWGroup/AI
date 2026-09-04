@@ -3,7 +3,15 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { api, ApiError } from "@/lib/client/api";
-import { Button, Card, Input, Label, Select, Textarea } from "@/components/ui";
+import {
+  Button,
+  Card,
+  Checkbox,
+  Input,
+  Label,
+  Select,
+  Textarea,
+} from "@/components/ui";
 
 interface Option {
   id: string;
@@ -215,9 +223,8 @@ export function NewRequisitionForm({
           </div>
         </div>
         <label className="mt-4 flex gap-2 text-sm">
-          <input
-            type="checkbox"
-            className="mt-0.5 h-4 w-4 accent-fsw-600"
+          <Checkbox
+            className="mt-0.5"
             checked={form.salaryPublish}
             onChange={(e) => set("salaryPublish", e.target.checked)}
           />
@@ -296,9 +303,7 @@ export function NewRequisitionForm({
                 className="flex items-center justify-between rounded-lg border border-navy-100 px-3 py-2 text-sm"
               >
                 <span className="flex items-center gap-2">
-                  <input
-                    type="checkbox"
-                    className="h-4 w-4 accent-fsw-600"
+                  <Checkbox
                     checked={index >= 0}
                     onChange={(e) =>
                       setSelectedApprovers((prev) =>

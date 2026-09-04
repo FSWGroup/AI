@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { Button, Card, Textarea } from "@/components/ui";
+import { Button, Card, ErrorText, Textarea } from "@/components/ui";
 
 export function TalentConsent({
   token,
@@ -84,7 +84,7 @@ export function TalentConsent({
         />
       </Card>
 
-      {error && <p className="mt-4 text-sm text-red-700">{error}</p>}
+      {error && <ErrorText className="mt-4">{error}</ErrorText>}
 
       <div className="mt-6 flex flex-wrap gap-3">
         <Button disabled={busy} onClick={() => answer("in")}>

@@ -10,8 +10,9 @@
 
 import { z } from "zod";
 import { prisma } from "@/lib/db";
+import { getCompanyName } from "@/lib/org-settings";
 import { apiError, apiOk, parseBody, withErrorHandling } from "@/lib/api";
-import { getCurrentUser } from "@/lib/auth/session";
+import { requireAnyUser } from "@/lib/auth/session";
 import { can } from "@/lib/auth/rbac";
 import { audit, AUDIT_ACTIONS } from "@/lib/audit";
 import { generateToken, hashToken } from "@/lib/crypto";
@@ -25,7 +26,7 @@ import {
   transitionError,
   unresolvedFields,
 } from "@/lib/ats/offers";
-import { buildMergeContext } from "@/lib/ats/offer-letter";
+import { mergeContextForOffer } from "@/lib/ats/offer-letter";
 import { logRequisitionEvent } from "@/lib/ats/service";
 
 const schema = z.discriminatedUnion("action", [
@@ -44,8 +45,7 @@ const schema = z.discriminatedUnion("action", [
 ]);
 
 export const POST = withErrorHandling(async (req, ctx) => {
-  const user = await getCurrentUser();
-  if (!user) return apiError("Not signed in.", 401);
+  const user = await requireAnyUser();
   const { offerId } = await ctx.params;
   const body = await parseBody(req, schema);
 
@@ -71,11 +71,7 @@ export const POST = withErrorHandling(async (req, ctx) => {
   });
   if (!offer) return apiError("Offer not found.", 404);
 
-  const settings = await prisma.orgSettings.findUnique({ where: { id: "org" } });
-  const companyName = settings?.companyName ?? "FSW Group";
-  const hiringManager =
-    offer.application.requisition.team.find((t) => t.role === "HIRING_MANAGER")?.user
-      .name ?? null;
+  const companyName = await getCompanyName();
 
   const steps: ApprovalStep[] = offer.approvals.map((a) => ({
     stepIndex: a.stepIndex,
@@ -161,27 +157,7 @@ export const POST = withErrorHandling(async (req, ctx) => {
         return apiError("Choose an offer letter template first.", 422);
       }
 
-      const context = buildMergeContext({
-        offer: {
-          reference: offer.reference,
-          jobTitle: offer.jobTitle,
-          departmentName: offer.departmentName,
-          locationName: offer.locationName,
-          employmentType: offer.employmentType,
-          workArrangement: offer.workArrangement,
-          baseSalary: offer.baseSalary,
-          salaryCurrency: offer.salaryCurrency,
-          salaryPeriod: offer.salaryPeriod,
-          signingBonus: offer.signingBonus,
-          variablePay: offer.variablePay,
-          benefitsSummary: offer.benefitsSummary,
-          startDate: offer.startDate,
-          expiresAt: offer.expiresAt,
-        },
-        candidate: offer.application.candidate,
-        companyName,
-        hiringManagerName: hiringManager,
-      });
+      const context = mergeContextForOffer(offer, companyName);
       const unresolved = unresolvedFields(offer.template.body, context);
       const readiness = checkReadyToSend({
         status: offer.status,

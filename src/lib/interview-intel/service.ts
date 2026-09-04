@@ -10,7 +10,7 @@
 import "server-only";
 import type { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/db";
-import { audit } from "@/lib/audit";
+import { audit, AUDIT_ACTIONS } from "@/lib/audit";
 import { generateToken, hashToken } from "@/lib/crypto";
 import { getStorage } from "@/lib/storage";
 import { sendEmail } from "@/lib/email";
@@ -130,7 +130,7 @@ export async function requestConsent(args: {
 
   await audit({
     userId: args.actorId,
-    action: "interview_recording.consent_requested",
+    action: AUDIT_ACTIONS.INTERVIEW_RECORDING_CONSENT_REQUESTED,
     entityType: "Interview",
     entityId: args.interviewId,
     newValue: { parties: expected.length },
@@ -269,7 +269,7 @@ export async function destroyRecording(
   ]);
 
   await audit({
-    action: "interview_recording.destroyed",
+    action: AUDIT_ACTIONS.INTERVIEW_RECORDING_DESTROYED,
     entityType: "Interview",
     entityId: interviewId,
     newValue: { reason },
@@ -309,7 +309,7 @@ export async function storeAudio(args: {
 
   await audit({
     userId: args.actorId,
-    action: "interview_recording.uploaded",
+    action: AUDIT_ACTIONS.INTERVIEW_RECORDING_UPLOADED,
     entityType: "Interview",
     entityId: args.interviewId,
     newValue: { fileName: args.fileName, bytes: args.bytes.length },
@@ -368,7 +368,7 @@ export async function storeTranscript(args: {
 
   await audit({
     userId: args.actorId,
-    action: "interview_recording.transcript_stored",
+    action: AUDIT_ACTIONS.INTERVIEW_RECORDING_TRANSCRIPT_STORED,
     entityType: "Interview",
     entityId: args.interviewId,
     newValue: { segments: parsed.segments.length, format: parsed.format },
@@ -482,7 +482,7 @@ export async function runEvidenceExtraction(args: {
 
   await audit({
     userId: args.actorId,
-    action: "interview_recording.evidence_extracted",
+    action: AUDIT_ACTIONS.INTERVIEW_RECORDING_EVIDENCE_EXTRACTED,
     entityType: "Interview",
     entityId: args.interviewId,
     newValue: {

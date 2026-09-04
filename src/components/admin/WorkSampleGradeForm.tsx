@@ -1,9 +1,9 @@
 "use client";
 
 import { useState } from "react";
-import { useRouter } from "next/navigation";
-import { api, ApiError } from "@/lib/client/api";
-import { Button, Card, Textarea } from "@/components/ui";
+import { api } from "@/lib/client/api";
+import { useAction } from "@/lib/client/use-action";
+import { Button, Card, ErrorText, Textarea } from "@/components/ui";
 import { LEVEL_LABEL, type CriterionLike } from "@/lib/worksample/rubric";
 
 export function WorkSampleGradeForm({
@@ -17,21 +17,17 @@ export function WorkSampleGradeForm({
   initial: { comment: string; levels: Record<string, number | null> } | null;
   alreadyFiled: boolean;
 }) {
-  const router = useRouter();
+  const { busy, error, run } = useAction();
   const [levels, setLevels] = useState<Record<string, number | null>>(
     initial?.levels ?? {},
   );
   const [comment, setComment] = useState(initial?.comment ?? "");
   const [reconciling, setReconciling] = useState(false);
-  const [busy, setBusy] = useState(false);
-  const [error, setError] = useState<string | null>(null);
 
   const locked = alreadyFiled && !reconciling;
 
   const save = async (submit: boolean) => {
-    setBusy(true);
-    setError(null);
-    try {
+    await run(async () => {
       await api("/api/admin/work-sample-grades", {
         method: "POST",
         body: {
@@ -47,12 +43,7 @@ export function WorkSampleGradeForm({
         },
       });
       setReconciling(false);
-      router.refresh();
-    } catch (err) {
-      setError(err instanceof ApiError ? err.message : "Could not save the grade.");
-    } finally {
-      setBusy(false);
-    }
+    }, { fallback: "Could not save the grade." });
   };
 
   return (
@@ -134,7 +125,7 @@ export function WorkSampleGradeForm({
         />
       </div>
 
-      {error && <p className="mt-4 text-sm text-red-700">{error}</p>}
+      {error && <ErrorText className="mt-4">{error}</ErrorText>}
 
       <div className="mt-5 flex flex-wrap gap-3">
         {locked ? (

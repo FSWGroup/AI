@@ -10,6 +10,18 @@ export class ApiError extends Error {
   }
 }
 
+/**
+ * The sentence to show a person for a failed request.
+ *
+ * An ApiError already carries the server's plain-English message, which is
+ * written for the person reading it. Anything else — a dropped connection, a
+ * parse failure — has a message written for a developer, so the caller's
+ * fallback is used instead.
+ */
+export function errorMessage(err: unknown, fallback: string): string {
+  return err instanceof ApiError ? err.message : fallback;
+}
+
 export async function api<T>(
   path: string,
   options: { method?: string; body?: unknown } = {},

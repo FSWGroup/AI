@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { api, ApiError } from "@/lib/client/api";
-import { Badge, Button, Card, Textarea } from "@/components/ui";
+import { Badge, Button, Card, ErrorText, Textarea } from "@/components/ui";
 import { INTERVIEWER_CONSENT_STATEMENT } from "@/lib/interview-intel/consent";
 import { msToClock } from "@/lib/interview-intel/transcript";
 
@@ -186,7 +186,7 @@ export function InterviewEvidencePanel({
         </div>
       )}
 
-      {error && <p className="mt-3 text-sm text-red-700">{error}</p>}
+      {error && <ErrorText className="mt-3">{error}</ErrorText>}
       {message && <p className="mt-3 text-sm text-navy-700">{message}</p>}
 
       {me && me.status !== "GRANTED" && me.status !== "WITHDRAWN" && (

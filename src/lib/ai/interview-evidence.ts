@@ -22,8 +22,7 @@
  */
 
 import { z } from "zod/v4";
-import { zodOutputFormat } from "@anthropic-ai/sdk/helpers/zod";
-import { AI_MODEL, SHARED_GUARDRAILS, getAiClient } from "./client";
+import { runGuardedAnalysis } from "./client";
 
 export const INTERVIEW_EVIDENCE_PROMPT_VERSION = "interview-evidence-1.0";
 
@@ -101,8 +100,6 @@ export async function extractInterviewEvidence(input: EvidenceInput): Promise<{
   inputTokens: number;
   outputTokens: number;
 }> {
-  const client = getAiClient();
-
   const competencyBlock = input.competencies
     .map((c) => `- ${c.name}${c.definition ? `: ${c.definition}` : ""}`)
     .join("\n");
@@ -119,30 +116,14 @@ export async function extractInterviewEvidence(input: EvidenceInput): Promise<{
     TASK,
   ].join("\n\n");
 
-  const response = await client.messages.parse({
-    model: AI_MODEL,
-    max_tokens: 16000,
-    thinking: { type: "adaptive" },
-    system: SHARED_GUARDRAILS,
-    messages: [{ role: "user", content }],
-    output_config: { format: zodOutputFormat(InterviewEvidenceSchema) },
+  const { parsed, inputTokens, outputTokens } = await runGuardedAnalysis({
+    schema: InterviewEvidenceSchema,
+    content,
+    refusalMessage:
+      "The transcript could not be analyzed. Check the material and try again.",
   });
 
-  if (response.stop_reason === "refusal") {
-    throw new Error(
-      "The transcript could not be analyzed. Check the material and try again.",
-    );
-  }
-  const parsed = response.parsed_output;
-  if (!parsed) {
-    throw new Error("The analysis returned an unreadable result. Please try again.");
-  }
-
-  return {
-    output: parsed,
-    inputTokens: response.usage.input_tokens,
-    outputTokens: response.usage.output_tokens,
-  };
+  return { output: parsed, inputTokens, outputTokens };
 }
 
 /**

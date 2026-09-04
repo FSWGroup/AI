@@ -4,7 +4,7 @@ import { z } from "zod";
 import { prisma } from "@/lib/db";
 import { apiError, apiOk, parseBody, withErrorHandling } from "@/lib/api";
 import { requirePermission } from "@/lib/auth/session";
-import { audit } from "@/lib/audit";
+import { audit, AUDIT_ACTIONS } from "@/lib/audit";
 
 export const runtime = "nodejs";
 
@@ -37,7 +37,7 @@ export const PATCH = withErrorHandling(async (req, ctx) => {
 
   await audit({
     userId: user.id,
-    action: "performance_cycle.status_changed",
+    action: AUDIT_ACTIONS.PERFORMANCE_CYCLE_STATUS_CHANGED,
     entityType: "PerformanceCycle",
     entityId: cycleId,
     previousValue: { status: existing.status },

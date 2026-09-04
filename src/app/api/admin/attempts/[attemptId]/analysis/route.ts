@@ -8,12 +8,12 @@
  */
 
 import { prisma } from "@/lib/db";
-import type { Prisma } from "@prisma/client";
 import { apiError, apiOk, rateLimit, withErrorHandling } from "@/lib/api";
 import { requirePermission, requestMeta } from "@/lib/auth/session";
 import { assertAttemptAccess } from "@/lib/auth/scope";
 import { audit, AUDIT_ACTIONS } from "@/lib/audit";
 import { AI_MODEL, AiNotConfiguredError, isAiConfigured } from "@/lib/ai/client";
+import { recordAnalysis } from "@/lib/ai/analysis-record";
 import { redactIdentity } from "@/lib/ai/redact";
 import {
   CANDIDATE_FIT_PROMPT_VERSION,
@@ -115,75 +115,58 @@ export const POST = withErrorHandling(async (_req, ctx) => {
     : null;
   const resumeText = redaction?.text ?? null;
 
-  const pending = await prisma.aiAnalysis.create({
-    data: {
+  const {
+    output: analysis,
+    inputTokens,
+    outputTokens,
+    record: saved,
+  } = await recordAnalysis({
+    create: {
       kind: "CANDIDATE_FIT",
-      status: "PENDING",
       attemptId,
       documentId: resume?.id ?? null,
       model: AI_MODEL,
       promptVersion: CANDIDATE_FIT_PROMPT_VERSION,
       requestedById: user.id,
     },
+    run: async () => {
+      const result = await analyzeCandidateFit({
+        report: report.payload as unknown as ReportPayload,
+        jobTitle: attempt.jobOpening.title,
+        jobProfileName: attempt.jobOpening.jobProfile.name,
+        jobDescription: attempt.jobOpening.jobProfile.jobDescription,
+        resumeText,
+      });
+      return { ...result, output: result.analysis };
+    },
   });
 
-  try {
-    const { analysis, inputTokens, outputTokens } = await analyzeCandidateFit({
-      report: report.payload as unknown as ReportPayload,
-      jobTitle: attempt.jobOpening.title,
-      jobProfileName: attempt.jobOpening.jobProfile.name,
-      jobDescription: attempt.jobOpening.jobProfile.jobDescription,
-      resumeText,
-    });
-
-    const saved = await prisma.aiAnalysis.update({
-      where: { id: pending.id },
-      data: {
-        status: "READY",
-        output: analysis as unknown as Prisma.InputJsonValue,
-        inputTokens,
-        outputTokens,
-        completedAt: new Date(),
-      },
-    });
-
-    const meta = await requestMeta();
-    await audit({
-      userId: user.id,
-      action: AUDIT_ACTIONS.AI_CANDIDATE_ANALYSIS,
-      entityType: "AiAnalysis",
-      entityId: saved.id,
-      newValue: {
-        attemptId,
-        model: AI_MODEL,
-        promptVersion: CANDIDATE_FIT_PROMPT_VERSION,
-        usedResume: Boolean(resumeText),
-        redactedIdentifiers: redaction?.redactedCounts ?? null,
-        inputTokens,
-        outputTokens,
-      },
-      ip: meta.ip,
-    });
-
-    return apiOk({
-      analysis: {
-        id: saved.id,
-        output: analysis,
-        model: saved.model,
-        promptVersion: saved.promptVersion,
-        createdAt: saved.createdAt.toISOString(),
-      },
+  const meta = await requestMeta();
+  await audit({
+    userId: user.id,
+    action: AUDIT_ACTIONS.AI_CANDIDATE_ANALYSIS,
+    entityType: "AiAnalysis",
+    entityId: saved.id,
+    newValue: {
+      attemptId,
+      model: AI_MODEL,
+      promptVersion: CANDIDATE_FIT_PROMPT_VERSION,
       usedResume: Boolean(resumeText),
-    });
-  } catch (err) {
-    await prisma.aiAnalysis.update({
-      where: { id: pending.id },
-      data: {
-        status: "FAILED",
-        error: err instanceof Error ? err.message.slice(0, 500) : "Unknown error",
-        completedAt: new Date(),
-      },
-    });
-    throw err;
-  }
+      redactedIdentifiers: redaction?.redactedCounts ?? null,
+      inputTokens,
+      outputTokens,
+    },
+    ip: meta.ip,
+  });
+
+  return apiOk({
+    analysis: {
+      id: saved.id,
+      output: analysis,
+      model: saved.model,
+      promptVersion: saved.promptVersion,
+      createdAt: saved.createdAt.toISOString(),
+    },
+    usedResume: Boolean(resumeText),
+  });
 });

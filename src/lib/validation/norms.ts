@@ -16,7 +16,7 @@
  * claim than the report is making.
  */
 
-import { quantile } from "./stats";
+import { mean, quantile } from "./stats";
 import { percentileFromCurve } from "@/lib/scoring/percentile-curve";
 import { MIN_N_NORM_ACTIVE, MIN_N_NORM_DRAFT, normGate } from "./gates";
 
@@ -49,10 +49,6 @@ export interface BuiltNormTable {
   hasCollapsedBands: boolean;
   gate: ReturnType<typeof normGate>;
   warnings: string[];
-}
-
-function meanOf(values: number[]): number {
-  return values.reduce((a, b) => a + b, 0) / values.length;
 }
 
 /**
@@ -136,7 +132,7 @@ export function buildNormTable(values: number[]): BuiltNormTable | null {
     sampleSize: n,
     min: sorted[0],
     max: sorted[sorted.length - 1],
-    mean: meanOf(sorted),
+    mean: mean(sorted),
     median: quantile(sorted, 0.5),
     hasCollapsedBands,
     gate,

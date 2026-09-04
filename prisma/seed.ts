@@ -12,10 +12,10 @@
  */
 
 import { PrismaClient, type Construct, type Prisma } from "@prisma/client";
-import bcrypt from "bcryptjs";
 import { randomUUID } from "crypto";
 
 import { resolveDatabaseUrl } from "../src/lib/database-url";
+import { hashPassword } from "../src/lib/auth/password";
 
 // Accept Netlify DB / Neon connection strings under their various env names.
 resolveDatabaseUrl();
@@ -33,24 +33,16 @@ import { behavioralNarratives2 } from "../src/content/narratives/behavioral-narr
 import { validityNarratives } from "../src/content/narratives/validity-narratives";
 import { interviewTemplates } from "../src/content/narratives/interview-templates";
 import { developmentTemplates } from "../src/content/narratives/development-templates";
-import type { AptitudeItem, StatementItem } from "../src/content/types";
+import {
+  BEHAVIORAL_CONSTRUCTS,
+  type AptitudeItem,
+  type StatementItem,
+} from "../src/content/types";
 
 const prisma = new PrismaClient();
 const NARRATIVE_VERSION = "1.0";
 
-const BEHAVIORAL_ORDER = [
-  "ENERGY",
-  "FLEXIBILITY",
-  "ORGANIZATION",
-  "COMMUNICATION",
-  "EMOTIONAL_DEVELOPMENT",
-  "ASSERTIVENESS",
-  "COMPETITIVENESS",
-  "MENTAL_TOUGHNESS",
-  "QUESTIONING_PROBING",
-  "MOTIVATION",
-  "DISTORTION",
-];
+const BEHAVIORAL_ORDER: string[] = [...BEHAVIORAL_CONSTRUCTS, "DISTORTION"];
 
 async function main(): Promise<void> {
   console.log("Seeding FSW Talent Scout…");
@@ -86,7 +78,7 @@ async function main(): Promise<void> {
         email: bootstrapEmail.toLowerCase(),
         name: "FSW Administrator",
         role: "SUPER_ADMIN",
-        passwordHash: await bcrypt.hash(bootstrapPassword, 12),
+        passwordHash: await hashPassword(bootstrapPassword),
       },
     });
     console.log(`Bootstrap SUPER_ADMIN created: ${bootstrapEmail.toLowerCase()}`);
@@ -97,7 +89,7 @@ async function main(): Promise<void> {
     console.log("Production: skipping dev admin accounts (set real users manually).");
   } else {
     const password = process.env.SEED_ADMIN_PASSWORD ?? "fsw-talentscout-dev";
-    const hash = await bcrypt.hash(password, 12);
+    const hash = await hashPassword(password);
     const users = [
       { email: "super@fsw.local", name: "Sam Superuser", role: "SUPER_ADMIN" },
       { email: "hr@fsw.local", name: "Harper Reyes (HR)", role: "HR_ADMIN" },

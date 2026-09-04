@@ -9,7 +9,7 @@
 import "server-only";
 import type { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/db";
-import { audit } from "@/lib/audit";
+import { audit, AUDIT_ACTIONS } from "@/lib/audit";
 import { generateToken, hashToken } from "@/lib/crypto";
 import { createHash } from "crypto";
 import { normalizeEmail } from "@/lib/ats/dedupe";
@@ -132,7 +132,7 @@ export async function inviteToPool(args: {
 
   await audit({
     userId: args.actorId,
-    action: "talent.consent_requested",
+    action: AUDIT_ACTIONS.TALENT_CONSENT_REQUESTED,
     entityType: "TalentProfile",
     entityId: profile.id,
     newValue: { candidateId: candidate.id },
@@ -181,7 +181,7 @@ export async function recordConsentDecision(args: {
     });
     await audit({
       actorLabel: "candidate",
-      action: "talent.opted_out",
+      action: AUDIT_ACTIONS.TALENT_OPTED_OUT,
       entityType: "TalentProfile",
       entityId: profile.id,
     });
@@ -201,7 +201,7 @@ export async function recordConsentDecision(args: {
   });
   await audit({
     actorLabel: "candidate",
-    action: "talent.opted_in",
+    action: AUDIT_ACTIONS.TALENT_OPTED_IN,
     entityType: "TalentProfile",
     entityId: profile.id,
   });
@@ -249,7 +249,7 @@ export async function suppressCandidate(args: {
   });
   await audit({
     userId: args.actorId,
-    action: "talent.suppressed",
+    action: AUDIT_ACTIONS.TALENT_SUPPRESSED,
     entityType: "Candidate",
     entityId: args.candidateId,
     newValue: { reason: args.reason ?? "manual" },
@@ -341,7 +341,7 @@ export async function recordOutreach(args: {
 
   await audit({
     userId: args.actorId,
-    action: "talent.outreach_recorded",
+    action: AUDIT_ACTIONS.TALENT_OUTREACH_RECORDED,
     entityType: "TalentProfile",
     entityId: args.profileId,
     newValue: { requisitionId: args.requisitionId ?? null, channel: args.channel },

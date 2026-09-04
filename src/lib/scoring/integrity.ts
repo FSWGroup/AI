@@ -40,8 +40,6 @@ export const INTEGRITY_EVENT_TYPES = [
   "RAPID_ANSWER_CHANGES",
   "ATTEMPT_COMPLETED",
 ] as const;
-export type IntegrityEventType = (typeof INTEGRITY_EVENT_TYPES)[number];
-
 export interface IntegrityEventCount {
   type: string;
   count: number;

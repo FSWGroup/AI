@@ -6,20 +6,13 @@ import { can } from "@/lib/auth/rbac";
 import { Badge, Card, SectionHeading } from "@/components/ui";
 import {
   CONSENT_LABEL,
+  CONSENT_TONE,
   MIN_DAYS_BETWEEN_OUTREACH,
-  type ConsentStatus,
 } from "@/lib/talent/consent";
 import { TalentSearch } from "@/components/admin/TalentSearch";
 import { NewPoolForm } from "@/components/admin/NewPoolForm";
 
 export const dynamic = "force-dynamic";
-
-const TONE: Record<ConsentStatus, "green" | "amber" | "neutral" | "red"> = {
-  OPTED_IN: "green",
-  INVITED: "amber",
-  NOT_ASKED: "neutral",
-  OPTED_OUT: "red",
-};
 
 export default async function TalentPage() {
   const user = await getCurrentUser();
@@ -79,7 +72,7 @@ export default async function TalentPage() {
       <div className="mt-5 grid gap-4 sm:grid-cols-4">
         {(["OPTED_IN", "INVITED", "NOT_ASKED", "OPTED_OUT"] as const).map((s) => (
           <Card key={s} className="p-4">
-            <Badge tone={TONE[s]}>{CONSENT_LABEL[s]}</Badge>
+            <Badge tone={CONSENT_TONE[s]}>{CONSENT_LABEL[s]}</Badge>
             <p className="mt-2 text-2xl font-bold text-navy-900">
               {byStatus.get(s) ?? 0}
             </p>

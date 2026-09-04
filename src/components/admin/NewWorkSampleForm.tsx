@@ -1,9 +1,17 @@
 "use client";
 
 import { useState } from "react";
-import { useRouter } from "next/navigation";
-import { api, ApiError } from "@/lib/client/api";
-import { Button, Card, Input, Label, Select, Textarea } from "@/components/ui";
+import { api } from "@/lib/client/api";
+import { useAction } from "@/lib/client/use-action";
+import {
+  Button,
+  Card,
+  ErrorText,
+  Input,
+  Label,
+  Select,
+  Textarea,
+} from "@/components/ui";
 import { LEVEL_LABEL, MAX_LEVEL, MIN_LEVEL } from "@/lib/worksample/rubric";
 
 interface DraftCriterion {
@@ -25,7 +33,7 @@ export function NewWorkSampleForm({
 }: {
   jobProfiles: { id: string; name: string }[];
 }) {
-  const router = useRouter();
+  const { busy, error, run } = useAction();
   const [open, setOpen] = useState(false);
   const [title, setTitle] = useState("");
   const [summary, setSummary] = useState("");
@@ -38,8 +46,6 @@ export function NewWorkSampleForm({
   const [requiredGraders, setRequiredGraders] = useState(2);
   const [jobProfileId, setJobProfileId] = useState("");
   const [criteria, setCriteria] = useState<DraftCriterion[]>([emptyCriterion()]);
-  const [busy, setBusy] = useState(false);
-  const [error, setError] = useState<string | null>(null);
 
   if (!open) {
     return (
@@ -257,14 +263,12 @@ export function NewWorkSampleForm({
         </Button>
       </div>
 
-      {error && <p className="mt-4 text-sm text-red-700">{error}</p>}
+      {error && <ErrorText className="mt-4">{error}</ErrorText>}
       <div className="mt-6 flex gap-3">
         <Button
           disabled={busy || title.trim() === "" || instructions.trim() === ""}
           onClick={async () => {
-            setBusy(true);
-            setError(null);
-            try {
+            await run(async () => {
               await api("/api/admin/work-samples", {
                 method: "POST",
                 body: {
@@ -296,14 +300,7 @@ export function NewWorkSampleForm({
                 },
               });
               setOpen(false);
-              router.refresh();
-            } catch (err) {
-              setError(
-                err instanceof ApiError ? err.message : "Could not create the work sample.",
-              );
-            } finally {
-              setBusy(false);
-            }
+            }, { fallback: "Could not create the work sample." });
           }}
         >
           {busy ? "Creating…" : "Create as draft"}

@@ -8,8 +8,8 @@
 
 import "server-only";
 import { prisma } from "@/lib/db";
-import { audit } from "@/lib/audit";
-import { generateToken, hashToken } from "@/lib/crypto";
+import { audit, AUDIT_ACTIONS } from "@/lib/audit";
+import { generateToken, hashToken, reference } from "@/lib/crypto";
 import { getCalendar, buildIcs, type CalendarEvent } from "@/lib/calendar";
 import {
   findSlots,
@@ -21,11 +21,8 @@ import {
 } from "./slots";
 import { wallClockIn } from "./timezone";
 
-const ALPHABET = "ABCDEFGHJKMNPQRSTUVWXYZ23456789";
-
 export function schedulingReference(): string {
-  const bytes = crypto.getRandomValues(new Uint8Array(6));
-  return `IV-${Array.from(bytes, (b) => ALPHABET[b % ALPHABET.length]).join("")}`;
+  return reference("IV");
 }
 
 /**
@@ -228,7 +225,7 @@ export async function createSchedulingRequest(args: {
 
   await audit({
     userId: args.actorId,
-    action: "scheduling.request_created",
+    action: AUDIT_ACTIONS.SCHEDULING_REQUEST_CREATED,
     entityType: "SchedulingRequest",
     entityId: request.id,
     newValue: { reference: request.reference, panelists: args.panelists.length },
@@ -486,7 +483,7 @@ export async function cancelBooking(args: {
   await audit({
     userId: args.actorId ?? null,
     actorLabel: args.byCandidate ? "candidate" : undefined,
-    action: "scheduling.cancelled",
+    action: AUDIT_ACTIONS.SCHEDULING_CANCELLED,
     entityType: "SchedulingRequest",
     entityId: request.id,
     newValue: { reason: args.reason ?? null },

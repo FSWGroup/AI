@@ -1,12 +1,11 @@
 import Link from "next/link";
-import { prisma } from "@/lib/db";
 import { listPublicPostings } from "@/lib/ats/public-postings";
+import { getCompanyName } from "@/lib/org-settings";
 
 export const dynamic = "force-dynamic";
 
 export async function generateMetadata() {
-  const settings = await prisma.orgSettings.findUnique({ where: { id: "org" } });
-  const company = settings?.companyName ?? "FSW Group";
+  const company = await getCompanyName();
   return {
     title: `Careers at ${company}`,
     description: `Open roles at ${company}.`,
@@ -15,11 +14,10 @@ export async function generateMetadata() {
 }
 
 export default async function CareersIndexPage() {
-  const [postings, settings] = await Promise.all([
+  const [postings, company] = await Promise.all([
     listPublicPostings(),
-    prisma.orgSettings.findUnique({ where: { id: "org" } }),
+    getCompanyName(),
   ]);
-  const company = settings?.companyName ?? "FSW Group";
 
   const byDepartment = new Map<string, typeof postings>();
   for (const p of postings) {

@@ -22,6 +22,8 @@
 import { PdfBuilder, COLORS, encodable } from "./pdf-layout";
 import type { ReportPayload } from "./generate";
 import type { CandidateFitAnalysis } from "@/lib/ai/candidate-analysis";
+import { POSITION_LABEL } from "@/lib/scoring/benchmark";
+import type { RangePosition } from "@/lib/scoring/types";
 
 export interface SessionSection {
   sectionKey: string;
@@ -107,16 +109,7 @@ function formatMeta(meta: unknown): string {
 }
 
 function positionLabel(position: string | null): string {
-  switch (position) {
-    case "WITHIN":
-      return "In range";
-    case "BELOW":
-      return "Below range";
-    case "ABOVE":
-      return "Above range";
-    default:
-      return "-";
-  }
+  return POSITION_LABEL[position as RangePosition] ?? "-";
 }
 
 export async function buildFullReportPdf(

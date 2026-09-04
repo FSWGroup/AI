@@ -11,22 +11,22 @@
  */
 
 import { NextResponse } from "next/server";
-import { prisma } from "@/lib/db";
 import { withErrorHandling } from "@/lib/api";
 import { env } from "@/lib/env";
 import { buildJobFeed } from "@/lib/ats/postings";
 import { listPublicPostings } from "@/lib/ats/public-postings";
+import { getCompanyName } from "@/lib/org-settings";
 
 export const runtime = "nodejs";
 
 export const GET = withErrorHandling(async () => {
-  const [postings, settings] = await Promise.all([
+  const [postings, companyName] = await Promise.all([
     listPublicPostings(),
-    prisma.orgSettings.findUnique({ where: { id: "org" } }),
+    getCompanyName(),
   ]);
 
   const xml = buildJobFeed(postings, {
-    companyName: settings?.companyName ?? "FSW Group",
+    companyName,
     baseUrl: env.appBaseUrl,
   });
 

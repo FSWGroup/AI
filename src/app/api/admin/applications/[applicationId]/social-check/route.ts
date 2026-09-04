@@ -9,8 +9,9 @@
 
 import { z } from "zod";
 import { prisma } from "@/lib/db";
+import { DEFAULT_COMPANY_NAME, getOrgSettings } from "@/lib/org-settings";
 import { apiError, apiOk, parseBody, withErrorHandling } from "@/lib/api";
-import { getCurrentUser } from "@/lib/auth/session";
+import { requireAnyUser } from "@/lib/auth/session";
 import { assertApplicationAccess } from "@/lib/auth/scope";
 import { can } from "@/lib/auth/rbac";
 import { audit, AUDIT_ACTIONS } from "@/lib/audit";
@@ -29,8 +30,7 @@ const schema = z.object({
 });
 
 export const POST = withErrorHandling(async (req, ctx) => {
-  const user = await getCurrentUser();
-  if (!user) return apiError("Not signed in.", 401);
+  const user = await requireAnyUser();
   if (!can(user.role, "MANAGE_SOCIAL_CHECKS")) {
     return apiError("You cannot start a social media review.", 403);
   }
@@ -53,7 +53,7 @@ export const POST = withErrorHandling(async (req, ctx) => {
         },
       },
     }),
-    prisma.orgSettings.findUnique({ where: { id: "org" } }),
+    getOrgSettings(),
   ]);
   if (!application) return apiError("Application not found.", 404);
   if (application.socialMediaCheck) {
@@ -106,7 +106,7 @@ export const POST = withErrorHandling(async (req, ctx) => {
   });
 
   const url = `${env.appBaseUrl}/social-check/${token}`;
-  const settingsName = settings?.companyName ?? "FSW Group";
+  const settingsName = settings?.companyName ?? DEFAULT_COMPANY_NAME;
   await sendEmail({
     to: application.candidate.email,
     template: "interview_invitation",

@@ -14,13 +14,7 @@
  */
 
 import { z } from "zod/v4";
-import { zodOutputFormat } from "@anthropic-ai/sdk/helpers/zod";
-import {
-  AI_MODEL,
-  PROMPT_VERSIONS,
-  SHARED_GUARDRAILS,
-  getAiClient,
-} from "./client";
+import { PROMPT_VERSIONS, runGuardedAnalysis } from "./client";
 import { dimensionMeta } from "@/content/narratives/dimension-meta";
 
 const SCOREABLE = dimensionMeta.filter((d) => d.category !== "VALIDITY");
@@ -139,8 +133,6 @@ export async function analyzeJobDescription(params: {
   inputTokens: number;
   outputTokens: number;
 }> {
-  const client = getAiClient();
-
   const prompt = `
 <job_title>${params.jobTitle}</job_title>
 
@@ -172,24 +164,14 @@ How to work:
 Rationales are the record of WHY this configuration is job-related. Tie each one to a specific duty.
 `.trim();
 
-  const response = await client.messages.parse({
-    model: AI_MODEL,
-    max_tokens: 16000,
-    thinking: { type: "adaptive" },
-    system: SHARED_GUARDRAILS,
-    messages: [{ role: "user", content: prompt }],
-    output_config: { format: zodOutputFormat(JobDescriptionProposalSchema) },
-  });
-
-  if (response.stop_reason === "refusal") {
-    throw new Error(
+  const { parsed, inputTokens, outputTokens } = await runGuardedAnalysis({
+    schema: JobDescriptionProposalSchema,
+    content: prompt,
+    refusalMessage:
       "A proposal could not be generated for this job description. Review the text and try again.",
-    );
-  }
-  const parsed = response.parsed_output;
-  if (!parsed) {
-    throw new Error("The proposal returned an unreadable result. Please try again.");
-  }
+    unreadableMessage:
+      "The proposal returned an unreadable result. Please try again.",
+  });
 
   // Defensive: never let an inverted range reach the editor.
   for (const d of parsed.dimensions) {
@@ -200,11 +182,7 @@ Rationales are the record of WHY this configuration is job-related. Tie each one
     }
   }
 
-  return {
-    proposal: parsed,
-    inputTokens: response.usage.input_tokens,
-    outputTokens: response.usage.output_tokens,
-  };
+  return { proposal: parsed, inputTokens, outputTokens };
 }
 
 export const JOB_DESCRIPTION_PROMPT_VERSION = PROMPT_VERSIONS.jobDescription;

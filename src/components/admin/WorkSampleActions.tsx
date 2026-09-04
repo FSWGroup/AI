@@ -1,9 +1,8 @@
 "use client";
 
-import { useState } from "react";
-import { useRouter } from "next/navigation";
-import { api, ApiError } from "@/lib/client/api";
-import { Button } from "@/components/ui";
+import { api } from "@/lib/client/api";
+import { useAction } from "@/lib/client/use-action";
+import { Button, ErrorText } from "@/components/ui";
 
 export function WorkSampleActions({
   workSampleId,
@@ -14,24 +13,15 @@ export function WorkSampleActions({
   status: string;
   blocked: string[];
 }) {
-  const router = useRouter();
-  const [busy, setBusy] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const { busy, error, run } = useAction();
 
   const setStatus = async (next: "ACTIVE" | "RETIRED" | "DRAFT") => {
-    setBusy(true);
-    setError(null);
-    try {
+    await run(async () => {
       await api(`/api/admin/work-samples/${workSampleId}`, {
         method: "PATCH",
         body: { status: next },
       });
-      router.refresh();
-    } catch (err) {
-      setError(err instanceof ApiError ? err.message : "Could not update.");
-    } finally {
-      setBusy(false);
-    }
+    }, { fallback: "Could not update." });
   };
 
   return (
@@ -71,7 +61,7 @@ export function WorkSampleActions({
           </ul>
         </div>
       )}
-      {error && <p className="mt-2 text-sm text-red-700">{error}</p>}
+      {error && <ErrorText className="mt-2">{error}</ErrorText>}
     </div>
   );
 }

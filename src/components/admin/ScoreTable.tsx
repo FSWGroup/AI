@@ -5,8 +5,17 @@
  */
 
 import { dimensionMeta } from "@/content/narratives/dimension-meta";
+import {
+  APTITUDE_CONSTRUCTS,
+  BEHAVIORAL_CONSTRUCTS,
+  VALIDITY_CONSTRUCTS,
+} from "@/content/types";
 import { Badge, Card } from "@/components/ui";
-import { classifyAgainstRange } from "@/lib/scoring/benchmark";
+import {
+  POSITION_LABEL,
+  POSITION_TONE,
+  classifyAgainstRange,
+} from "@/lib/scoring/benchmark";
 
 export interface ScoreRow {
   construct: string;
@@ -22,28 +31,6 @@ export interface BenchmarkRow {
   maxScore: number;
   enabled: boolean;
 }
-
-const APTITUDES = [
-  "MENTAL_ACUITY",
-  "BUSINESS_TERMS",
-  "AWARENESS_MEMORY",
-  "VOCABULARY",
-  "NUMERICAL_PERCEPTION",
-  "MECHANICAL_INTEREST",
-];
-const BEHAVIORAL = [
-  "ENERGY",
-  "FLEXIBILITY",
-  "ORGANIZATION",
-  "COMMUNICATION",
-  "EMOTIONAL_DEVELOPMENT",
-  "ASSERTIVENESS",
-  "COMPETITIVENESS",
-  "MENTAL_TOUGHNESS",
-  "QUESTIONING_PROBING",
-  "MOTIVATION",
-];
-const VALIDITY = ["DISTORTION", "EQUIVOCATION"];
 
 export function ScoreScaleRow({
   construct,
@@ -92,13 +79,7 @@ export function ScoreScaleRow({
       <p className="text-xs text-navy-400 sm:pl-3">{meta?.highDescriptor}</p>
       <div className="sm:text-right">
         {position && (
-          <Badge
-            tone={
-              position === "WITHIN" ? "green" : position === "BELOW" ? "amber" : "blue"
-            }
-          >
-            {position === "WITHIN" ? "In range" : position === "BELOW" ? "Below" : "Above"}
-          </Badge>
+          <Badge tone={POSITION_TONE[position]}>{POSITION_LABEL[position]}</Badge>
         )}
       </div>
     </div>
@@ -124,7 +105,7 @@ export function ScoreTable({
     );
   }
 
-  const group = (title: string, keys: string[]) => {
+  const group = (title: string, keys: readonly string[]) => {
     const rows = keys
       .map((k) => ({ key: k, score: scoreFor(k) }))
       .filter((r) => r.score);
@@ -150,9 +131,9 @@ export function ScoreTable({
 
   return (
     <div className="space-y-6">
-      {group("Mental Aptitudes", APTITUDES)}
-      {group("Performance Scales", BEHAVIORAL)}
-      {group("Response Validity", VALIDITY)}
+      {group("Mental Aptitudes", APTITUDE_CONSTRUCTS)}
+      {group("Performance Scales", BEHAVIORAL_CONSTRUCTS)}
+      {group("Response Validity", VALIDITY_CONSTRUCTS)}
       <Card className="p-4 text-xs text-navy-500">
         <p className="font-semibold text-navy-700">Legend</p>
         <p className="mt-1">

@@ -4,7 +4,7 @@ import { z } from "zod";
 import { prisma } from "@/lib/db";
 import { apiError, apiOk, parseBody, withErrorHandling } from "@/lib/api";
 import { requirePermission } from "@/lib/auth/session";
-import { audit } from "@/lib/audit";
+import { audit, AUDIT_ACTIONS } from "@/lib/audit";
 import { validateRubric } from "@/lib/worksample/rubric";
 import { toCriterionLike } from "@/lib/worksample/service";
 
@@ -40,7 +40,7 @@ export const PATCH = withErrorHandling(async (req, ctx) => {
 
   await audit({
     userId: user.id,
-    action: "work_sample.status_changed",
+    action: AUDIT_ACTIONS.WORK_SAMPLE_STATUS_CHANGED,
     entityType: "WorkSample",
     entityId: workSampleId,
     previousValue: { status: sample.status },
