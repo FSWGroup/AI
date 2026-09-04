@@ -378,3 +378,51 @@ describe("groupSlotsByDay", () => {
     ]);
   });
 });
+
+describe("slotStillAvailable holds the same line findSlots does", () => {
+  const panelist = {
+    userId: "u1",
+    required: true,
+    timeZone: "Asia/Manila",
+    rules: [{ dayOfWeek: 6, startMinute: 9 * 60, endMinute: 17 * 60 }],
+    exceptions: [],
+    busy: [],
+  };
+
+  it("refuses a start that is not on the offered grid", () => {
+    // 01:07Z is inside the panel's free hours but was never an offered slot.
+    const off = slotStillAvailable([panelist], new Date("2026-09-05T01:07:00Z"), 60, {
+      now: new Date("2026-09-01T00:00:00Z"),
+    });
+    expect(off.ok).toBe(false);
+    if (!off.ok) expect(off.reason).toMatch(/not one of the times offered/i);
+
+    const on = slotStillAvailable([panelist], new Date("2026-09-05T01:00:00Z"), 60, {
+      now: new Date("2026-09-01T00:00:00Z"),
+    });
+    expect(on.ok).toBe(true);
+  });
+
+  it("does not blame another candidate for a time nobody was ever free for", () => {
+    const gate = slotStillAvailable([panelist], new Date("2026-09-05T20:00:00Z"), 60, {
+      now: new Date("2026-09-01T00:00:00Z"),
+    });
+    expect(gate.ok).toBe(false);
+    if (!gate.ok) expect(gate.reason).toMatch(/Nobody on the panel is available/i);
+  });
+
+  it("refuses when no required panelist decides the times, as findSlots does", () => {
+    const optional = { ...panelist, required: false };
+    expect(
+      findSlots(
+        [optional],
+        { start: new Date("2026-09-05T00:00:00Z"), end: new Date("2026-09-06T00:00:00Z") },
+        { durationMinutes: 60, now: new Date("2026-09-01T00:00:00Z") },
+      ),
+    ).toHaveLength(0);
+    const gate = slotStillAvailable([optional], new Date("2026-09-05T01:00:00Z"), 60, {
+      now: new Date("2026-09-01T00:00:00Z"),
+    });
+    expect(gate.ok).toBe(false);
+  });
+});

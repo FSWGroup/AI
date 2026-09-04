@@ -28,12 +28,18 @@ interface State {
   reason: string | null;
   parties: Party[];
   aiConfigured: boolean;
+  /**
+   * Whether this viewer is cleared for the recording itself, per
+   * OrgSettings.recordingAccessRoles. A panelist who is not still answers for
+   * themselves about being recorded — they just do not handle the media.
+   */
+  mayAccessRecording: boolean;
   recording: {
     status: string;
-    fileName: string | null;
-    durationSeconds: number | null;
-    segmentCount: number;
-    hasTimestamps: boolean;
+    fileName?: string | null;
+    durationSeconds?: number | null;
+    segmentCount?: number;
+    hasTimestamps?: boolean;
     evidence: Evidence[];
   } | null;
 }
@@ -228,7 +234,15 @@ export function InterviewEvidencePanel({
         )}
       </div>
 
-      {state.canRecord && (
+      {state.canRecord && !state.mayAccessRecording && (
+        <p className="mt-5 border-t border-navy-100 pt-4 text-sm text-navy-500">
+          Recording is on. Handling the recording — the transcript, the
+          evidence, deleting it — sits with the roles cleared for it, so it is
+          not shown here.
+        </p>
+      )}
+
+      {state.canRecord && state.mayAccessRecording && (
         <div className="mt-5 border-t border-navy-100 pt-4">
           <p className="text-xs font-semibold uppercase tracking-wide text-navy-400">
             Transcript
@@ -349,9 +363,10 @@ export function InterviewEvidencePanel({
         </div>
       )}
 
-      {(state.recording?.status === "UPLOADED" ||
-        state.recording?.status === "TRANSCRIBED" ||
-        state.recording?.status === "ANALYZED") && (
+      {state.mayAccessRecording &&
+        (state.recording?.status === "UPLOADED" ||
+          state.recording?.status === "TRANSCRIBED" ||
+          state.recording?.status === "ANALYZED") && (
         <button
           type="button"
           className="mt-5 text-xs text-navy-500 underline"

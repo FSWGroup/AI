@@ -516,6 +516,13 @@ model Candidate {
   lastName  String
   email     String
   phone     String?
+  /// Fabricated by a demo/seed script rather than a real person.
+  ///
+  /// Carried on the row rather than inferred from an email domain, because
+  /// anything derived from these records has to be able to say so too — a
+  /// norm table built while a demo fixture was loaded is the reference group
+  /// that bands real candidates, and it long outlives the fixture.
+  synthetic   Boolean   @default(false)
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
@@ -711,6 +718,10 @@ model NormTable {
   population          String
   effectiveDate       DateTime
   sampleSize          Int
+  /// How many cases in the norming sample were synthetic. A table with any is
+  /// never activatable and is removed when the fixture is purged: fabricated
+  /// people must not decide where a real candidate's stanine boundaries fall.
+  syntheticSampleSize Int      @default(0)
   methodology         String
   /// Ordered raw-score (or theta) upper bounds for bands 1..8; band 9 above.
   /// [{ "band": 1, "maxRaw": 4 }, ...] or z-thresholds per methodology.

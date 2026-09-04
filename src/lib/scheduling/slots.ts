@@ -257,10 +257,22 @@ export function slotStillAvailable(
   panelists: PanelistAvailability[],
   start: Date,
   durationMinutes: number,
-  options: { minNoticeHours?: number; now?: Date } = {},
+  options: { minNoticeHours?: number; now?: Date; granularityMinutes?: number } = {},
 ): { ok: true } | { ok: false; reason: string } {
   const now = options.now ?? new Date();
   const end = new Date(start.getTime() + durationMinutes * 60_000);
+
+  // The same "somebody has to decide the times" rule findSlots applies. The
+  // two functions answer the same question from different directions, and a
+  // gap between them is a time the candidate could book but was never shown.
+  const required = panelists.filter((x) => x.required);
+  if (required.length === 0) {
+    return {
+      ok: false,
+      reason:
+        "There is nobody on this panel whose calendar decides the times. Ask the recruiter to set the interview up again.",
+    };
+  }
 
   if (start.getTime() < now.getTime() + (options.minNoticeHours ?? 0) * 3600_000) {
     return {
@@ -269,15 +281,44 @@ export function slotStillAvailable(
     };
   }
 
-  for (const p of panelists.filter((x) => x.required)) {
+  // On the grid, because the start has to be one of the times that were
+  // offered. Without this a caller could post any instant that happened to
+  // fall inside the panel's free time — 01:07 against a half-hour grid — and
+  // it booked.
+  const granularityMs =
+    (options.granularityMinutes ?? DEFAULT_GRANULARITY_MINUTES) * 60_000;
+  if (start.getTime() % granularityMs !== 0) {
+    return {
+      ok: false,
+      reason: "That is not one of the times offered. Please pick one from the list.",
+    };
+  }
+
+  for (const p of required) {
     const free = availableIntervalsFor(p, {
       start: new Date(start.getTime() - 60_000),
       end: new Date(end.getTime() + 60_000),
     });
     if (!covers(free, start, end)) {
+      // Two different failures, and telling a candidate the wrong one wastes
+      // their time: "just been taken" sends them hunting for another slot on
+      // a day the panel never offered any hours at all.
+      //
+      // The distinction is exact rather than heuristic — recompute with
+      // nothing booked. If the time is covered then, something really was
+      // booked over it; if it still is not, no working hours ever reached it.
+      const ifNothingBooked = availableIntervalsFor(
+        { ...p, busy: [] },
+        {
+          start: new Date(start.getTime() - 60_000),
+          end: new Date(end.getTime() + 60_000),
+        },
+      );
       return {
         ok: false,
-        reason: "That time has just been taken. Please pick another.",
+        reason: covers(ifNothingBooked, start, end)
+          ? "That time has just been taken. Please pick another."
+          : "Nobody on the panel is available then. Please pick one of the times offered.",
       };
     }
   }

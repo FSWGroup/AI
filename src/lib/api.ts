@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { Prisma } from "@prisma/client";
 import { ZodError, type ZodSchema } from "zod";
 import { AuthError } from "@/lib/auth/session";
 
@@ -35,6 +36,27 @@ export function withErrorHandling(
       }
       if (err instanceof AuthError) {
         return apiError(err.message, err.status);
+      }
+      // A request naming something that does not exist is a bad request, not
+      // a broken server. Prisma reports both cases as exceptions, so without
+      // this a mistyped id anywhere in a body — a job profile, a pool, a
+      // panelist — came back as "something went wrong on our side", which
+      // sends whoever is debugging it to the logs instead of to their own
+      // payload. Individual routes still check existence up front where they
+      // can say something more specific; this is the floor.
+      if (err instanceof Prisma.PrismaClientKnownRequestError) {
+        if (err.code === "P2025") {
+          return apiError("That record does not exist.", 404);
+        }
+        if (err.code === "P2003") {
+          return apiError(
+            "Something the request referred to does not exist. Check the ids you sent.",
+            422,
+          );
+        }
+        if (err.code === "P2002") {
+          return apiError("That already exists.", 409);
+        }
       }
       console.error("[api]", err instanceof Error ? err.message : err);
       return apiError(

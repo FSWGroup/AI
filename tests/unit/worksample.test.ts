@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   DIVERGENT_LEVELS,
   canSeeOtherGrades,
+  canResume,
   canStart,
   canSubmit,
   effectiveAssignmentStatus,
@@ -397,5 +398,23 @@ describe("the candidate's side", () => {
     // gets asked for a list, and "accepts anything" is how an executable
     // arrives.
     expect(fileTypeAllowed("anything.zip", [])).toBe(false);
+  });
+});
+
+describe("resuming a work sample", () => {
+  const base = { status: "STARTED", dueAt: new Date("2026-01-10T00:00:00Z") };
+
+  it("lets a started assignment be reopened after its start deadline has passed", () => {
+    // dueAt is the deadline to BEGIN. Somebody who began an hour before it
+    // and reloads the page twenty minutes later is resuming, not starting.
+    expect(canResume(base).ok).toBe(true);
+    expect(canStart(base, new Date("2026-01-11T00:00:00Z")).ok).toBe(false);
+  });
+
+  it("refuses to reopen a submitted, withdrawn or expired assignment", () => {
+    for (const status of ["SUBMITTED", "GRADED", "WITHDRAWN", "EXPIRED"]) {
+      const gate = canResume({ ...base, status });
+      expect(gate.ok).toBe(false);
+    }
   });
 });

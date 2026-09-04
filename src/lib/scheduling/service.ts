@@ -14,6 +14,7 @@ import { getCalendar, buildIcs, type CalendarEvent } from "@/lib/calendar";
 import {
   findSlots,
   slotStillAvailable,
+  DEFAULT_GRANULARITY_MINUTES,
   type Interval,
   type PanelistAvailability,
   type Slot,
@@ -320,6 +321,8 @@ export async function bookSlot(args: {
   const check = slotStillAvailable(availability, args.start, request.durationMinutes, {
     minNoticeHours: request.minNoticeHours,
     now,
+    // The same grid the offered slots were generated on.
+    granularityMinutes: DEFAULT_GRANULARITY_MINUTES,
   });
   if (!check.ok) return { ok: false, reason: check.reason };
 
@@ -430,6 +433,14 @@ export async function cancelBooking(args: {
   const request = await prisma.schedulingRequest.findUniqueOrThrow({
     where: { id: args.requestId },
   });
+
+  // Cancelling twice does not rewrite why it was cancelled the first time.
+  //
+  // The second call overwrote `cancelledReason` with whatever it carried,
+  // including null — so re-posting a cancel erased the candidate's stated
+  // reason, and the record of why an interview did not happen is often the
+  // only record of it at all.
+  if (request.status === "CANCELLED") return;
 
   await prisma.$transaction(async (tx) => {
     if (request.interviewId) {

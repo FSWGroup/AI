@@ -117,7 +117,14 @@ export function canContact(
   return { ok: true };
 }
 
-/** Whether a person may be searched for and shown in the CRM at all. */
+/**
+ * Whether a person may be searched for and shown in the CRM at all.
+ *
+ * Two conditions, because they come from different places: the profile's own
+ * consent status, and the suppression list, which is keyed on a hash of the
+ * email address and so outlives deletion of the profile row. A profile
+ * recreated for a suppressed address passes the first and must still fail.
+ */
 export function canAppearInSearch(profile: ProfileLike, suppressed: boolean): boolean {
   if (suppressed) return false;
   return profile.consentStatus !== "OPTED_OUT";

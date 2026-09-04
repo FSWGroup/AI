@@ -116,8 +116,26 @@ async function purge(): Promise<void> {
   await prisma.application.deleteMany({ where: { candidateId: { in: ids } } });
   await prisma.invitation.deleteMany({ where: { candidateId: { in: ids } } });
   await prisma.candidate.deleteMany({ where: { id: { in: ids } } });
-  await prisma.normTable.deleteMany({ where: { population: { startsWith: DEMO_PREFIX } } });
-  console.log(`Purged ${ids.length} demo candidates and their attached records.`);
+  // Norm tables built while the fixture was loaded, by whatever population
+  // label the product happened to give them.
+  //
+  // Matching on `population: startsWith("DEMO")` never removed a single one:
+  // generateNormTables always writes "All assessed applicants" or
+  // "Applicants assessed for this job profile", so every table generated
+  // through the product survived the purge — still ACTIVE, still banding real
+  // candidates against a reference group that had just been deleted as
+  // fabricated.
+  const fabricated = await prisma.normTable.deleteMany({
+    where: {
+      OR: [
+        { syntheticSampleSize: { gt: 0 } },
+        { population: { startsWith: DEMO_PREFIX } },
+      ],
+    },
+  });
+  console.log(
+    `Purged ${ids.length} demo candidates and their attached records, and ${fabricated.count} norm tables built from them.`,
+  );
 }
 
 async function main(): Promise<void> {
@@ -206,6 +224,10 @@ async function main(): Promise<void> {
         firstName: `${DEMO_PREFIX}`,
         lastName: `Employee ${String(i + 1).padStart(3, "0")}`,
         email: `demo.employee.${i + 1}@${DEMO_EMAIL_DOMAIN}`,
+        // The flag, not just the domain. Anything computed from these rows —
+        // a norm table above all — has to be able to say it was built from
+        // people who do not exist, long after the fixture is gone.
+        synthetic: true,
       },
     });
 

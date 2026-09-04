@@ -418,6 +418,31 @@ export function canStart(
   return { ok: true };
 }
 
+/**
+ * Whether an already-started assignment may be reopened.
+ *
+ * Not the same question as `canStart`. `dueAt` is the deadline to BEGIN, so
+ * once someone has begun it stops applying — a page reload twenty minutes
+ * into a task that was started an hour before the due date is a resume, and
+ * the `expiresAt` clock, not `dueAt`, is what governs from then on. Only the
+ * terminal states close it.
+ */
+export function canResume(assignment: { status: string }): AssignmentGate {
+  if (assignment.status === "SUBMITTED" || assignment.status === "GRADED") {
+    return { ok: false, reason: "This work sample has already been submitted." };
+  }
+  if (assignment.status === "WITHDRAWN") {
+    return { ok: false, reason: "This work sample is no longer active." };
+  }
+  if (assignment.status === "EXPIRED") {
+    return {
+      ok: false,
+      reason: "The window to start this work sample has closed. Contact the recruiter if you need it reopened.",
+    };
+  }
+  return { ok: true };
+}
+
 export function canSubmit(
   assignment: { status: string; expiresAt: Date | null },
   now: Date = new Date(),

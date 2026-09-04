@@ -65,6 +65,31 @@ export const POST = withErrorHandling(async (req) => {
     return apiError("One of those performance criteria is not recognised.", 422);
   }
 
+  // Dates, parsed once and checked. `new Date("not-a-date")` is an Invalid
+  // Date, which Prisma rejects at the driver with a 500.
+  const hiredFrom = body.hiredFrom ? new Date(body.hiredFrom) : null;
+  const hiredTo = body.hiredTo ? new Date(body.hiredTo) : null;
+  if (hiredFrom && Number.isNaN(hiredFrom.getTime())) {
+    return apiError("That start date is not a date.", 422);
+  }
+  if (hiredTo && Number.isNaN(hiredTo.getTime())) {
+    return apiError("That end date is not a date.", 422);
+  }
+  if (hiredFrom && hiredTo && hiredFrom > hiredTo) {
+    return apiError(
+      "The hire window ends before it starts, so no hire can fall inside it. The study would run to n = 0 and be stamped as computed.",
+      422,
+    );
+  }
+
+  if (body.jobProfileId) {
+    const profile = await prisma.jobProfile.findUnique({
+      where: { id: body.jobProfileId },
+      select: { id: true },
+    });
+    if (!profile) return apiError("That job profile does not exist.", 422);
+  }
+
   const study = await prisma.validationStudy.create({
     data: {
       name: body.name,
@@ -75,8 +100,8 @@ export const POST = withErrorHandling(async (req) => {
       retentionDays:
         body.criterionKind === "RETENTION" ? (body.retentionDays ?? 365) : null,
       cycleKinds: body.cycleKinds ?? [],
-      hiredFrom: body.hiredFrom ? new Date(body.hiredFrom) : null,
-      hiredTo: body.hiredTo ? new Date(body.hiredTo) : null,
+      hiredFrom,
+      hiredTo,
       correctRangeRestriction: body.correctRangeRestriction ?? true,
       correctAttenuation: body.correctAttenuation ?? true,
       createdById: user.id,

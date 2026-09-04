@@ -15,6 +15,7 @@ import { audit } from "@/lib/audit";
 import { generateToken, hashToken } from "@/lib/crypto";
 import { getStorage } from "@/lib/storage";
 import {
+  canResume,
   canStart,
   canSubmit,
   fileTypeAllowed,
@@ -161,7 +162,16 @@ export async function startAssignment(
     include: { workSample: true },
   });
 
+  // A resume is still gated, just on a different question.
+  //
+  // Short-circuiting on `startedAt` was meant to make a page reload a resume
+  // rather than a restart, and it did — but it also made every later state
+  // unreachable, so "start" on a submitted, withdrawn or expired assignment
+  // answered 200 STARTED and handed the instructions back out, while GET on
+  // the same token correctly refused.
   if (assignment.startedAt) {
+    const resume = canResume(assignment);
+    if (!resume.ok) return { ok: false, reason: resume.reason };
     return { ok: true, expiresAt: assignment.expiresAt };
   }
   const gate = canStart(assignment);

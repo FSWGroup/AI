@@ -43,9 +43,24 @@ export const POST = withErrorHandling(async (req, ctx) => {
   // broken rather than like the request was wrong.
   const profile = await prisma.talentProfile.findUnique({
     where: { id: profileId },
-    select: { id: true },
+    select: { id: true, consentStatus: true },
   });
   if (!profile) return apiError("That talent profile does not exist.", 404);
+
+  // Nothing that enriches the record of someone who asked not to be kept.
+  //
+  // add_to_pool and outreach already refuse through the consent gate; tag and
+  // note wrote with raw Prisma and never consulted it, against this module's
+  // own claim that every write path passes through it. The row survives an
+  // opt-out only so the opt-out itself can be honoured, not so it can go on
+  // being built up. Removing things stays allowed.
+  const ENRICHING = ["tag", "note"];
+  if (profile.consentStatus === "OPTED_OUT" && ENRICHING.includes(body.action)) {
+    return apiError(
+      "This person asked not to be kept in the talent pool. Their record stays only so that decision can be honoured — nothing more is added to it.",
+      409,
+    );
+  }
 
   switch (body.action) {
     case "tag": {

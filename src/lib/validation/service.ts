@@ -469,6 +469,8 @@ export interface NormPreview {
   label: string;
   table: BuiltNormTable | null;
   sampleSize: number;
+  /** How many of those cases were fabricated by a demo fixture. */
+  syntheticSampleSize: number;
   /** How the current population would redistribute across the new bands. */
   shift: ReturnType<typeof bandShiftPreview> | null;
   reason?: string;
@@ -501,13 +503,31 @@ export async function previewNormTables(args: {
   // round trips to build a page that shows sixteen rows of the same table.
   const allRows = await prisma.score.findMany({
     where,
-    select: { construct: true, rawScore: true, band: true },
+    select: {
+      construct: true,
+      rawScore: true,
+      band: true,
+      // Counted, not filtered. A demo fixture is loaded precisely so the
+      // norming screens have something to show, so the sample is allowed to
+      // contain it — but the resulting table has to carry the fact, because
+      // activation is what turns a reference group into the thing real
+      // candidates are measured against.
+      attempt: { select: { candidate: { select: { synthetic: true } } } },
+    },
   });
-  const byConstruct = new Map<Construct, { rawScore: number; band: number }[]>();
+  const byConstruct = new Map<
+    Construct,
+    { rawScore: number; band: number; synthetic: boolean }[]
+  >();
   for (const row of allRows) {
+    const entry = {
+      rawScore: row.rawScore,
+      band: row.band,
+      synthetic: row.attempt.candidate.synthetic,
+    };
     const list = byConstruct.get(row.construct);
-    if (list) list.push({ rawScore: row.rawScore, band: row.band });
-    else byConstruct.set(row.construct, [{ rawScore: row.rawScore, band: row.band }]);
+    if (list) list.push(entry);
+    else byConstruct.set(row.construct, [entry]);
   }
 
   const previews: NormPreview[] = [];
@@ -519,6 +539,7 @@ export async function previewNormTables(args: {
       label: constructLabel(construct),
       table,
       sampleSize: rows.length,
+      syntheticSampleSize: rows.filter((r) => r.synthetic).length,
       shift: table ? bandShiftPreview(table, rows) : null,
       reason: table
         ? undefined
@@ -572,6 +593,7 @@ export async function generateNormTables(args: {
         population: populationLabel,
         effectiveDate: new Date(),
         sampleSize: preview.table.sampleSize,
+        syntheticSampleSize: preview.syntheticSampleSize,
         methodology: [
           "Stanine cut points placed at the observed percentiles of the sample",
           "(4, 11, 23, 40, 60, 77, 89, 96), not at z-score points from an assumed",
@@ -609,6 +631,20 @@ export async function activateNormTable(
   const table = await prisma.normTable.findUniqueOrThrow({ where: { id: normTableId } });
   if (table.status === "ACTIVE") {
     return { ok: false, reason: "This table is already active." };
+  }
+  // Refused outright, whatever the sample size.
+  //
+  // The demo fixture's purge deletes candidates by email domain; it cannot
+  // find a norm table computed over them, so before this a table built while
+  // the fixture was loaded stayed ACTIVE after the purge and went on banding
+  // real people against a reference group that had been deleted as
+  // fabricated — reported as a stanine, not a provisional band. Measured: a
+  // real candidate moved from band 9 to band 2.
+  if (table.syntheticSampleSize > 0) {
+    return {
+      ok: false,
+      reason: `${table.syntheticSampleSize} of the ${table.sampleSize} cases behind this table are demo data. A norm table is the reference group every future candidate is compared against, so it cannot be built from people who do not exist. Purge the demo fixture and generate it again.`,
+    };
   }
   if (normGate(table.sampleSize) !== "ACTIVATABLE") {
     return {

@@ -82,19 +82,32 @@ async function main(): Promise<void> {
       ? `\n\nWhere: ${interview.meetingDetail}`
       : "";
 
+    // The day-before and the hour-before say different things.
+    //
+    // They shared one body, so when both fell due in the same run — which
+    // they will after any outage inside the lateness window — the candidate
+    // received the identical email twice, which reads as a mistake rather
+    // than as two reminders.
+    const imminent = reminder.kind === "CANDIDATE_HOUR_BEFORE";
     const payload = toCandidate
       ? {
           to: interview.application.candidate.email,
           template: "reminder" as const,
-          subject: `Reminder: your ${interview.title} with ${company}`,
+          subject: imminent
+            ? `Starting soon: your ${interview.title} with ${company}`
+            : `Tomorrow: your ${interview.title} with ${company}`,
           bodyText: [
             `Hello ${interview.application.candidate.firstName},`,
             "",
-            `This is a reminder about your ${interview.title} for ${interview.application.requisition.title}.`,
+            imminent
+              ? `Your ${interview.title} for ${interview.application.requisition.title} starts shortly.`
+              : `This is a reminder that your ${interview.title} for ${interview.application.requisition.title} is tomorrow.`,
             "",
             `When: ${when}`.concat(where),
             "",
-            "If you need to move or cancel it, use the same link you booked with.",
+            imminent
+              ? "If something has come up, use the same link you booked with and let us know — it is better than not appearing."
+              : "If you need to move or cancel it, use the same link you booked with.",
             "",
             company,
           ].join("\n"),

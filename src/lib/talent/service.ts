@@ -14,7 +14,10 @@ import { generateToken, hashToken } from "@/lib/crypto";
 import { createHash } from "crypto";
 import { normalizeEmail } from "@/lib/ats/dedupe";
 import {
+  askState,
+  canAppearInSearch,
   canContact,
+  CONSENT_REMINDER_DAYS,
   poolExpiryFrom,
   type ConsentStatus,
   type ProfileLike,
@@ -90,6 +93,24 @@ export async function inviteToPool(args: {
   }
   if (candidate.talentProfile?.consentStatus === "OPTED_IN") {
     return { error: "This person has already agreed to be kept in mind." };
+  }
+
+  // An outstanding ask is left alone until it has had time to lapse.
+  //
+  // Each invite writes a new token hash over the old one, so re-asking
+  // silently killed the link already sitting in the candidate's inbox: they
+  // clicked what we actually sent them and got a bare "that link is not
+  // valid". It also reset `consentAskedAt`, which is what askState() measures
+  // from, so a repeatedly re-asked profile could be held at FRESH forever and
+  // never lapse.
+  const outstanding = candidate.talentProfile;
+  if (outstanding && askState(outstanding) === "FRESH") {
+    const days = Math.ceil(
+      (Date.now() - (outstanding.consentAskedAt?.getTime() ?? 0)) / 86_400_000,
+    );
+    return {
+      error: `We already asked ${days <= 1 ? "today" : `${days} days ago`} and have not heard back. Asking again now would invalidate the link they were sent. The ask can be repeated once it has gone unanswered for ${CONSENT_REMINDER_DAYS} days.`,
+    };
   }
 
   const token = generateToken();
@@ -341,12 +362,20 @@ export interface TalentSearchFilters {
 }
 
 export async function searchTalent(filters: TalentSearchFilters, take = 100) {
-  const where: Prisma.TalentProfileWhereInput = {
-    // People who said no are not in the CRM's search at all. A recruiter
-    // should not be able to browse the list of people who declined.
-    consentStatus: filters.consentStatus
+  // People who said no are not in the CRM's search at all. A recruiter should
+  // not be able to browse the list of people who declined.
+  //
+  // Written as an AND rather than as a default, because a default is only a
+  // default: the request schema accepted `consentStatus: "OPTED_OUT"` and the
+  // filter then replaced the exclusion with a request for exactly the people
+  // it exists to hide. The UI never offered the option, but the API is where
+  // this is enforced.
+  const requestedStatus =
+    filters.consentStatus && filters.consentStatus !== "OPTED_OUT"
       ? filters.consentStatus
-      : { not: "OPTED_OUT" },
+      : undefined;
+  const where: Prisma.TalentProfileWhereInput = {
+    consentStatus: requestedStatus ?? { not: "OPTED_OUT" },
     ...(filters.tagIds && filters.tagIds.length > 0
       ? { tags: { some: { tagId: { in: filters.tagIds } } } }
       : {}),
@@ -378,7 +407,7 @@ export async function searchTalent(filters: TalentSearchFilters, take = 100) {
   // over the API to anyone who could run a search. It is a SHA-256 of a
   // 256-bit token and so cannot be replayed, but a secret-shaped field with
   // no reason to leave the server should not leave the server.
-  return prisma.talentProfile.findMany({
+  const rows = await prisma.talentProfile.findMany({
     where,
     select: {
       id: true,
@@ -404,6 +433,24 @@ export async function searchTalent(filters: TalentSearchFilters, take = 100) {
     orderBy: { updatedAt: "desc" },
     take,
   });
+
+  // The suppression list, applied to search as well.
+  //
+  // It is keyed on a hash of the email address precisely so it survives
+  // deletion of the profile row — which means a profile recreated for a
+  // suppressed address has a clean consentStatus and passes the query. The
+  // match path already checked this; search did not.
+  const suppressedKeys = new Set(
+    (
+      await prisma.talentSuppression.findMany({
+        where: { emailHash: { in: rows.map((r) => suppressionKey(r.candidate.email)) } },
+        select: { emailHash: true },
+      })
+    ).map((r) => r.emailHash),
+  );
+  return rows.filter((r) =>
+    canAppearInSearch(r, suppressedKeys.has(suppressionKey(r.candidate.email))),
+  );
 }
 
 /** Past applicants worth another look for a new opening. */

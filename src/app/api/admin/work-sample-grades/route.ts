@@ -72,6 +72,21 @@ export const POST = withErrorHandling(async (req) => {
     );
   }
 
+  // A filed grade is never dropped back to a draft.
+  //
+  // `reconciled: true, submit: false` took the upsert's update branch, which
+  // set the row back to DRAFT, nulled `submittedAt` and deleted every rating
+  // — while `refreshGradedStatus` and the audit call, both behind
+  // `if (body.submit)`, did not run. So a grade could be wiped with the
+  // assignment still reading GRADED and nothing in the log, by a grader who
+  // had already seen the other grade because filing is what opens the blind.
+  if (existing?.status === "SUBMITTED" && !body.submit) {
+    return apiError(
+      "A filed grade cannot be turned back into a draft. Revise it and file it again — the record has to show what you concluded, not that you withdrew it.",
+      409,
+    );
+  }
+
   const ratings = (body.ratings ?? [])
     .filter((r) => criteria.some((c) => c.id === r.criterionId))
     .map((r) => ({ ...r, note: r.note ?? null }));
@@ -119,7 +134,7 @@ export const POST = withErrorHandling(async (req) => {
     return saved;
   });
 
-  if (body.submit) {
+  if (body.submit || existing?.status === "SUBMITTED") {
     await refreshGradedStatus(assignment.id);
     await audit({
       userId: user.id,

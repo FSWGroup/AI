@@ -39,24 +39,50 @@ const jsonSchema = z.discriminatedUnion("action", [
 ]);
 
 /**
- * The gate both handlers open with.
+ * Two different gates, because two different things are being asked for.
  *
- * MANAGE_INTERVIEWS says you run interviews; it does not say you may listen
- * to one. Recording access is read from OrgSettings.recordingAccessRoles
- * exactly as it is for assessment recordings, because a room the candidate
- * agreed to record for a hiring decision is not a room every interviewer in
- * the company may replay. And the job scope answers "whose interview?" —
- * without it a hiring manager holds MANAGE_INTERVIEWS over every requisition
- * in the business, including the verbatim quotes pulled from the transcript.
+ * ACCESS is about reading or handling the recording: the audio, the
+ * transcript, the extracted quotes, destroying any of it. That is read from
+ * OrgSettings.recordingAccessRoles exactly as it is for assessment
+ * recordings, because a room the candidate agreed to record for a hiring
+ * decision is not a room every interviewer in the company may replay. The job
+ * scope answers "whose interview?" — without it a hiring manager holds
+ * MANAGE_INTERVIEWS over every requisition in the business.
  *
- * A mistyped id is a 404, never a 500.
+ * PARTICIPATION is answering for yourself about being recorded, and it must
+ * never be gated on media access. A hiring manager is not in the default
+ * recordingAccessRoles and is very often on the panel; putting their own
+ * consent behind that permission made the all-party gate unsatisfiable for
+ * every interview they sit on — nobody could grant, so nothing could ever be
+ * recorded — and, worse, stopped anyone who had already agreed from
+ * withdrawing, against a statement that promises they can withdraw at any
+ * point.
+ *
+ * A mistyped id is a 404 from either gate, never a 500.
  */
-async function guardInterview(user: User, interviewId: string) {
-  const [found, settings] = await Promise.all([
-    prisma.interview.findUnique({ where: { id: interviewId }, select: { id: true } }),
+async function requireInterviewExists(interviewId: string) {
+  const found = await prisma.interview.findUnique({
+    where: { id: interviewId },
+    select: { id: true },
+  });
+  return found ? null : apiError("That interview does not exist.", 404);
+}
+
+/** Answering for yourself. Scope only — no media-access requirement. */
+async function guardParticipation(user: User, interviewId: string) {
+  const missing = await requireInterviewExists(interviewId);
+  if (missing) return missing;
+  await assertInterviewAccess(user, interviewId);
+  return null;
+}
+
+/** Reading or handling the recording itself. */
+async function guardRecordingAccess(user: User, interviewId: string) {
+  const [missing, settings] = await Promise.all([
+    requireInterviewExists(interviewId),
     prisma.orgSettings.findUnique({ where: { id: "org" } }),
   ]);
-  if (!found) return apiError("That interview does not exist.", 404);
+  if (missing) return missing;
   if (
     !canAccessRecordings(
       user.role,
@@ -72,8 +98,16 @@ async function guardInterview(user: User, interviewId: string) {
 export const GET = withErrorHandling(async (_req, ctx) => {
   const user = await requirePermission("MANAGE_INTERVIEWS");
   const { interviewId } = await ctx.params;
-  const denied = await guardInterview(user, interviewId);
+  // A participant needs to see the consent state to answer at all, so this
+  // read is behind the participation gate; the recording's own contents are
+  // withheld separately below.
+  const denied = await guardParticipation(user, interviewId);
   if (denied) return denied;
+  const settings = await prisma.orgSettings.findUnique({ where: { id: "org" } });
+  const mayAccessRecording = canAccessRecordings(
+    user.role,
+    settings?.recordingAccessRoles ?? ["SUPER_ADMIN", "HR_ADMIN"],
+  );
 
   // Count the transcript rather than loading it. This response reports a
   // number and a boolean about the segments and shows none of them, and the
@@ -108,24 +142,32 @@ export const GET = withErrorHandling(async (_req, ctx) => {
         isMe: p.userId === user.id,
       };
     }),
-    recording: recording
-      ? {
-          status: recording.status,
-          fileName: recording.fileName,
-          durationSeconds: recording.durationSeconds,
-          transcriptSource: recording.transcriptSource,
-          segmentCount,
-          hasTimestamps: timestamped > 0,
-          evidence: recording.evidence.map((e) => ({
-            id: e.id,
-            competencyName: e.competencyName,
-            quote: e.quote,
-            startMs: e.startMs,
-            relevance: e.relevance,
-            dismissedAt: e.dismissedAt,
-          })),
-        }
-      : null,
+    // A panelist who is not cleared for recordings still needs to know
+    // whether this one is running — they must not describe an interview as
+    // recorded when it is not — and nothing beyond that. The verbatim quotes
+    // in particular are the transcript in another form.
+    mayAccessRecording,
+    recording:
+      recording && mayAccessRecording
+        ? {
+            status: recording.status,
+            fileName: recording.fileName,
+            durationSeconds: recording.durationSeconds,
+            transcriptSource: recording.transcriptSource,
+            segmentCount,
+            hasTimestamps: timestamped > 0,
+            evidence: recording.evidence.map((e) => ({
+              id: e.id,
+              competencyName: e.competencyName,
+              quote: e.quote,
+              startMs: e.startMs,
+              relevance: e.relevance,
+              dismissedAt: e.dismissedAt,
+            })),
+          }
+        : recording
+          ? { status: recording.status, evidence: [] }
+          : null,
     aiConfigured: isAiConfigured(),
   });
 });
@@ -133,12 +175,14 @@ export const GET = withErrorHandling(async (_req, ctx) => {
 export const POST = withErrorHandling(async (req, ctx) => {
   const user = await requirePermission("MANAGE_INTERVIEWS");
   const { interviewId } = await ctx.params;
-  const denied = await guardInterview(user, interviewId);
+  const denied = await guardParticipation(user, interviewId);
   if (denied) return denied;
   const contentType = req.headers.get("content-type") ?? "";
 
   // ---- Audio upload ---------------------------------------------------------
   if (contentType.includes("multipart/form-data")) {
+    const blocked = await guardRecordingAccess(user, interviewId);
+    if (blocked) return blocked;
     const form = await req.formData();
     const file = form.get("file");
     if (!file || typeof file === "string") return apiError("No file was sent.", 400);
@@ -187,6 +231,8 @@ export const POST = withErrorHandling(async (req, ctx) => {
       return apiOk({ ok: true });
     }
     case "transcript": {
+      const blocked = await guardRecordingAccess(user, interviewId);
+      if (blocked) return blocked;
       const out = await storeTranscript({
         interviewId,
         raw: body.text,
@@ -196,6 +242,8 @@ export const POST = withErrorHandling(async (req, ctx) => {
       return apiOk(out);
     }
     case "analyze": {
+      const blocked = await guardRecordingAccess(user, interviewId);
+      if (blocked) return blocked;
       if (!isAiConfigured()) {
         return apiError("AI analysis is not configured on this instance.", 503);
       }
@@ -204,6 +252,8 @@ export const POST = withErrorHandling(async (req, ctx) => {
       return apiOk(out);
     }
     case "destroy": {
+      const blocked = await guardRecordingAccess(user, interviewId);
+      if (blocked) return blocked;
       await destroyRecording(interviewId, `deleted by ${user.name}`);
       return apiOk({ ok: true });
     }

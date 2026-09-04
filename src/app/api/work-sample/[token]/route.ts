@@ -66,7 +66,12 @@ export const GET = withErrorHandling(async (_req, ctx) => {
     // beforehand turns a timed task into an untimed one for anyone who reads
     // the page and comes back later.
     instructions: assignment.startedAt ? assignment.workSample.instructions : null,
-    successCriteria: assignment.workSample.successCriteria,
+    // Withheld alongside the instructions, not before them. For most tasks
+    // the success criteria ARE the marking key in prose, so serving them
+    // early gave away most of what withholding the instructions was for.
+    successCriteria: assignment.startedAt
+      ? assignment.workSample.successCriteria
+      : null,
     submissionKind: assignment.workSample.submissionKind,
     allowedFileTypes: assignment.workSample.allowedFileTypes,
     timeLimitMinutes: assignment.workSample.timeLimitMinutes,
@@ -136,7 +141,14 @@ export const POST = withErrorHandling(async (req, ctx) => {
       text,
       file: filePayload,
     });
-    if (!result.ok) return apiError(result.errors.join(" "), 422);
+    if (!result.ok) {
+      // A closed assignment is a state conflict, like the save path already
+      // reports; only a failed content check is a 422.
+      const closed = result.errors.some((e) =>
+        /not open for submission|already been submitted|no longer active/i.test(e),
+      );
+      return apiError(result.errors.join(" "), closed ? 409 : 422);
+    }
     return apiOk({ status: "SUBMITTED" });
   }
 
