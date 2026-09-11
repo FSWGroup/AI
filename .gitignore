@@ -1,0 +1,13 @@
+node_modules
+dist
+dist-ssr
+*.local
+.env
+.env.*
+.netlify
+coverage
+.DS_Store
+# Never commit Order Tracker workbooks or exports containing customer data
+*.xlsx
+*.xls
+*.csv
