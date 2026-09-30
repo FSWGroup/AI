@@ -1,0 +1,50 @@
+@import "tailwindcss";
+
+:root {
+  --bg: #f4f5f7;
+  --panel: #ffffff;
+  --ink: #16191f;
+  --muted: #5d6572;
+  --line: #d9dde3;
+  --accent: #1f4e8c;
+  --ok: #1e7f4d;
+  --warn: #a15c00;
+  --bad: #b3261e;
+}
+
+html { font-size: 13px; }
+body { background: var(--bg); color: var(--ink); font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif; }
+code, .mono, kbd, pre { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace; }
+
+a { color: var(--accent); }
+a:hover { text-decoration: underline; }
+
+h1 { font-size: 1.35rem; font-weight: 600; letter-spacing: -0.01em; }
+h2 { font-size: 1rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.04em; color: var(--muted); }
+h3 { font-size: 0.95rem; font-weight: 600; }
+
+.panel { background: var(--panel); border: 1px solid var(--line); border-radius: 4px; }
+.panel-head { border-bottom: 1px solid var(--line); padding: 0.5rem 0.75rem; display: flex; align-items: center; justify-content: space-between; gap: 0.5rem; }
+.panel-body { padding: 0.75rem; }
+
+table.data { width: 100%; border-collapse: collapse; font-size: 12.5px; }
+table.data th { text-align: left; font-weight: 600; color: var(--muted); font-size: 11px; text-transform: uppercase; letter-spacing: 0.04em; padding: 0.35rem 0.5rem; border-bottom: 1px solid var(--line); background: #f8f9fb; white-space: nowrap; }
+table.data td { padding: 0.35rem 0.5rem; border-bottom: 1px solid #eceef2; vertical-align: top; }
+table.data tr:hover td { background: #f7f9fc; }
+table.data td.num, table.data th.num { text-align: right; font-variant-numeric: tabular-nums; }
+
+input[type=text], input[type=number], input[type=search], textarea, select {
+  border: 1px solid var(--line); border-radius: 3px; padding: 0.35rem 0.5rem; background: #fff; font-size: 13px; color: var(--ink);
+}
+input:focus, textarea:focus, select:focus { outline: 2px solid #9db8dd; outline-offset: 0; }
+.btn { display: inline-flex; align-items: center; gap: 0.3rem; border: 1px solid var(--accent); background: var(--accent); color: #fff; border-radius: 3px; padding: 0.35rem 0.7rem; font-size: 12.5px; font-weight: 500; cursor: pointer; }
+.btn:hover { background: #17417a; text-decoration: none; }
+.btn.secondary { background: #fff; color: var(--accent); }
+.btn.secondary:hover { background: #eef3fa; }
+.btn.danger { background: #fff; color: var(--bad); border-color: var(--bad); }
+.btn.small { padding: 0.15rem 0.45rem; font-size: 11.5px; }
+
+details > summary { cursor: pointer; color: var(--accent); }
+.kv { display: grid; grid-template-columns: max-content 1fr; gap: 0.2rem 0.9rem; font-size: 12.5px; }
+.kv dt { color: var(--muted); }
+.abstain { border-left: 4px solid var(--bad); background: #fff4f3; padding: 0.6rem 0.8rem; font-weight: 600; }
