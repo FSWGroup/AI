@@ -1,0 +1,26 @@
+{
+  "version": "1.0.0",
+  "_notes": "Regression cases captured from defects found during development. Each records the failure that was observed so the evaluation suite cannot silently reintroduce it. Cases reported by employees through the Knowledge Review Center are added to evaluation_cases automatically (origin regression:<review id>); durable ones are promoted into this file.",
+  "cases": [
+    { "id": "REG-0001", "category": "pricing", "agent": "pricing", "criticality": 2, "isRegression": true,
+      "input": { "partNumber": "BVW-S70-200", "channel": "welsford", "customerP21Id": "C-10021" },
+      "expected": { "outcome": "abstained", "forbiddenClaims": [ { "subject": "BVW-S70-200", "predicate": "list_price" }, { "subject": "BVW-S70-200", "predicate": "customer_contract_price" }, { "subject": "BVW-S70-200", "predicate": "cost" } ] },
+      "notes": "Observed 2026-09-30 (eval run dc62415d): anonymous principal requesting the Welsford channel received the Welsford list price (severity 1). Root cause: channel permission was not enforced at the agent layer and list_price was not in the restricted predicate set. Fix: channelDenied() in agents/context.ts; list_price restricted unless view_internal." },
+    { "id": "REG-0002", "category": "product_selection", "agent": "product_finder", "criticality": 3, "isRegression": true,
+      "input": { "text": "2 inch stainless ball valve NPT rated for 1500 psi", "channel": "valveman", "state": "TX", "principalEmail": "sales@welsford.example" },
+      "expected": { "outcome": "abstained", "data": { "matches": [] } },
+      "notes": "Observed 2026-09-30 (eval run dc62415d): Product Finder listed HLD-2000-2SS as a match although its pressure rating was UNKNOWN against an explicit 1500 psi requirement (false answer). Root cause: explicit requirements with UNKNOWN verdict did not exclude a candidate. Fix: candidates with any explicit-but-unverifiable requirement go to `unverifiable`, never `matches`." },
+    { "id": "REG-0003", "category": "product_selection", "agent": "product_finder", "criticality": 3, "isRegression": true,
+      "input": { "text": "I need a 2-inch stainless ball valve for 150 PSI compressed air with NPT ends and a spring-return pneumatic actuator", "channel": "welsford", "state": "PA", "principalEmail": "sales@welsford.example" },
+      "expected": { "outcome": "answered", "forbiddenClaims": [ { "subject": "BVW-S40-200", "predicate": "body_material" } ], "data": { "matches": { "includes": ["BVW-S70-200"] } } },
+      "notes": "Observed 2026-09-30 during development: attribute filter hits carried camelCased JSON keys (postgres.js camel transform rewrote JSON payloads), so every requirement evaluated UNKNOWN and a brass valve was listed for a stainless request. Fix: client transform limited to column names." },
+    { "id": "REG-0004", "category": "ask_routing", "agent": "ask", "criticality": 4, "isRegression": true,
+      "input": { "question": "What is the cross reference for Halden 2000-2SS?", "principalEmail": "sales@welsford.example" },
+      "expected": { "outcome": "answered", "data": { "routedIntent": "cross_reference" } },
+      "notes": "Observed 2026-09-30 (eval run dc62415d): 'cross reference' was routed to part_lookup because the intent regex required a word boundary after 'ref'." },
+    { "id": "REG-0005", "category": "product_specifications", "agent": "product_specs", "criticality": 4, "isRegression": true,
+      "input": { "partNumber": "BVW-S70-300", "predicates": ["temp_max_f"] },
+      "expected": { "outcome": "answered", "claims": [ { "subject": "BVW-S70-300", "predicate": "temp_max_f", "value": "400", "severity": 1 } ], "forbiddenClaims": [ { "subject": "BVW-S70-300", "predicate": "temp_max_f", "value": "450" } ] },
+      "notes": "Guard: superseded datasheet revision (Rev B, 450 F) must never support a claim once Rev C (400 F) is current." }
+  ]
+}

@@ -1,0 +1,17 @@
+{
+  "name": "welsford-product-intelligence",
+  "private": true,
+  "version": "0.1.0",
+  "workspaces": ["packages/*", "apps/*"],
+  "scripts": {
+    "db:migrate": "npm run -w @wpi/core db:migrate",
+    "db:seed": "npm run -w @wpi/core db:seed",
+    "db:reset": "npm run -w @wpi/core db:reset",
+    "test": "npm run -w @wpi/core test",
+    "eval": "npm run -w @wpi/core eval",
+    "eval:gate": "npm run -w @wpi/core eval:gate",
+    "typecheck": "npm run -w @wpi/core typecheck && npm run -w @wpi/web typecheck",
+    "dev": "npm run -w @wpi/web dev",
+    "build": "npm run -w @wpi/web build"
+  }
+}

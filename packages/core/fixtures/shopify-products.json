@@ -1,0 +1,60 @@
+{
+  "_fixture_notice": "DEVELOPMENT FIXTURE. Shaped like the Shopify Admin REST API `products` payload. Not real ValveMan data.",
+  "products": [
+    { "id": 9100000001, "title": "Bramwell Series 70 Stainless Steel Ball Valve, NPT", "body_html": "<p>Two-piece 316 stainless steel full-port ball valve with PTFE seats. 1000 WOG. ISO 5211 mounting pad for direct-mount automation.</p>", "vendor": "Bramwell Valve Works", "product_type": "Ball Valves", "handle": "bramwell-series-70-stainless-ball-valve", "status": "active", "tags": "Ball Valve, Stainless, NPT, Direct Mount", "published_at": "2024-01-10T12:00:00Z", "updated_at": "2026-09-28T04:45:00Z",
+      "options": [{ "name": "Size", "values": ["1/2\"", "3/4\"", "1\"", "1-1/2\"", "2\"", "3\""] }],
+      "variants": [
+        { "id": 9200000001, "sku": "BVW-S70-050", "title": "1/2\"", "option1": "1/2\"", "price": "78.50", "compare_at_price": null, "inventory_quantity": 120, "inventory_management": "shopify", "inventory_policy": "deny", "weight": 0.9, "weight_unit": "lb", "barcode": "" },
+        { "id": 9200000002, "sku": "BVW-S70-075", "title": "3/4\"", "option1": "3/4\"", "price": "96.00", "compare_at_price": null, "inventory_quantity": 88, "inventory_management": "shopify", "inventory_policy": "deny", "weight": 1.3, "weight_unit": "lb", "barcode": "" },
+        { "id": 9200000003, "sku": "BVW-S70-100", "title": "1\"", "option1": "1\"", "price": "199.00", "compare_at_price": "215.00", "inventory_quantity": 54, "inventory_management": "shopify", "inventory_policy": "deny", "weight": 1.9, "weight_unit": "lb", "barcode": "" },
+        { "id": 9200000004, "sku": "BVW-S70-150", "title": "1-1/2\"", "option1": "1-1/2\"", "price": "205.00", "compare_at_price": null, "inventory_quantity": 21, "inventory_management": "shopify", "inventory_policy": "deny", "weight": 4.2, "weight_unit": "lb", "barcode": "" },
+        { "id": 9200000005, "sku": "BVW-S70-200", "title": "2\"", "option1": "2\"", "price": "249.00", "compare_at_price": null, "inventory_quantity": 36, "inventory_management": "shopify", "inventory_policy": "deny", "weight": 6.1, "weight_unit": "lb", "barcode": "" },
+        { "id": 9200000006, "sku": "BVW-S70-300", "title": "3\"", "option1": "3\"", "price": "612.00", "compare_at_price": null, "inventory_quantity": 4, "inventory_management": "shopify", "inventory_policy": "continue", "weight": 14.8, "weight_unit": "lb", "barcode": "" }
+      ],
+      "images": [{ "id": 9300000001, "src": "fixture://images/bvw-s70.png", "alt": "Bramwell Series 70" }],
+      "metafields": [{ "namespace": "specs", "key": "pressure_rating", "value": "1000 WOG", "type": "single_line_text_field" }, { "namespace": "specs", "key": "body_material", "value": "316 Stainless Steel", "type": "single_line_text_field" }]
+    },
+    { "id": 9100000002, "title": "Bramwell Series 70 2\" Stainless Steel Ball Valve, NPT, FKM Seals", "body_html": "<p>Series 70 with FKM stem seals for chemical service.</p>", "vendor": "Bramwell Valve Works", "product_type": "Ball Valves", "handle": "bramwell-series-70-2in-fkm", "status": "active", "tags": "Ball Valve, Stainless, NPT", "published_at": "2024-05-10T12:00:00Z", "updated_at": "2026-09-28T04:45:00Z",
+      "options": [{ "name": "Title", "values": ["Default Title"] }],
+      "variants": [{ "id": 9200000007, "sku": "BVW-S70-200-V", "title": "Default Title", "option1": "Default Title", "price": "289.00", "compare_at_price": null, "inventory_quantity": 8, "inventory_management": "shopify", "inventory_policy": "deny", "weight": 6.1, "weight_unit": "lb", "barcode": "" }],
+      "images": [], "metafields": []
+    },
+    { "id": 9100000003, "title": "Bramwell Series 40 Brass Ball Valve, NPT", "body_html": "<p>Two-piece forged brass full-port ball valve. Rated 800 WOG. Not for potable water.</p>", "vendor": "Bramwell Valve Works", "product_type": "Ball Valves", "handle": "bramwell-series-40-brass-ball-valve", "status": "active", "tags": "Ball Valve, Brass, NPT", "published_at": "2024-01-10T12:00:00Z", "updated_at": "2026-09-28T04:45:00Z",
+      "options": [{ "name": "Size", "values": ["3/4\"", "1\"", "2\""] }],
+      "variants": [
+        { "id": 9200000008, "sku": "BVW-S40-050", "title": "3/4\"", "option1": "3/4\"", "price": "24.90", "compare_at_price": null, "inventory_quantity": 300, "inventory_management": "shopify", "inventory_policy": "deny", "weight": 0.6, "weight_unit": "lb", "barcode": "" },
+        { "id": 9200000009, "sku": "BVW-S40-100", "title": "1\"", "option1": "1\"", "price": "39.90", "compare_at_price": null, "inventory_quantity": 210, "inventory_management": "shopify", "inventory_policy": "deny", "weight": 1.1, "weight_unit": "lb", "barcode": "" },
+        { "id": 9200000010, "sku": "BVW-S40-200", "title": "2\"", "option1": "2\"", "price": "92.00", "compare_at_price": null, "inventory_quantity": 40, "inventory_management": "shopify", "inventory_policy": "deny", "weight": 3.4, "weight_unit": "lb", "barcode": "" }
+      ],
+      "images": [], "metafields": [{ "namespace": "specs", "key": "pressure_rating", "value": "800 WOG", "type": "single_line_text_field" }]
+    },
+    { "id": 9100000004, "title": "Bramwell Series 90 Wafer Butterfly Valve, EPDM Seat", "body_html": "<p>Ductile iron wafer butterfly valve with 316SS disc and EPDM seat. Request a quote for pricing.</p>", "vendor": "Bramwell Valve Works", "product_type": "Butterfly Valves", "handle": "bramwell-series-90-wafer-butterfly", "status": "active", "tags": "Butterfly Valve, Wafer, RFQ", "published_at": "2024-01-10T12:00:00Z", "updated_at": "2026-09-28T04:45:00Z",
+      "options": [{ "name": "Size", "values": ["3\"", "4\""] }],
+      "variants": [
+        { "id": 9200000011, "sku": "BVW-S90-300", "title": "3\"", "option1": "3\"", "price": "0.00", "compare_at_price": null, "inventory_quantity": 6, "inventory_management": "shopify", "inventory_policy": "continue", "weight": 12.0, "weight_unit": "lb", "barcode": "" },
+        { "id": 9200000012, "sku": "BVW-S90-400", "title": "4\"", "option1": "4\"", "price": "0.00", "compare_at_price": null, "inventory_quantity": 2, "inventory_management": "shopify", "inventory_policy": "continue", "weight": 16.0, "weight_unit": "lb", "barcode": "" }
+      ],
+      "images": [], "metafields": []
+    },
+    { "id": 9100000005, "title": "Corvin RA Series Rack & Pinion Pneumatic Actuator", "body_html": "<p>Aluminum rack and pinion actuator. ISO 5211 and NAMUR interfaces.</p>", "vendor": "Corvin Actuation", "product_type": "Pneumatic Actuators", "handle": "corvin-ra-series-actuator", "status": "active", "tags": "Actuator, Pneumatic", "published_at": "2024-01-10T12:00:00Z", "updated_at": "2026-09-28T04:45:00Z",
+      "options": [{ "name": "Model", "values": ["RA-052 Double Acting", "RA-052 Spring Return", "RA-085 Double Acting", "RA-085 Spring Return"] }],
+      "variants": [
+        { "id": 9200000013, "sku": "CVA-RA-052-DA", "title": "RA-052 Double Acting", "option1": "RA-052 Double Acting", "price": "168.00", "compare_at_price": null, "inventory_quantity": 25, "inventory_management": "shopify", "inventory_policy": "deny", "weight": 3.1, "weight_unit": "lb", "barcode": "" },
+        { "id": 9200000014, "sku": "CVA-RA-052-SR", "title": "RA-052 Spring Return", "option1": "RA-052 Spring Return", "price": "214.00", "compare_at_price": null, "inventory_quantity": 14, "inventory_management": "shopify", "inventory_policy": "deny", "weight": 3.6, "weight_unit": "lb", "barcode": "" },
+        { "id": 9200000015, "sku": "CVA-RA-085-DA", "title": "RA-085 Double Acting", "option1": "RA-085 Double Acting", "price": "262.00", "compare_at_price": null, "inventory_quantity": 11, "inventory_management": "shopify", "inventory_policy": "deny", "weight": 5.9, "weight_unit": "lb", "barcode": "" },
+        { "id": 9200000016, "sku": "CVA-RA-085-SR", "title": "RA-085 Spring Return", "option1": "RA-085 Spring Return", "price": "338.00", "compare_at_price": null, "inventory_quantity": 0, "inventory_management": "shopify", "inventory_policy": "continue", "weight": 6.8, "weight_unit": "lb", "barcode": "" }
+      ],
+      "images": [], "metafields": []
+    },
+    { "id": 9100000006, "title": "Corvin Actuator Accessories", "body_html": "<p>NAMUR solenoids, limit switch boxes and mounting kits for Corvin RA actuators.</p>", "vendor": "Corvin Actuation", "product_type": "Actuator Accessories", "handle": "corvin-actuator-accessories", "status": "active", "tags": "Accessories", "published_at": "2024-01-10T12:00:00Z", "updated_at": "2026-09-28T04:45:00Z",
+      "options": [{ "name": "Item", "values": ["SOL-120 Solenoid 120VAC", "LS-2 Limit Switch Box", "BK-F07-S90 Bracket Kit", "FR-14 Filter Regulator"] }],
+      "variants": [
+        { "id": 9200000017, "sku": "CVA-SOL-120", "title": "SOL-120 Solenoid 120VAC", "option1": "SOL-120 Solenoid 120VAC", "price": "89.00", "compare_at_price": null, "inventory_quantity": 40, "inventory_management": "shopify", "inventory_policy": "deny", "weight": 0.8, "weight_unit": "lb", "barcode": "" },
+        { "id": 9200000018, "sku": "CVA-LS-2", "title": "LS-2 Limit Switch Box", "option1": "LS-2 Limit Switch Box", "price": "142.00", "compare_at_price": null, "inventory_quantity": 18, "inventory_management": "shopify", "inventory_policy": "deny", "weight": 1.2, "weight_unit": "lb", "barcode": "" },
+        { "id": 9200000019, "sku": "CVA-BK-F07-S90", "title": "BK-F07-S90 Bracket Kit", "option1": "BK-F07-S90 Bracket Kit", "price": "58.00", "compare_at_price": null, "inventory_quantity": 9, "inventory_management": "shopify", "inventory_policy": "deny", "weight": 2.0, "weight_unit": "lb", "barcode": "" },
+        { "id": 9200000020, "sku": "CVA-FR-14", "title": "FR-14 Filter Regulator", "option1": "FR-14 Filter Regulator", "price": "64.00", "compare_at_price": null, "inventory_quantity": 12, "inventory_management": "shopify", "inventory_policy": "deny", "weight": 1.0, "weight_unit": "lb", "barcode": "" }
+      ],
+      "images": [], "metafields": []
+    }
+  ]
+}

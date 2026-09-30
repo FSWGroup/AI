@@ -1,0 +1,6 @@
+node_modules
+.env
+.next
+dist
+eval/runs/*.json
+!eval/runs/.gitkeep
