@@ -26,7 +26,7 @@ export { askAgent, classify } from "./agents/ask.ts";
 export { detectConflicts, resolveConflict } from "./knowledge/conflicts.ts";
 export { rebuildAttributeProjection } from "./knowledge/projection.ts";
 export * from "./review/reviews.ts";
-export { runEvaluation, type EvalRunResult } from "./eval/runner.ts";
+export { runEvaluation, releaseGate, computeMetrics, type EvalRunResult, type EvalMetrics, type CaseResult } from "./eval/runner.ts";
 export { readGoldenFiles, loadGoldenDataset } from "./eval/dataset.ts";
 export { createShopifyConnector } from "./connectors/shopify.ts";
 export { createP21Connector } from "./connectors/p21.ts";

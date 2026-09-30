@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { releaseGate, type EvalMetrics } from "@wpi/core/src/eval/runner.ts";
+import { gateReasons as releaseGate, type EvalMetrics } from "@/lib/evals";
 import { db } from "@/lib/db";
 import { requireInternal } from "@/lib/guard";
 import { runEvaluationAction } from "@/app/actions/evaluations";

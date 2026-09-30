@@ -17,8 +17,13 @@ export function toCitation(e: EvidenceRow): Citation {
   return { sourceRecordId: e.sourceRecordId, label, sourceType: e.sourceType, authorityLevel: e.authorityLevel, isFixture: e.isFixture, supportingText: e.supportingText, documentTitle: e.documentTitle, documentNumber: e.documentNumber, revision: e.revision, pageNumber: e.pageNumber, recordLocator: e.recordLocator, asOf: e.lastVerifiedAt };
 }
 
+export interface AssertionWithEvidence {
+  id: string; subjectId: string; predicate: string; valueText: string | null; valueNumber: string | number | null; valueNumberMax: string | number | null; valueJson: unknown; unit: string | null;
+  status: string; criticality: number; effectiveDate: string | null; expiresAt: string | null; supersedesId: string | null; createdAt: string; updatedAt: string; evidence: Citation[];
+}
+
 /** Assertions for a set of subject ids with their evidence rows (any status). */
-export async function loadAssertionsWithEvidence(sql: Sql, subjectIds: string[]) {
+export async function loadAssertionsWithEvidence(sql: Sql, subjectIds: string[]): Promise<AssertionWithEvidence[]> {
   if (!subjectIds.length) return [];
   const rows = await sql`
     SELECT a.id, a.subject_id, a.predicate, a.value_text, a.value_number, a.value_number_max, a.value_json, a.unit, a.status, a.criticality, a.effective_date, a.expires_at, a.supersedes_id, a.created_at, a.updated_at,
@@ -34,7 +39,7 @@ export async function loadAssertionsWithEvidence(sql: Sql, subjectIds: string[])
     LEFT JOIN documents d ON d.id = dv.document_id
     WHERE a.subject_id = ANY(${subjectIds})
     GROUP BY a.id ORDER BY a.predicate, a.status, a.created_at DESC`;
-  return rows.map((r) => ({ ...r, evidence: (r.evidence as EvidenceRow[]).map(toCitation) }));
+  return rows.map((r) => ({ ...(r as unknown as Omit<AssertionWithEvidence, "evidence">), evidence: (r.evidence as EvidenceRow[]).map(toCitation) }));
 }
 
 export function assertionValue(a: { valueText?: string | null; valueNumber?: unknown; valueNumberMax?: unknown; valueJson?: unknown }): string {
